@@ -4,7 +4,7 @@
 
 ## Sobre o Projeto
 
-O **UniONG** é um sistema de gestão administrativa desenvolvido para pequenas Organizações Não Governamentais (ONGs). O objetivo é centralizar e facilitar as operações do dia a dia, oferecendo transparência financeira e controle eficiente dos recursos.
+O UniONG é um sistema de gestão administrativa desenvolvido para pequenas Organizações Não Governamentais (ONGs). O objetivo é centralizar e facilitar as operações do dia a dia, oferecendo transparência financeira e controle eficiente dos recursos.
 
 ### Funcionalidades principais
 
@@ -18,7 +18,7 @@ O **UniONG** é um sistema de gestão administrativa desenvolvido para pequenas 
 - **Portal de Transparência** — Página pública com dados anonimizados da organização
 - **Login com Google** — Autenticação via conta Google OAuth 2.0
 
-### Stack tecnológica
+### Stack 
 
 | Camada | Tecnologia |
 |---|---|
@@ -56,7 +56,7 @@ Antes de começar, certifique-se de ter instalado em sua máquina:
 
 ### 1. Clonando o Repositório
 
-Abra o terminal (PowerShell no Windows ou Bash no Linux/macOS), navegue até a pasta onde deseja salvar o projeto e execute:
+Abra o terminal (PowerShell), navegue até a pasta onde deseja salvar o projeto e execute:
 
 ```bash
 git clone https://github.com/maniglia-vithor/uniong.git
@@ -77,7 +77,7 @@ cd uniong
 CREATE DATABASE ong_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-4. Clique no botão **Execute** (ícone de raio ⚡) ou pressione `Ctrl+Enter`
+4. Clique no botão **Execute** ou pressione `Ctrl+Enter`
 
 #### Via linha de comando (CLI)
 
@@ -112,12 +112,6 @@ python -m venv venv
 > ```
 > Depois tente ativar novamente.
 
-**Linux / macOS (Bash):**
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
 Após ativar, o início do terminal deve exibir `(venv)` indicando que o ambiente está ativo.
 
 #### 3.2 Instalar as dependências Python
@@ -135,11 +129,6 @@ Duplique o arquivo de exemplo e renomeie-o:
 **Windows (PowerShell):**
 ```powershell
 Copy-Item .env.example .env
-```
-
-**Linux / macOS:**
-```bash
-cp .env.example .env
 ```
 
 Abra o arquivo `.env` em qualquer editor de texto e preencha os campos:
@@ -231,11 +220,6 @@ Este comando pode demorar alguns minutos na primeira execução. Ele baixa todas
 Copy-Item .env.example .env
 ```
 
-**Linux / macOS:**
-```bash
-cp .env.example .env
-```
-
 O arquivo `.env` do frontend contém o Client ID do Google OAuth. Para desenvolvimento inicial, pode ser deixado em branco — o login com Google simplesmente não funcionará, mas o login tradicional continuará funcionando.
 
 #### 4.4 Iniciar o servidor frontend
@@ -289,21 +273,6 @@ uniong/
 ├── .env.example            # Modelo de variáveis de ambiente
 └── .gitignore
 ```
-
----
-
-## Solução de Problemas Comuns
-
-**`ModuleNotFoundError` ao rodar o Django**
-→ Certifique-se de que o ambiente virtual está ativo (`(venv)` no início do terminal) e rode `pip install -r requirements.txt` novamente.
-
-**Erro de conexão com o banco de dados**
-→ Verifique se o MySQL Server está rodando e se as credenciais no `.env` estão corretas (usuário, senha e nome do banco).
-
-**`CORS` bloqueando requisições do frontend**
-→ Confirme que `CORS_ALLOWED_ORIGINS` no `.env` contém `http://localhost:5173`.
-
-**Porta 8000 ou 5173 já em uso**
 → Backend: `python manage.py runserver 8001` · Frontend: `npm run dev -- --port 5174`
 
 **`Set-ExecutionPolicy` necessário no PowerShell**
