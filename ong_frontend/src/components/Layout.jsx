@@ -1,0 +1,354 @@
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import {
+  LayoutDashboard, Megaphone, HandCoins, Users,
+  MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X,
+} from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import api from '../services/api'
+import logoIcon from '../assets/logo-icon-uniong.png.jpg'
+import RecordDetailDrawer from './RecordDetailDrawer'
+
+const navItems = [
+  { to: '/admin', label: 'Painel', icon: LayoutDashboard, end: true },
+  { to: '/admin/campanhas', label: 'Campanhas', icon: Megaphone },
+  { to: '/admin/doacoes', label: 'Doações', icon: HandCoins },
+  { to: '/admin/apoiadores', label: 'Apoiadores', icon: Users },
+  { to: '/admin/comunicacao', label: 'Comunicação', icon: MessageSquare },
+  { to: '/admin/custos', label: 'Custos', icon: Receipt },
+  { to: '/admin/relatorios', label: 'Relatórios', icon: BarChart3 },
+]
+
+const titulos = {
+  '/admin': { titulo: 'Painel Principal', sub: 'Visão geral da organização' },
+  '/admin/campanhas': { titulo: 'Campanhas', sub: 'Gerencie as campanhas de arrecadação' },
+  '/admin/doacoes': { titulo: 'Doações', sub: 'Histórico de doações' },
+  '/admin/apoiadores': { titulo: 'Apoiadores', sub: 'Gerencie os apoiadores' },
+  '/admin/comunicacao': { titulo: 'Comunicação', sub: 'Mensagens e notificações' },
+  '/admin/custos': { titulo: 'Custos', sub: 'Gestão de despesas e transparência financeira' },
+  '/admin/relatorios': { titulo: 'Relatórios', sub: 'Análises e exportações' },
+}
+
+const tipoCor = {
+  doacao: '#22c55e',
+  campanha: '#f97316',
+  apoiador: '#3b82f6',
+}
+
+function formatarTempo(isoStr) {
+  const diff = Math.floor((Date.now() - new Date(isoStr)) / 1000)
+  if (diff < 60) return 'agora mesmo'
+  if (diff < 3600) return `${Math.floor(diff / 60)}min atrás`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h atrás`
+  return `${Math.floor(diff / 86400)}d atrás`
+}
+
+function iniciais(nome = '') {
+  return nome.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()
+}
+
+const avatarCores = ['#0f4c5c', '#f97316', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6']
+function avatarCor(nome = '') {
+  let h = 0
+  for (let i = 0; i < nome.length; i++) h = (h + nome.charCodeAt(i)) % avatarCores.length
+  return avatarCores[h]
+}
+
+export default function Layout() {
+  const { pathname } = useLocation()
+  const { usuario, logout } = useAuth()
+  const navigate = useNavigate()
+  const paginaAtual = titulos[pathname] || titulos['/admin']
+
+  const [notificacoes, setNotificacoes] = useState([])
+  const [abaAtiva, setAbaAtiva] = useState('todas')
+  const [aberto, setAberto] = useState(false)
+  const [drawerTarget, setDrawerTarget] = useState(null)
+  const dropdownRef = useRef(null)
+
+  const naoLidas = notificacoes.filter(n => !n.lida).length
+
+  const buscarNotificacoes = useCallback(async () => {
+    try {
+      const { data } = await api.get('/notificacoes/?page_size=50')
+      setNotificacoes(data.results ?? data)
+    } catch { /* silencia erros de polling */ }
+  }, [])
+
+  useEffect(() => {
+    buscarNotificacoes()
+    const intervalo = setInterval(buscarNotificacoes, 20000)
+    return () => clearInterval(intervalo)
+  }, [buscarNotificacoes])
+
+  useEffect(() => {
+    function handleClickFora(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setAberto(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickFora)
+    return () => document.removeEventListener('mousedown', handleClickFora)
+  }, [])
+
+  async function marcarTodasLidas() {
+    await api.post('/notificacoes/marcar-todas-lidas/')
+    setNotificacoes(prev => prev.map(n => ({ ...n, lida: true })))
+  }
+
+  async function clicarNotificacao(n) {
+    // marca como lida
+    if (!n.lida) {
+      await api.patch(`/notificacoes/${n.id}/`, { lida: true })
+      setNotificacoes(prev => prev.map(x => x.id === n.id ? { ...x, lida: true } : x))
+    }
+    setAberto(false)
+    // abre drawer se tem target_type e target_id
+    if (n.target_type && n.target_id) {
+      setDrawerTarget({ type: n.target_type, id: n.target_id })
+    }
+  }
+
+  async function remover(e, id) {
+    e.stopPropagation()
+    await api.delete(`/notificacoes/${id}/`)
+    setNotificacoes(prev => prev.filter(n => n.id !== id))
+  }
+
+  function handleLogout() {
+    logout()
+    navigate('/login', { replace: true })
+  }
+
+  const lista = abaAtiva === 'nao_lidas'
+    ? notificacoes.filter(n => !n.lida)
+    : notificacoes
+
+  return (
+    <>
+      <div className="flex h-screen overflow-hidden">
+        {/* Sidebar */}
+        <aside className="w-64 flex-shrink-0 flex flex-col" style={{ backgroundColor: '#0f4c5c' }}>
+          {/* Branding */}
+          <div className="flex items-center gap-3 px-5 py-4 border-b border-white/10">
+            <img
+              src={logoIcon}
+              alt="UniONG"
+              className="w-9 h-9 rounded-lg object-contain flex-shrink-0"
+            />
+            <div>
+              <p className="text-white font-bold text-sm leading-tight">UniONG</p>
+              <p className="text-white/50 text-xs">Painel Administrativo</p>
+            </div>
+          </div>
+
+          {/* Nav */}
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+            {navItems.map(({ to, label, icon: Icon, end }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                className={({ isActive }) =>
+                  `relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                    isActive
+                      ? 'text-white'
+                      : 'text-white/55 hover:bg-white/10 hover:text-white'
+                  }`
+                }
+                style={({ isActive }) =>
+                  isActive ? { backgroundColor: 'rgba(249,115,22,0.22)' } : {}
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    {isActive && (
+                      <span
+                        className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full"
+                        style={{ backgroundColor: '#f97316' }}
+                      />
+                    )}
+                    <Icon size={18} style={isActive ? { color: '#f97316' } : {}} />
+                    {label}
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </nav>
+
+          {/* User */}
+          <div className="px-4 py-4 border-t border-white/10 space-y-1">
+            <div className="flex items-center gap-3 px-2 py-2">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ backgroundColor: '#f97316' }}>
+                {usuario?.username?.[0]?.toUpperCase() ?? 'U'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-xs font-medium truncate">{usuario?.username ?? 'Usuário'}</p>
+                <p className="text-white/40 text-xs">Administrador</p>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-white/10 transition-colors text-white/60 hover:text-white text-xs font-medium"
+            >
+              <LogOut size={14} />
+              Sair
+            </button>
+          </div>
+        </aside>
+
+        {/* Main */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Topbar */}
+          <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
+            <div>
+              <h1 className="text-base font-semibold text-slate-800">{paginaAtual.titulo}</h1>
+              <p className="text-xs text-slate-400">{paginaAtual.sub}</p>
+            </div>
+
+            {/* Bell */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setAberto(v => !v)}
+                className="relative p-2 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <Bell size={18} className="text-slate-500" />
+                {naoLidas > 0 && (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full text-[10px] font-bold text-white flex items-center justify-center px-1"
+                    style={{ backgroundColor: '#ef4444' }}
+                  >
+                    {naoLidas > 99 ? '99+' : naoLidas}
+                  </span>
+                )}
+              </button>
+
+              {/* Dropdown */}
+              {aberto && (
+                <div
+                  className="absolute right-0 top-11 w-96 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 flex flex-col overflow-hidden"
+                  style={{ maxHeight: '520px' }}
+                >
+                  {/* Header */}
+                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+                    <span className="font-semibold text-slate-800 text-sm">Notificações</span>
+                    {naoLidas > 0 && (
+                      <button
+                        onClick={marcarTodasLidas}
+                        className="flex items-center gap-1 text-xs font-medium transition-colors"
+                        style={{ color: '#0f4c5c' }}
+                      >
+                        <Check size={13} />
+                        Marcar todas como lidas
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Abas */}
+                  <div className="flex border-b border-slate-100 flex-shrink-0">
+                    {[
+                      { id: 'todas', label: 'Todas' },
+                      { id: 'nao_lidas', label: `Não lidas${naoLidas > 0 ? ` (${naoLidas})` : ''}` },
+                    ].map(aba => (
+                      <button
+                        key={aba.id}
+                        onClick={() => setAbaAtiva(aba.id)}
+                        className="flex-1 py-2 text-xs font-medium transition-colors border-b-2"
+                        style={{
+                          borderColor: abaAtiva === aba.id ? '#0f4c5c' : 'transparent',
+                          color: abaAtiva === aba.id ? '#0f4c5c' : '#94a3b8',
+                        }}
+                      >
+                        {aba.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Lista estilo Jira */}
+                  <div className="overflow-y-auto flex-1">
+                    {lista.length === 0 ? (
+                      <div className="py-12 text-center">
+                        <Bell size={32} className="mx-auto mb-3 text-slate-200" />
+                        <p className="text-sm text-slate-400">Nenhuma notificação</p>
+                      </div>
+                    ) : (
+                      lista.map(n => {
+                        const actor = n.actor_name || 'Sistema'
+                        const cor = avatarCor(actor)
+                        return (
+                          <button
+                            key={n.id}
+                            onClick={() => clicarNotificacao(n)}
+                            className="w-full text-left flex items-start gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors border-b border-slate-50 group relative"
+                            style={{ backgroundColor: n.lida ? '#fff' : '#f0f9ff' }}
+                          >
+                            {/* Avatar */}
+                            <div
+                              className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5"
+                              style={{ backgroundColor: cor }}
+                            >
+                              {iniciais(actor)}
+                            </div>
+
+                            {/* Texto */}
+                            <div className="flex-1 min-w-0 pr-4">
+                              <p className="text-xs text-slate-700 leading-snug">
+                                <span className="font-semibold text-slate-800">{actor}</span>
+                                {' '}
+                                {n.action_text || n.mensagem}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span
+                                  className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+                                  style={{
+                                    backgroundColor: `${tipoCor[n.tipo] ?? '#94a3b8'}20`,
+                                    color: tipoCor[n.tipo] ?? '#94a3b8',
+                                  }}
+                                >
+                                  {n.tipo}
+                                </span>
+                                <span className="text-[11px] text-slate-400">{formatarTempo(n.criada_em)}</span>
+                              </div>
+                            </div>
+
+                            {/* Indicador não lida */}
+                            {!n.lida && (
+                              <span
+                                className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1.5"
+                                style={{ backgroundColor: '#3b82f6' }}
+                              />
+                            )}
+
+                            {/* Botão remover */}
+                            <button
+                              onClick={e => remover(e, n.id)}
+                              className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-slate-200 transition-all"
+                            >
+                              <X size={12} className="text-slate-400" />
+                            </button>
+                          </button>
+                        )
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </header>
+
+          {/* Content */}
+          <main className="flex-1 overflow-y-auto p-6">
+            <Outlet context={{ openDrawer: setDrawerTarget }} />
+          </main>
+        </div>
+      </div>
+
+      {/* Record Detail Drawer */}
+      <RecordDetailDrawer
+        target={drawerTarget}
+        onClose={() => setDrawerTarget(null)}
+        onRefresh={() => {}}
+      />
+    </>
+  )
+}

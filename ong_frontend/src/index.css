@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  /* remove outline de foco em elementos SVG do Recharts */
+  .recharts-wrapper, .recharts-wrapper * {
+    outline: none !important;
+  }
+  body {
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    background-color: #f1f5f9;
+    color: #1e293b;
+  }
+}
