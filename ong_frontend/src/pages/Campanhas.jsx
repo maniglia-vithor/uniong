@@ -3,6 +3,7 @@ import { Pencil, Trash2, Plus } from 'lucide-react'
 import { useOutletContext } from 'react-router-dom'
 import Modal from '../components/Modal'
 import { Campo, Input, Select, BotaoSubmit, BotaoCancelar } from '../components/CampoForm'
+import CampoData from '../components/CampoData'
 import BadgeStatus from '../components/BadgeStatus'
 import BarraProgresso from '../components/BarraProgresso'
 import { getCampanhas, criarCampanha, atualizarCampanha, excluirCampanha } from '../services/api'
@@ -164,10 +165,10 @@ export default function Campanhas() {
             </Campo>
             <div className="grid grid-cols-2 gap-3">
               <Campo label="Data de início">
-                <Input name="data_inicio" type="date" value={form.data_inicio} onChange={onChange} required />
+                <CampoData name="data_inicio" value={form.data_inicio} onChange={onChange} required />
               </Campo>
               <Campo label="Data de encerramento">
-                <Input name="data_fim" type="date" value={form.data_fim} onChange={onChange} />
+                <CampoData name="data_fim" value={form.data_fim} onChange={onChange} />
               </Campo>
             </div>
             <Campo label="Status">

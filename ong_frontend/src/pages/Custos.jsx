@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2, TrendingDown, AlertCircle, Tag, ChevronUp, Chevro
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import Modal from '../components/Modal'
 import { Campo, Input, Select, BotaoSubmit, BotaoCancelar } from '../components/CampoForm'
+import CampoData from '../components/CampoData'
 import BadgeStatus from '../components/BadgeStatus'
 import TabelaVazia from '../components/TabelaVazia'
 import {
@@ -352,7 +353,7 @@ export default function Custos() {
                 <Input name="valor" type="number" min="0.01" step="0.01" value={form.valor} onChange={onChange} placeholder="0,00" required />
               </Campo>
               <Campo label="Vencimento">
-                <Input name="data_vencimento" type="date" value={form.data_vencimento} onChange={onChange} required />
+                <CampoData name="data_vencimento" value={form.data_vencimento} onChange={onChange} required />
               </Campo>
             </div>
 
@@ -374,7 +375,7 @@ export default function Custos() {
 
             {/* Data de pagamento */}
             <Campo label="Data de Pagamento (opcional)">
-              <Input name="data_pagamento" type="date" value={form.data_pagamento} onChange={onChange} />
+              <CampoData name="data_pagamento" value={form.data_pagamento} onChange={onChange} />
             </Campo>
 
             {/* Toggle Despesa Fixa */}

@@ -3,6 +3,7 @@ import { Pencil, Trash2, Plus } from 'lucide-react'
 import { useOutletContext } from 'react-router-dom'
 import Modal from '../components/Modal'
 import { Campo, Input, Select, BotaoSubmit, BotaoCancelar } from '../components/CampoForm'
+import CampoData from '../components/CampoData'
 import BadgeStatus from '../components/BadgeStatus'
 import TabelaVazia from '../components/TabelaVazia'
 import { getDoacoes, criarDoacao, atualizarDoacao, excluirDoacao, getApoiadores, getCampanhas } from '../services/api'
@@ -203,7 +204,7 @@ export default function Doacoes() {
                 <Input name="valor" type="number" min="0.01" step="0.01" value={form.valor} onChange={onChange} placeholder="0,00" required />
               </Campo>
               <Campo label="Data">
-                <Input name="data" type="date" value={form.data} onChange={onChange} required />
+                <CampoData name="data" value={form.data} onChange={onChange} required />
               </Campo>
             </div>
             <Campo label="Status">

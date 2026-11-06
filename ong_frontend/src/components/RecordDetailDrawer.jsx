@@ -5,6 +5,7 @@ import api from '../services/api'
 import BadgeStatus from './BadgeStatus'
 import BarraProgresso from './BarraProgresso'
 import { Campo, Input, Select } from './CampoForm'
+import CampoData from './CampoData'
 
 function formatBRL(v) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v ?? 0)
@@ -87,7 +88,7 @@ function EditDoacao({ record, apoiadores, campanhas, onSaved, onCancel }) {
             onChange={e => setForm(f => ({ ...f, valor: e.target.value }))} required />
         </Campo>
         <Campo label="Data">
-          <Input name="data" type="date" value={form.data}
+          <CampoData name="data" value={form.data}
             onChange={e => setForm(f => ({ ...f, data: e.target.value }))} required />
         </Campo>
       </div>
@@ -175,11 +176,11 @@ function EditCampanha({ record, onSaved, onCancel }) {
       </Campo>
       <div className="grid grid-cols-2 gap-3">
         <Campo label="Data de início">
-          <Input name="data_inicio" type="date" value={form.data_inicio}
+          <CampoData name="data_inicio" value={form.data_inicio}
             onChange={e => setForm(f => ({ ...f, data_inicio: e.target.value }))} required />
         </Campo>
         <Campo label="Encerramento">
-          <Input name="data_fim" type="date" value={form.data_fim}
+          <CampoData name="data_fim" value={form.data_fim}
             onChange={e => setForm(f => ({ ...f, data_fim: e.target.value }))} />
         </Campo>
       </div>
