@@ -1,6 +1,5 @@
-import { useEffect, useState, useMemo } from 'react'
-import { createPortal } from 'react-dom'
-import { Plus, Pencil, Trash2, TrendingDown, AlertCircle, Tag, ChevronUp, ChevronDown, ChevronsUpDown, X } from 'lucide-react'
+import { useEffect, useState, useMemo, useRef } from 'react'
+import { Plus, Pencil, Trash2, TrendingDown, AlertCircle, Tag, ChevronUp, ChevronDown, ChevronsUpDown, Paperclip, X, RefreshCw, Repeat } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import Modal from '../components/Modal'
 import { Campo, Input, Select, BotaoSubmit, BotaoCancelar } from '../components/CampoForm'
@@ -8,12 +7,12 @@ import BadgeStatus from '../components/BadgeStatus'
 import TabelaVazia from '../components/TabelaVazia'
 import {
   getDespesas, criarDespesa, atualizarDespesa, excluirDespesa,
-  getDespesasResumo, getDespesasPorCategoria,
+  removerAnexoDespesa, getDespesasResumo, getDespesasPorCategoria,
 } from '../services/api'
 
 const VAZIO = {
   descricao: '', valor: '', data_vencimento: '', data_pagamento: '',
-  categoria: 'outros', status: 'pendente',
+  categoria: 'outros', status: 'pendente', is_fixed: false, recurrence_period: 'mensal',
 }
 
 const CATEGORIAS = [
@@ -74,9 +73,11 @@ export default function Custos() {
   const [modal, setModal] = useState(false)
   const [editando, setEditando] = useState(null)
   const [form, setForm] = useState(VAZIO)
+  const [novosAnexos, setNovosAnexos] = useState([])
   const [salvando, setSalvando] = useState(false)
   const [sortCol, setSortCol] = useState(null)
   const [sortDir, setSortDir] = useState('asc')
+  const fileInputRef = useRef(null)
 
   const carregar = () => {
     setCarregando(true)
@@ -93,7 +94,12 @@ export default function Custos() {
 
   useEffect(() => { carregar() }, [])
 
-  function abrirNovo() { setEditando(null); setForm(VAZIO); setModal(true) }
+  function abrirNovo() {
+    setEditando(null)
+    setForm(VAZIO)
+    setNovosAnexos([])
+    setModal(true)
+  }
 
   function abrirEdicao(item) {
     setEditando(item)
@@ -104,20 +110,52 @@ export default function Custos() {
       data_pagamento: item.data_pagamento || '',
       categoria: item.categoria,
       status: item.status,
+      is_fixed: item.is_fixed ?? false,
+      recurrence_period: item.recurrence_period || 'mensal',
     })
+    setNovosAnexos([])
     setModal(true)
   }
 
-  function fechar() { setModal(false); setEditando(null) }
-  function onChange(e) { setForm((f) => ({ ...f, [e.target.name]: e.target.value })) }
+  function fechar() { setModal(false); setEditando(null); setNovosAnexos([]) }
+
+  function onChange(e) {
+    const { name, value, type, checked } = e.target
+    setForm((f) => ({ ...f, [name]: type === 'checkbox' ? checked : value }))
+  }
+
+  function onAddFiles(e) {
+    const files = Array.from(e.target.files)
+    setNovosAnexos((prev) => [...prev, ...files])
+    e.target.value = ''
+  }
+
+  function removerNovoAnexo(idx) {
+    setNovosAnexos((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  async function removerAnexoExistente(anexoId) {
+    if (!editando) return
+    await removerAnexoDespesa(editando.id, anexoId)
+    setEditando((prev) => ({ ...prev, anexos: prev.anexos.filter((a) => a.id !== anexoId) }))
+  }
 
   async function onSubmit(e) {
     e.preventDefault()
     setSalvando(true)
-    const payload = { ...form, data_pagamento: form.data_pagamento || null }
+    const fd = new FormData()
+    fd.append('descricao', form.descricao)
+    fd.append('valor', form.valor)
+    fd.append('data_vencimento', form.data_vencimento)
+    if (form.data_pagamento) fd.append('data_pagamento', form.data_pagamento)
+    fd.append('categoria', form.categoria)
+    fd.append('status', form.status)
+    fd.append('is_fixed', form.is_fixed ? 'true' : 'false')
+    if (form.is_fixed) fd.append('recurrence_period', form.recurrence_period)
+    novosAnexos.forEach((f) => fd.append('anexos', f))
     try {
-      if (editando) await atualizarDespesa(editando.id, payload)
-      else await criarDespesa(payload)
+      if (editando) await atualizarDespesa(editando.id, fd)
+      else await criarDespesa(fd)
       fechar()
       carregar()
     } catch { alert('Erro ao salvar. Verifique os dados.') }
@@ -301,11 +339,14 @@ export default function Custos() {
 
       {/* Modal CRUD */}
       {modal && (
-        <Modal titulo={editando ? 'Editar Despesa' : 'Novo Custo'} onFechar={fechar}>
+        <Modal titulo={editando ? 'Editar Despesa' : 'Registrar despesa'} onFechar={fechar}>
           <form onSubmit={onSubmit} className="space-y-4">
+            {/* Descrição */}
             <Campo label="Descrição">
               <Input name="descricao" value={form.descricao} onChange={onChange} placeholder="Ex: Aluguel do escritório" required />
             </Campo>
+
+            {/* Valor + Vencimento */}
             <div className="grid grid-cols-2 gap-3">
               <Campo label="Valor (R$)">
                 <Input name="valor" type="number" min="0.01" step="0.01" value={form.valor} onChange={onChange} placeholder="0,00" required />
@@ -314,6 +355,8 @@ export default function Custos() {
                 <Input name="data_vencimento" type="date" value={form.data_vencimento} onChange={onChange} required />
               </Campo>
             </div>
+
+            {/* Categoria + Status */}
             <div className="grid grid-cols-2 gap-3">
               <Campo label="Categoria">
                 <Select name="categoria" value={form.categoria} onChange={onChange}>
@@ -328,9 +371,118 @@ export default function Custos() {
                 </Select>
               </Campo>
             </div>
+
+            {/* Data de pagamento */}
             <Campo label="Data de Pagamento (opcional)">
               <Input name="data_pagamento" type="date" value={form.data_pagamento} onChange={onChange} />
             </Campo>
+
+            {/* Toggle Despesa Fixa */}
+            <div className="rounded-xl border border-slate-200 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, is_fixed: !f.is_fixed }))}
+                className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
+              >
+                <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                  <Repeat size={15} className="text-slate-400" />
+                  Despesa fixa
+                </div>
+                {/* Toggle visual */}
+                <div
+                  className="relative w-10 h-5 rounded-full transition-colors duration-200 flex-shrink-0"
+                  style={{ backgroundColor: form.is_fixed ? '#0f4c5c' : '#cbd5e1' }}
+                >
+                  <span
+                    className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200"
+                    style={{ transform: form.is_fixed ? 'translateX(20px)' : 'translateX(0)' }}
+                  />
+                </div>
+              </button>
+
+              {/* Seção de recorrência — expande quando is_fixed = true */}
+              {form.is_fixed && (
+                <div className="px-4 py-3 border-t border-slate-200 bg-white">
+                  <Campo label="Frequência de repetição">
+                    <Select name="recurrence_period" value={form.recurrence_period} onChange={onChange}>
+                      <option value="semanal">Semanal</option>
+                      <option value="mensal">Mensal</option>
+                      <option value="anual">Anual</option>
+                    </Select>
+                  </Campo>
+                  <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
+                    <RefreshCw size={11} />
+                    A próxima despesa será gerada automaticamente ao marcar esta como paga.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Anexos — estilo Jira */}
+            <div>
+              <p className="text-xs font-medium text-slate-600 mb-2">Anexos</p>
+
+              {/* Anexos já salvos (modo edição) */}
+              {editando?.anexos?.length > 0 && (
+                <div className="space-y-1 mb-2">
+                  {editando.anexos.map((a) => (
+                    <div key={a.id} className="flex items-center justify-between gap-2 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200">
+                      <a
+                        href={a.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-teal-700 hover:underline truncate flex items-center gap-1.5"
+                      >
+                        <Paperclip size={11} className="flex-shrink-0" />
+                        {a.nome_original}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => removerAnexoExistente(a.id)}
+                        className="text-slate-300 hover:text-red-500 transition-colors flex-shrink-0"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Novos arquivos selecionados */}
+              {novosAnexos.length > 0 && (
+                <div className="space-y-1 mb-2">
+                  {novosAnexos.map((f, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2 px-3 py-1.5 bg-blue-50 rounded-lg border border-blue-100">
+                      <span className="text-xs text-blue-700 truncate flex items-center gap-1.5">
+                        <Paperclip size={11} className="flex-shrink-0" />
+                        {f.name}
+                      </span>
+                      <button type="button" onClick={() => removerNovoAnexo(i)} className="text-blue-300 hover:text-red-500 transition-colors flex-shrink-0">
+                        <X size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Área de drop / botão */}
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="flex flex-col items-center justify-center gap-2 px-4 py-5 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 cursor-pointer transition-colors text-center"
+              >
+                <Paperclip size={18} className="text-slate-400" />
+                <span className="text-xs text-slate-500 font-medium">Adicionar anexo</span>
+                <span className="text-[11px] text-slate-400">Clique para selecionar arquivos</span>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={onAddFiles}
+              />
+            </div>
+
             <div className="flex gap-3 pt-2">
               <BotaoCancelar onClick={fechar} />
               <BotaoSubmit carregando={salvando} />

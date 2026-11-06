@@ -149,6 +149,11 @@ class Despesa(models.Model):
         ('pago', 'Pago'),
         ('atrasado', 'Atrasado'),
     ]
+    RECORRENCIA_CHOICES = [
+        ('mensal', 'Mensal'),
+        ('semanal', 'Semanal'),
+        ('anual', 'Anual'),
+    ]
 
     descricao = models.CharField(max_length=200)
     valor = models.DecimalField(max_digits=12, decimal_places=2)
@@ -156,6 +161,10 @@ class Despesa(models.Model):
     data_pagamento = models.DateField(null=True, blank=True)
     categoria = models.CharField(max_length=20, choices=CATEGORIA_CHOICES, default='outros')
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pendente')
+    is_fixed = models.BooleanField(default=False)
+    recurrence_period = models.CharField(
+        max_length=10, choices=RECORRENCIA_CHOICES, null=True, blank=True
+    )
 
     class Meta:
         verbose_name = 'Despesa'
@@ -169,8 +178,65 @@ class Despesa(models.Model):
             return 'atrasado'
         return self.status
 
+    def _proxima_data_vencimento(self):
+        from dateutil.relativedelta import relativedelta
+        if self.recurrence_period == 'mensal':
+            return self.data_vencimento + relativedelta(months=1)
+        if self.recurrence_period == 'semanal':
+            from datetime import timedelta
+            return self.data_vencimento + timedelta(weeks=1)
+        if self.recurrence_period == 'anual':
+            return self.data_vencimento + relativedelta(years=1)
+        return None
+
+    def gerar_proxima_recorrencia(self):
+        """Cria a próxima despesa recorrente se ainda não existir."""
+        if not self.is_fixed or not self.recurrence_period:
+            return
+        proxima = self._proxima_data_vencimento()
+        if proxima is None:
+            return
+        ja_existe = Despesa.objects.filter(
+            descricao=self.descricao,
+            is_fixed=True,
+            data_vencimento=proxima,
+        ).exists()
+        if not ja_existe:
+            Despesa.objects.create(
+                descricao=self.descricao,
+                valor=self.valor,
+                categoria=self.categoria,
+                data_vencimento=proxima,
+                status='pendente',
+                is_fixed=True,
+                recurrence_period=self.recurrence_period,
+            )
+
     def __str__(self):
         return f'{self.descricao} — R$ {self.valor}'
+
+
+class DespesaAnexo(models.Model):
+    despesa = models.ForeignKey(
+        Despesa, on_delete=models.CASCADE, related_name='anexos'
+    )
+    arquivo = models.FileField(upload_to='despesas/anexos/')
+    nome_original = models.CharField(max_length=255, blank=True)
+    enviado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Anexo de Despesa'
+        verbose_name_plural = 'Anexos de Despesa'
+        ordering = ['enviado_em']
+
+    def save(self, *args, **kwargs):
+        if not self.nome_original and self.arquivo:
+            import os
+            self.nome_original = os.path.basename(self.arquivo.name)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'Anexo de {self.despesa}'
 
 
 class Comunicado(models.Model):

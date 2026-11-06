@@ -1,6 +1,6 @@
 from django.db.models import Sum
 from rest_framework import serializers
-from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa
+from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo
 
 
 class ApoiadorSerializer(serializers.ModelSerializer):
@@ -42,15 +42,34 @@ class NotificacaoSerializer(serializers.ModelSerializer):
         read_only_fields = ['criada_em']
 
 
+class DespesaAnexoSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DespesaAnexo
+        fields = ['id', 'nome_original', 'url', 'enviado_em']
+
+    def get_url(self, obj):
+        request = self.context.get('request')
+        if obj.arquivo and request:
+            return request.build_absolute_uri(obj.arquivo.url)
+        return obj.arquivo.url if obj.arquivo else None
+
+
 class DespesaSerializer(serializers.ModelSerializer):
     status_efetivo = serializers.SerializerMethodField()
     categoria_display = serializers.CharField(source='get_categoria_display', read_only=True)
+    recurrence_period_display = serializers.CharField(
+        source='get_recurrence_period_display', read_only=True, default=None
+    )
+    anexos = DespesaAnexoSerializer(many=True, read_only=True)
 
     class Meta:
         model = Despesa
         fields = [
             'id', 'descricao', 'valor', 'data_vencimento', 'data_pagamento',
             'categoria', 'categoria_display', 'status', 'status_efetivo',
+            'is_fixed', 'recurrence_period', 'recurrence_period_display', 'anexos',
         ]
 
     def get_status_efetivo(self, obj):

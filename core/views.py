@@ -14,8 +14,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 
-from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa
-from .serializers import ApoiadorSerializer, CampanhaSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer
+from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo
+from .serializers import ApoiadorSerializer, CampanhaSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer
 
 
 def _notificar_admins(mensagem, tipo, actor_name='', action_text='', target_type='', target_id=None):
@@ -357,9 +357,14 @@ class DashboardViewSet(viewsets.ViewSet):
 
 
 class DespesaViewSet(viewsets.ModelViewSet):
-    queryset = Despesa.objects.all()
+    queryset = Despesa.objects.prefetch_related('anexos').all()
     serializer_class = DespesaSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['request'] = self.request
+        return ctx
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -370,6 +375,43 @@ class DespesaViewSet(viewsets.ModelViewSet):
         if categoria:
             qs = qs.filter(categoria=categoria)
         return qs
+
+    def _salvar_anexos(self, despesa, arquivos):
+        for arq in arquivos:
+            import os
+            anexo = DespesaAnexo(despesa=despesa, nome_original=arq.name)
+            anexo.arquivo = arq
+            anexo.save()
+
+    def perform_create(self, serializer):
+        despesa = serializer.save()
+        arquivos = self.request.FILES.getlist('anexos')
+        if arquivos:
+            self._salvar_anexos(despesa, arquivos)
+        # Gera primeira recorrência ao criar despesa fixa
+        if despesa.is_fixed and despesa.recurrence_period:
+            despesa.gerar_proxima_recorrencia()
+
+    def perform_update(self, serializer):
+        status_anterior = serializer.instance.status
+        despesa = serializer.save()
+        arquivos = self.request.FILES.getlist('anexos')
+        if arquivos:
+            self._salvar_anexos(despesa, arquivos)
+        # Gera próxima recorrência quando marcada como paga
+        if (status_anterior != 'pago' and despesa.status == 'pago'
+                and despesa.is_fixed and despesa.recurrence_period):
+            despesa.gerar_proxima_recorrencia()
+
+    @action(detail=True, methods=['delete'], url_path='anexos/(?P<anexo_id>[^/.]+)')
+    def remover_anexo(self, request, pk=None, anexo_id=None):
+        try:
+            anexo = DespesaAnexo.objects.get(pk=anexo_id, despesa_id=pk)
+            anexo.arquivo.delete(save=False)
+            anexo.delete()
+            return Response(status=204)
+        except DespesaAnexo.DoesNotExist:
+            return Response({'erro': 'Anexo não encontrado.'}, status=404)
 
     @action(detail=False, methods=['get'], url_path='resumo')
     def resumo(self, request):

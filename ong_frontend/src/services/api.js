@@ -68,11 +68,12 @@ export const atualizarDoacao       = (id, data) => api.put(`/doacoes/${id}/`, da
 export const excluirDoacao         = (id) => api.delete(`/doacoes/${id}/`)
 
 // Despesas
-export const getDespesas          = () => api.get('/despesas/')
-export const criarDespesa         = (data) => api.post('/despesas/', data)
-export const atualizarDespesa     = (id, data) => api.put(`/despesas/${id}/`, data)
-export const excluirDespesa       = (id) => api.delete(`/despesas/${id}/`)
-export const getDespesasResumo    = () => api.get('/despesas/resumo/')
+export const getDespesas             = () => api.get('/despesas/')
+export const criarDespesa            = (fd) => api.post('/despesas/', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+export const atualizarDespesa        = (id, fd) => api.put(`/despesas/${id}/`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+export const excluirDespesa          = (id) => api.delete(`/despesas/${id}/`)
+export const removerAnexoDespesa     = (despesaId, anexoId) => api.delete(`/despesas/${despesaId}/anexos/${anexoId}/`)
+export const getDespesasResumo       = () => api.get('/despesas/resumo/')
 export const getDespesasPorCategoria = () => api.get('/despesas/por-categoria/')
 
 // Comunicados
