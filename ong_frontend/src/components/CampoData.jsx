@@ -39,8 +39,8 @@ export default function CampoData({ name, value, onChange, required, placeholder
       locale="pt-BR"
       selected={isoParaDate(value)}
       onChange={handleChange}
-      dateFormat="dd/MM/yy"
-      placeholderText={placeholder ?? 'dd/mm/aa'}
+      dateFormat="dd/MM/yyyy"
+      placeholderText={placeholder ?? 'dd/mm/aaaa'}
       required={required}
       disabled={disabled}
       autoComplete="off"
