@@ -17,6 +17,12 @@ function iniciais(nome) {
   return nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 }
 
+function formatData(iso) {
+  if (!iso) return '—'
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}/${y}`
+}
+
 export default function Apoiadores() {
   const { openDrawer } = useOutletContext() ?? {}
   const [lista, setLista] = useState([])
@@ -138,7 +144,7 @@ export default function Apoiadores() {
                       </div>
                     </td>
                     <td className="px-5 py-3 text-slate-500">{a.email}</td>
-                    <td className="px-5 py-3 text-slate-500">{a.data_cadastro}</td>
+                    <td className="px-5 py-3 text-slate-500">{formatData(a.data_cadastro)}</td>
                     <td className="px-5 py-3 text-right font-semibold text-slate-700">{formatBRL(a.total_doado)}</td>
                     <td className="px-5 py-3"><BadgeStatus status={a.status} /></td>
                     <td className="px-5 py-3">
