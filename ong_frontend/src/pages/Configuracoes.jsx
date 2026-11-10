@@ -29,8 +29,8 @@ function Toggle({ checked, onChange }) {
 
 function Card({ title, children }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6 space-y-4">
-      {title && <h3 className="text-sm font-semibold text-slate-700">{title}</h3>}
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-6 space-y-4">
+      {title && <h3 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h3>}
       {children}
     </div>
   )
@@ -40,8 +40,8 @@ function Row({ label, desc, children }) {
   return (
     <div className="flex items-center justify-between gap-4 py-2">
       <div>
-        <p className="text-sm font-medium text-slate-700">{label}</p>
-        {desc && <p className="text-xs text-slate-400 mt-0.5">{desc}</p>}
+        <p className="text-sm font-medium text-[var(--text-primary)]">{label}</p>
+        {desc && <p className="text-xs text-[var(--text-muted)] mt-0.5">{desc}</p>}
       </div>
       <div className="flex-shrink-0">{children}</div>
     </div>
@@ -175,14 +175,14 @@ export default function Configuracoes() {
     }
   }
 
-  const inputCls = 'w-full px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500 bg-white text-slate-800'
+  const inputCls = 'w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500 bg-[var(--bg-input)] text-[var(--text-primary)]'
   const selectCls = inputCls
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="text-lg font-bold text-slate-800">Configurações</h1>
-        <p className="text-xs text-slate-400">Personalize o sistema e gerencie seu perfil</p>
+        <h1 className="text-lg font-bold text-[var(--text-primary)]">Configurações</h1>
+        <p className="text-xs text-[var(--text-muted)]">Personalize o sistema e gerencie seu perfil</p>
       </div>
 
       {/* Feedback global */}
@@ -242,7 +242,7 @@ export default function Configuracoes() {
                     ))}
                   </div>
                 </Row>
-                <div className="border-t border-slate-50" />
+                <div className="border-t border-[var(--border-subtle)]" />
                 <Row label="Densidade" desc="Espaçamento dos elementos">
                   <select value={densidade} onChange={e => setDensidade(e.target.value)} className={selectCls + ' w-auto'}>
                     <option value="compacto">Compacto</option>
@@ -250,7 +250,7 @@ export default function Configuracoes() {
                     <option value="grande">Grande</option>
                   </select>
                 </Row>
-                <div className="border-t border-slate-50" />
+                <div className="border-t border-[var(--border-subtle)]" />
                 <Row label="Idioma" desc="Idioma da interface">
                   <select value={idioma} onChange={e => setIdioma(e.target.value)} className={selectCls + ' w-auto'}>
                     <option value="pt-BR">Português (Brasil)</option>
@@ -277,16 +277,16 @@ export default function Configuracoes() {
               <Card title="Informações do perfil">
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Nome de exibição</label>
+                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Nome de exibição</label>
                     <input className={inputCls} value={nome} onChange={e => setNome(e.target.value)} placeholder="Seu nome" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">E-mail</label>
+                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">E-mail</label>
                     <input className={inputCls} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="seu@email.com" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Usuário (somente leitura)</label>
-                    <input className={inputCls + ' bg-slate-50 text-slate-400 cursor-not-allowed'} value={usuario?.username ?? ''} readOnly />
+                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Usuário (somente leitura)</label>
+                    <input className={inputCls + ' bg-[var(--bg-card-alt)] text-[var(--text-muted)] cursor-not-allowed'} value={usuario?.username ?? ''} readOnly />
                   </div>
                 </div>
               </Card>
@@ -294,7 +294,7 @@ export default function Configuracoes() {
               <Card title="Alterar senha">
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Senha atual</label>
+                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Senha atual</label>
                     <div className="relative">
                       <input
                         className={inputCls + ' pr-9'}
@@ -311,15 +311,15 @@ export default function Configuracoes() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-slate-500 mb-1">Nova senha</label>
+                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Nova senha</label>
                       <input className={inputCls} type="password" value={senhaNova} onChange={e => setSenhaNova(e.target.value)} placeholder="••••••••" autoComplete="new-password" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-slate-500 mb-1">Confirmar</label>
+                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Confirmar</label>
                       <input className={inputCls} type="password" value={senhaConf} onChange={e => setSenhaConf(e.target.value)} placeholder="••••••••" autoComplete="new-password" />
                     </div>
                   </div>
-                  <p className="text-[11px] text-slate-400">Deixe em branco para manter a senha atual.</p>
+                  <p className="text-[11px] text-[var(--text-muted)]">Deixe em branco para manter a senha atual.</p>
                 </div>
               </Card>
 
@@ -340,8 +340,8 @@ export default function Configuracoes() {
           {aba === 'notif' && (
             <>
               <Card title="Alertas em tempo real">
-                <p className="text-xs text-slate-400 -mt-2">Escolha quais eventos geram notificações no painel.</p>
-                <div className="divide-y divide-slate-50">
+                <p className="text-xs text-[var(--text-muted)] -mt-2">Escolha quais eventos geram notificações no painel.</p>
+                <div className="divide-y divide-[var(--border-subtle)]">
                   <Row label="Doações" desc="Nova doação registrada no sistema">
                     <Toggle checked={notifDoacoes} onChange={setNotifDoacoes} />
                   </Row>
@@ -381,7 +381,7 @@ export default function Configuracoes() {
               </Card>
 
               <Card title="Exportação de dados">
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-[var(--text-muted)]">
                   Exporta todos os registros de doações, membros e campanhas em formato JSON.
                 </p>
                 <button

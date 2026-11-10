@@ -29,8 +29,8 @@ function DetalheDoacao({ record, onEdit }) {
           {iniciais(record.apoiador_nome)}
         </div>
         <div>
-          <p className="font-semibold text-slate-800 text-base">{record.apoiador_nome}</p>
-          <p className="text-xs text-slate-400">Doador</p>
+          <p className="font-semibold text-[var(--text-primary)] text-base">{record.apoiador_nome}</p>
+          <p className="text-xs text-[var(--text-muted)]">Doador</p>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
@@ -101,7 +101,7 @@ function EditDoacao({ record, apoiadores, campanhas, onSaved, onCancel }) {
       </Campo>
       <div className="flex gap-3 pt-1">
         <button type="button" onClick={onCancel}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors">
           <XCircle size={14} /> Cancelar
         </button>
         <button type="submit" disabled={salvando}
@@ -119,16 +119,16 @@ function DetalheCampanha({ record, onEdit }) {
   return (
     <div className="space-y-5">
       <div>
-        <h3 className="font-semibold text-slate-800 text-base">{record.titulo}</h3>
-        <p className="text-xs text-slate-400 mt-0.5">{record.descricao || 'Sem descrição.'}</p>
+        <h3 className="font-semibold text-[var(--text-primary)] text-base">{record.titulo}</h3>
+        <p className="text-xs text-[var(--text-muted)] mt-0.5">{record.descricao || 'Sem descrição.'}</p>
       </div>
       <div>
-        <div className="flex justify-between mb-1.5 text-xs text-slate-500">
+        <div className="flex justify-between mb-1.5 text-xs text-[var(--text-secondary)]">
           <span>{formatBRL(record.valor_arrecadado)} arrecadados</span>
           <span className="font-semibold" style={{ color: '#f97316' }}>{record.percentual_progresso}%</span>
         </div>
         <BarraProgresso percentual={record.percentual_progresso} cor="#f97316" />
-        <p className="text-xs text-slate-400 mt-1">Meta: {formatBRL(record.meta_valor)}</p>
+        <p className="text-xs text-[var(--text-muted)] mt-1">Meta: {formatBRL(record.meta_valor)}</p>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <InfoBox label="Status" value={<BadgeStatus status={record.status} />} />
@@ -194,11 +194,11 @@ function EditCampanha({ record, onSaved, onCancel }) {
       <Campo label="Descrição">
         <textarea name="descricao" value={form.descricao}
           onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))}
-          rows={3} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100 resize-none" />
+          rows={3} className="w-full px-3 py-2 text-sm border border-[var(--border)] bg-[var(--bg-input)] text-[var(--text-primary)] rounded-lg outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100 resize-none" />
       </Campo>
       <div className="flex gap-3 pt-1">
         <button type="button" onClick={onCancel}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors">
           <XCircle size={14} /> Cancelar
         </button>
         <button type="submit" disabled={salvando}
@@ -221,8 +221,8 @@ function DetalheApoiador({ record, onEdit }) {
           {iniciais(record.nome)}
         </div>
         <div>
-          <p className="font-semibold text-slate-800 text-base">{record.nome}</p>
-          <p className="text-xs text-slate-400">{record.email}</p>
+          <p className="font-semibold text-[var(--text-primary)] text-base">{record.nome}</p>
+          <p className="text-xs text-[var(--text-muted)]">{record.email}</p>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
@@ -269,7 +269,7 @@ function EditApoiador({ record, onSaved, onCancel }) {
       </Campo>
       <div className="flex gap-3 pt-1">
         <button type="button" onClick={onCancel}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors">
           <XCircle size={14} /> Cancelar
         </button>
         <button type="submit" disabled={salvando}
@@ -285,9 +285,9 @@ function EditApoiador({ record, onSaved, onCancel }) {
 // ── Caixa de info ────────────────────────────────────────────
 function InfoBox({ label, value, destaque }) {
   return (
-    <div className="bg-slate-50 rounded-lg px-3 py-2.5">
-      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-0.5">{label}</p>
-      <div className={`text-sm font-medium ${destaque ? 'text-teal-700' : 'text-slate-700'}`}>{value}</div>
+    <div className="bg-[var(--bg-card-alt)] rounded-lg px-3 py-2.5">
+      <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-0.5">{label}</p>
+      <div className={`text-sm font-medium ${destaque ? 'text-teal-700' : 'text-[var(--text-primary)]'}`}>{value}</div>
     </div>
   )
 }
@@ -349,11 +349,11 @@ export default function RecordDetailDrawer({ target, onClose, onRefresh }) {
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden max-h-[90vh]"
+        className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] flex-shrink-0">
           <div className="flex items-center gap-2">
             <span
               className="text-xs font-semibold px-2 py-0.5 rounded-full text-white"
@@ -361,11 +361,11 @@ export default function RecordDetailDrawer({ target, onClose, onRefresh }) {
             >
               {tituloMap[target.type]}
             </span>
-            <span className="text-sm font-semibold text-slate-700">
+            <span className="text-sm font-semibold text-[var(--text-primary)]">
               {editando ? `Editar ${tituloMap[target.type]}` : 'Detalhes'}
             </span>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600">
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)]">
             <X size={18} />
           </button>
         </div>

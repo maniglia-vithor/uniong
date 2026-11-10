@@ -150,13 +150,13 @@ export default function Dashboard() {
       {/* Campanhas + Gráfico */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Campanhas em andamento */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
-          <h2 className="text-sm font-semibold text-slate-700 mb-4">Campanhas em Andamento</h2>
+        <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border)] p-5">
+          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Campanhas em Andamento</h2>
           <div className="space-y-5">
             {campanhas.map((c, i) => (
               <div key={c.id}>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm font-medium text-slate-700 truncate max-w-[60%]">{c.titulo}</span>
+                  <span className="text-sm font-medium text-[var(--text-primary)] truncate max-w-[60%]">{c.titulo}</span>
                   <span
                     className="text-sm font-bold"
                     style={{ color: i % 2 === 0 ? '#0f4c5c' : '#f97316' }}
@@ -168,7 +168,7 @@ export default function Dashboard() {
                   percentual={c.percentual_progresso}
                   cor={i % 2 === 0 ? '#0f4c5c' : '#f97316'}
                 />
-                <div className="flex justify-between mt-1.5 text-xs text-slate-400">
+                <div className="flex justify-between mt-1.5 text-xs text-[var(--text-muted)]">
                   <span>{formatBRL(c.valor_arrecadado)} arrecadados</span>
                   <span>Meta: {formatBRL(c.meta_valor)}</span>
                 </div>
@@ -178,8 +178,8 @@ export default function Dashboard() {
         </div>
 
         {/* Gráfico mensal */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
-          <h2 className="text-sm font-semibold text-slate-700 mb-4">Arrecadação Mensal (últimos 12 meses)</h2>
+        <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border)] p-5">
+          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Arrecadação Mensal (últimos 12 meses)</h2>
           <ResponsiveContainer width="100%" height={220} style={{ outline: 'none' }}>
             <BarChart
               data={grafico}
@@ -223,21 +223,21 @@ export default function Dashboard() {
       {/* Doações recentes + Top Apoiadores */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Tabela de doações */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100 p-5">
-          <h2 className="text-sm font-semibold text-slate-700 mb-4">Doações Recentes</h2>
+        <div className="lg:col-span-2 bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border)] p-5">
+          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Doações Recentes</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="text-left text-xs font-medium text-slate-400 pb-2 pr-4">Doador</th>
-                  <th className="text-right text-xs font-medium text-slate-400 pb-2 pr-4">Valor</th>
-                  <th className="text-left text-xs font-medium text-slate-400 pb-2 pr-4">Data</th>
-                  <th className="text-left text-xs font-medium text-slate-400 pb-2">Status</th>
+                <tr className="border-b border-[var(--border)]">
+                  <th className="text-left text-xs font-medium text-[var(--text-muted)] pb-2 pr-4">Doador</th>
+                  <th className="text-right text-xs font-medium text-[var(--text-muted)] pb-2 pr-4">Valor</th>
+                  <th className="text-left text-xs font-medium text-[var(--text-muted)] pb-2 pr-4">Data</th>
+                  <th className="text-left text-xs font-medium text-[var(--text-muted)] pb-2">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {doacoes.map((d) => (
-                  <tr key={d.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={d.id} className="hover:bg-[var(--bg-hover)] transition-colors">
                     <td className="py-2.5 pr-4">
                       <div className="flex items-center gap-2">
                         <div
@@ -246,13 +246,13 @@ export default function Dashboard() {
                         >
                           {iniciais(d.apoiador_nome)}
                         </div>
-                        <span className="font-medium text-slate-700 truncate max-w-[140px]">{d.apoiador_nome}</span>
+                        <span className="font-medium text-[var(--text-primary)] truncate max-w-[140px]">{d.apoiador_nome}</span>
                       </div>
                     </td>
-                    <td className="py-2.5 pr-4 text-right font-semibold text-slate-800">
+                    <td className="py-2.5 pr-4 text-right font-semibold text-[var(--text-primary)]">
                       {formatBRL(d.valor)}
                     </td>
-                    <td className="py-2.5 pr-4 text-slate-500">{formatData(d.data)}</td>
+                    <td className="py-2.5 pr-4 text-[var(--text-secondary)]">{formatData(d.data)}</td>
                     <td className="py-2.5">
                       <BadgeStatus status={d.status} />
                     </td>
@@ -264,8 +264,8 @@ export default function Dashboard() {
         </div>
 
         {/* Top Apoiadores */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
-          <h2 className="text-sm font-semibold text-slate-700 mb-4">Top Membros</h2>
+        <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border)] p-5">
+          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Top Membros</h2>
           <div className="space-y-3">
             {topApoiadores.map((a, i) => (
               <div key={a.id} className="flex items-center gap-3">
@@ -276,8 +276,8 @@ export default function Dashboard() {
                   {iniciais(a.nome)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-700 truncate">{a.nome}</p>
-                  <p className="text-xs text-slate-400">{formatBRL(a.total_doado)} doados</p>
+                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">{a.nome}</p>
+                  <p className="text-xs text-[var(--text-muted)]">{formatBRL(a.total_doado)} doados</p>
                 </div>
                 <span
                   className="text-xs font-bold px-2 py-0.5 rounded-full"

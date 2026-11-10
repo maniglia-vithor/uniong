@@ -65,8 +65,8 @@ export default function Comunicacao() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold text-slate-800">Comunicação</h1>
-          <p className="text-xs text-slate-400">Gerencie comunicados e publicações da organização</p>
+          <h1 className="text-lg font-bold text-[var(--text-primary)]">Comunicação</h1>
+          <p className="text-xs text-[var(--text-muted)]">Gerencie comunicados e publicações da organização</p>
         </div>
         <button
           onClick={abrirNovo}
@@ -84,9 +84,9 @@ export default function Comunicacao() {
           <div className="w-8 h-8 border-4 border-slate-200 rounded-full animate-spin" style={{ borderTopColor: '#0f4c5c' }} />
         </div>
       ) : lista.length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm flex flex-col items-center justify-center py-16 gap-3">
-          <Megaphone size={32} className="text-slate-200" />
-          <p className="text-slate-400 text-sm">Nenhum comunicado publicado ainda.</p>
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm flex flex-col items-center justify-center py-16 gap-3">
+          <Megaphone size={32} className="text-[var(--text-muted)]" />
+          <p className="text-[var(--text-muted)] text-sm">Nenhum comunicado publicado ainda.</p>
           <button onClick={abrirNovo} className="text-xs font-medium px-3 py-1.5 rounded-lg text-white" style={{ backgroundColor: '#0f4c5c' }}>
             Criar primeiro comunicado
           </button>
@@ -94,23 +94,23 @@ export default function Comunicacao() {
       ) : (
         <div className="space-y-3">
           {lista.map((c) => (
-            <div key={c.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+            <div key={c.id} className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <PublicoIcon tipo={c.publico_alvo} />
-                    <span className="text-xs text-slate-400">{c.publico_alvo_display}</span>
-                    <span className="text-slate-200">·</span>
-                    <span className="text-xs text-slate-400">{formatDateTime(c.data_publicacao)}</span>
+                    <span className="text-xs text-[var(--text-muted)]">{c.publico_alvo_display}</span>
+                    <span className="text-[var(--text-muted)]">·</span>
+                    <span className="text-xs text-[var(--text-muted)]">{formatDateTime(c.data_publicacao)}</span>
                   </div>
-                  <h3 className="font-semibold text-slate-800 mb-2">{c.titulo}</h3>
-                  <p className="text-sm text-slate-600 whitespace-pre-line leading-relaxed">{c.conteudo}</p>
+                  <h3 className="font-semibold text-[var(--text-primary)] mb-2">{c.titulo}</h3>
+                  <p className="text-sm text-[var(--text-secondary)] whitespace-pre-line leading-relaxed">{c.conteudo}</p>
                 </div>
                 <div className="flex gap-1 flex-shrink-0">
-                  <button onClick={() => abrirEdicao(c)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-teal-700 transition-colors">
+                  <button onClick={() => abrirEdicao(c)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-700 transition-colors">
                     <Pencil size={14} />
                   </button>
-                  <button onClick={() => onExcluir(c.id, c.titulo)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
+                  <button onClick={() => onExcluir(c.id, c.titulo)} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -134,7 +134,7 @@ export default function Comunicacao() {
                 rows={6}
                 required
                 placeholder="Escreva o conteúdo do comunicado..."
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100 resize-none"
+                className="w-full px-3 py-2 text-sm border border-[var(--border)] bg-[var(--bg-input)] text-[var(--text-primary)] rounded-lg outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100 resize-none"
               />
             </Campo>
             <Campo label="Público-alvo">

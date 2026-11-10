@@ -91,8 +91,8 @@ export default function Campanhas() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold text-slate-800">Campanhas</h1>
-          <p className="text-xs text-slate-400">Gerencie as campanhas de arrecadação</p>
+          <h1 className="text-lg font-bold text-[var(--text-primary)]">Campanhas</h1>
+          <p className="text-xs text-[var(--text-muted)]">Gerencie as campanhas de arrecadação</p>
         </div>
         <button
           onClick={abrirNovo}
@@ -116,32 +116,32 @@ export default function Campanhas() {
           {lista.map((c, i) => (
             <div
               key={c.id}
-              className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col gap-3 cursor-pointer hover:shadow-md transition-shadow"
+              className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border)] p-5 flex flex-col gap-3 cursor-pointer hover:shadow-md transition-shadow"
               onClick={() => openDrawer?.({ type: 'campanha', id: c.id })}
             >
               <div className="flex items-start justify-between gap-2">
-                <h3 className="font-semibold text-slate-800 leading-snug">{c.titulo}</h3>
+                <h3 className="font-semibold text-[var(--text-primary)] leading-snug">{c.titulo}</h3>
                 <BadgeStatus status={c.status} />
               </div>
 
               <div>
-                <div className="flex justify-between mb-1.5 text-xs text-slate-500">
+                <div className="flex justify-between mb-1.5 text-xs text-[var(--text-secondary)]">
                   <span>{formatBRL(c.valor_arrecadado)} arrecadados</span>
                   <span className="font-semibold" style={{ color: i % 2 === 0 ? '#0f4c5c' : '#f97316' }}>
                     {c.percentual_progresso}%
                   </span>
                 </div>
                 <BarraProgresso percentual={c.percentual_progresso} cor={i % 2 === 0 ? '#0f4c5c' : '#f97316'} />
-                <p className="text-xs text-slate-400 mt-1">Meta: {formatBRL(c.meta_valor)}</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">Meta: {formatBRL(c.meta_valor)}</p>
               </div>
 
-              <div className="flex items-center justify-between mt-auto pt-2 border-t border-slate-50">
-                <span className="text-xs text-slate-400">Início: {c.data_inicio}</span>
+              <div className="flex items-center justify-between mt-auto pt-2 border-t border-[var(--border-subtle)]">
+                <span className="text-xs text-[var(--text-muted)]">Início: {c.data_inicio}</span>
                 <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => abrirEdicao(c)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-teal-700 transition-colors">
+                  <button onClick={() => abrirEdicao(c)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-600 transition-colors">
                     <Pencil size={14} />
                   </button>
-                  <button onClick={() => onExcluir(c.id, c.titulo)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
+                  <button onClick={() => onExcluir(c.id, c.titulo)} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -149,7 +149,7 @@ export default function Campanhas() {
             </div>
           ))}
           {lista.length === 0 && (
-            <p className="col-span-3 text-center py-16 text-slate-400 text-sm">Nenhuma campanha cadastrada.</p>
+            <p className="col-span-3 text-center py-16 text-[var(--text-muted)] text-sm">Nenhuma campanha cadastrada.</p>
           )}
         </div>
       )}
@@ -185,7 +185,7 @@ export default function Campanhas() {
                 onChange={onChange}
                 rows={3}
                 placeholder="Descreva o objetivo desta campanha..."
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100 resize-none"
+                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100 resize-none bg-[var(--bg-input)] text-[var(--text-primary)]"
               />
             </Campo>
             <div className="flex gap-3 pt-2">

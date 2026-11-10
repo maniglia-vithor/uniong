@@ -125,29 +125,29 @@ export default function Doacoes() {
         <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-center text-red-600 text-sm">{erro}</div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100">
+      <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border)]">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-100">
-                <th className="text-left text-xs font-medium text-slate-400 px-5 py-3">Doador</th>
-                <th className="text-left text-xs font-medium text-slate-400 px-5 py-3">Campanha</th>
-                <th className="text-right text-xs font-medium text-slate-400 px-5 py-3">Valor</th>
-                <th className="text-left text-xs font-medium text-slate-400 px-5 py-3">Data</th>
-                <th className="text-left text-xs font-medium text-slate-400 px-5 py-3">Status</th>
+              <tr className="border-b border-[var(--border)]">
+                <th className="text-left text-xs font-medium text-[var(--text-muted)] px-5 py-3">Doador</th>
+                <th className="text-left text-xs font-medium text-[var(--text-muted)] px-5 py-3">Campanha</th>
+                <th className="text-right text-xs font-medium text-[var(--text-muted)] px-5 py-3">Valor</th>
+                <th className="text-left text-xs font-medium text-[var(--text-muted)] px-5 py-3">Data</th>
+                <th className="text-left text-xs font-medium text-[var(--text-muted)] px-5 py-3">Status</th>
                 <th className="px-5 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-[var(--border-subtle)]">
               {carregando ? (
-                <tr><td colSpan={6} className="text-center py-10 text-slate-300 text-sm">Carregando...</td></tr>
+                <tr><td colSpan={6} className="text-center py-10 text-[var(--text-muted)] text-sm">Carregando...</td></tr>
               ) : lista.length === 0 ? (
                 <TabelaVazia />
               ) : (
                 lista.map((d) => (
                   <tr
                     key={d.id}
-                    className="hover:bg-slate-50 transition-colors cursor-pointer"
+                    className="hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
                     onClick={() => openDrawer?.({ type: 'doacao', id: d.id })}
                   >
                     <td className="px-5 py-3">
@@ -155,19 +155,19 @@ export default function Doacoes() {
                         <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ backgroundColor: '#0f4c5c' }}>
                           {iniciais(d.apoiador_nome)}
                         </div>
-                        <span className="font-medium text-slate-700">{d.apoiador_nome}</span>
+                        <span className="font-medium text-[var(--text-primary)]">{d.apoiador_nome}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-3 text-slate-500">{d.campanha_titulo || <span className="text-slate-300">—</span>}</td>
-                    <td className="px-5 py-3 text-right font-semibold text-slate-800">{formatBRL(d.valor)}</td>
-                    <td className="px-5 py-3 text-slate-500">{formatData(d.data)}</td>
+                    <td className="px-5 py-3 text-[var(--text-secondary)]">{d.campanha_titulo || <span className="text-[var(--text-muted)]">—</span>}</td>
+                    <td className="px-5 py-3 text-right font-semibold text-[var(--text-primary)]">{formatBRL(d.valor)}</td>
+                    <td className="px-5 py-3 text-[var(--text-secondary)]">{formatData(d.data)}</td>
                     <td className="px-5 py-3"><BadgeStatus status={d.status} /></td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2 justify-end" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => abrirEdicao(d)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-teal-700 transition-colors">
+                        <button onClick={() => abrirEdicao(d)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-600 transition-colors">
                           <Pencil size={14} />
                         </button>
-                        <button onClick={() => onExcluir(d.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
+                        <button onClick={() => onExcluir(d.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
                           <Trash2 size={14} />
                         </button>
                       </div>

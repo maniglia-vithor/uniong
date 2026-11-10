@@ -149,15 +149,15 @@ export default function KpiDetailPanel({ kpi, onClose }) {
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col overflow-hidden max-h-[90vh]"
+        className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-5xl flex flex-col overflow-hidden max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-white z-10 border-b border-slate-100 flex items-center justify-between px-6 py-4 flex-shrink-0">
-          <h2 className="text-sm font-semibold text-slate-700">{cfg.titulo}</h2>
+        <div className="sticky top-0 bg-[var(--bg-card)] z-10 border-b border-[var(--border)] flex items-center justify-between px-6 py-4 flex-shrink-0">
+          <h2 className="text-sm font-semibold text-[var(--text-primary)]">{cfg.titulo}</h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600"
+            className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)]"
           >
             <X size={18} />
           </button>
@@ -173,16 +173,16 @@ export default function KpiDetailPanel({ kpi, onClose }) {
               />
             </div>
           ) : dadosOrdenados.length === 0 ? (
-            <p className="text-slate-400 text-sm text-center py-16">Nenhum registro encontrado.</p>
+            <p className="text-[var(--text-muted)] text-sm text-center py-16">Nenhum registro encontrado.</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100">
+                <tr className="border-b border-[var(--border)]">
                   {cfg.colunas.map((col) => (
                     <th
                       key={col.key}
                       onClick={() => handleSort(col.key)}
-                      className="text-left text-xs font-semibold text-slate-500 pb-2 pr-4 cursor-pointer select-none hover:text-slate-800 transition-colors whitespace-nowrap"
+                      className="text-left text-xs font-semibold text-[var(--text-secondary)] pb-2 pr-4 cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors whitespace-nowrap"
                     >
                       {col.label}
                       <SortIcon dir={sortCol === col.key ? sortDir : null} />
@@ -190,11 +190,11 @@ export default function KpiDetailPanel({ kpi, onClose }) {
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {dadosOrdenados.map((row, i) => (
-                  <tr key={row.id ?? i} className="hover:bg-slate-50 transition-colors">
+                  <tr key={row.id ?? i} className="hover:bg-[var(--bg-hover)] transition-colors">
                     {cfg.colunas.map((col) => (
-                      <td key={col.key} className="py-2.5 pr-4 text-slate-700">
+                      <td key={col.key} className="py-2.5 pr-4 text-[var(--text-primary)]">
                         {col.render ? col.render(row[col.key]) : row[col.key] ?? '—'}
                       </td>
                     ))}
@@ -207,8 +207,8 @@ export default function KpiDetailPanel({ kpi, onClose }) {
 
         {/* Footer */}
         {!carregando && dadosOrdenados.length > 0 && (
-          <div className="bg-slate-50 border-t border-slate-100 px-6 py-3 flex-shrink-0">
-            <p className="text-xs text-slate-400">
+          <div className="bg-[var(--bg-card-alt)] border-t border-[var(--border)] px-6 py-3 flex-shrink-0">
+            <p className="text-xs text-[var(--text-muted)]">
               {dadosOrdenados.length} {dadosOrdenados.length === 1 ? 'registro' : 'registros'}
             </p>
           </div>

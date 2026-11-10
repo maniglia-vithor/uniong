@@ -44,17 +44,17 @@ function formatData(iso) {
 
 function KpiCusto({ titulo, valor, subtitulo, icone: Icone, cor }) {
   return (
-    <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+    <div className="bg-[var(--bg-card)] rounded-xl p-5 shadow-sm border border-[var(--border)]">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">{titulo}</p>
-          <p className="text-2xl font-bold text-slate-800 mt-1">{valor}</p>
+          <p className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">{titulo}</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{valor}</p>
         </div>
         <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${cor}18` }}>
           <Icone size={20} style={{ color: cor }} />
         </div>
       </div>
-      {subtitulo && <p className="text-xs text-slate-400 mt-2">{subtitulo}</p>}
+      {subtitulo && <p className="text-xs text-[var(--text-muted)] mt-2">{subtitulo}</p>}
     </div>
   )
 }
@@ -197,7 +197,7 @@ export default function Custos() {
   const colHeader = (key, label, align = 'left') => (
     <th
       onClick={() => handleSort(key)}
-      className={`text-${align} text-xs font-medium text-slate-400 px-5 py-3 cursor-pointer select-none hover:text-slate-700 transition-colors whitespace-nowrap`}
+      className={`text-${align} text-xs font-medium text-[var(--text-muted)] px-5 py-3 cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors whitespace-nowrap`}
     >
       {label}<SortIcon dir={sortCol === key ? sortDir : null} />
     </th>
@@ -208,8 +208,8 @@ export default function Custos() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold text-slate-800">Custos</h1>
-          <p className="text-xs text-slate-400">{lista.length} registro{lista.length !== 1 ? 's' : ''}</p>
+          <h1 className="text-lg font-bold text-[var(--text-primary)]">Custos</h1>
+          <p className="text-xs text-[var(--text-muted)]">{lista.length} registro{lista.length !== 1 ? 's' : ''}</p>
         </div>
         <button
           onClick={abrirNovo}
@@ -254,10 +254,10 @@ export default function Custos() {
       {/* Gráfico + Tabela */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Donut */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col">
-          <h2 className="text-sm font-semibold text-slate-700 mb-4">Distribuição por Categoria (mês atual)</h2>
+        <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border)] p-5 flex flex-col">
+          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Distribuição por Categoria (mês atual)</h2>
           {grafico.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center text-slate-300 text-sm">Sem dados</div>
+            <div className="flex-1 flex items-center justify-center text-[var(--text-muted)] text-sm">Sem dados</div>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
@@ -283,11 +283,11 @@ export default function Custos() {
         </div>
 
         {/* Tabela */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100">
+        <div className="lg:col-span-2 bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border)]">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100">
+                <tr className="border-b border-[var(--border)]">
                   {colHeader('descricao', 'Descrição')}
                   {colHeader('categoria_display', 'Categoria')}
                   {colHeader('data_vencimento', 'Vencimento')}
@@ -296,15 +296,15 @@ export default function Custos() {
                   <th className="px-5 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {carregando ? (
-                  <tr><td colSpan={6} className="text-center py-10 text-slate-300 text-sm">Carregando...</td></tr>
+                  <tr><td colSpan={6} className="text-center py-10 text-[var(--text-muted)] text-sm">Carregando...</td></tr>
                 ) : listaOrdenada.length === 0 ? (
                   <TabelaVazia />
                 ) : (
                   listaOrdenada.map((d) => (
-                    <tr key={d.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-5 py-3 font-medium text-slate-700 max-w-[200px] truncate">{d.descricao}</td>
+                    <tr key={d.id} className="hover:bg-[var(--bg-hover)] transition-colors">
+                      <td className="px-5 py-3 font-medium text-[var(--text-primary)] max-w-[200px] truncate">{d.descricao}</td>
                       <td className="px-5 py-3">
                         <span
                           className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
@@ -316,15 +316,15 @@ export default function Custos() {
                           {d.categoria_display}
                         </span>
                       </td>
-                      <td className="px-5 py-3 text-slate-500">{formatData(d.data_vencimento)}</td>
-                      <td className="px-5 py-3 text-right font-semibold text-slate-800">{formatBRL(d.valor)}</td>
+                      <td className="px-5 py-3 text-[var(--text-secondary)]">{formatData(d.data_vencimento)}</td>
+                      <td className="px-5 py-3 text-right font-semibold text-[var(--text-primary)]">{formatBRL(d.valor)}</td>
                       <td className="px-5 py-3"><BadgeStatus status={d.status_efetivo} /></td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2 justify-end">
-                          <button onClick={() => abrirEdicao(d)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-teal-700 transition-colors">
+                          <button onClick={() => abrirEdicao(d)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-700 transition-colors">
                             <Pencil size={14} />
                           </button>
-                          <button onClick={() => onExcluir(d.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
+                          <button onClick={() => onExcluir(d.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
                             <Trash2 size={14} />
                           </button>
                         </div>
@@ -379,13 +379,13 @@ export default function Custos() {
             </Campo>
 
             {/* Toggle Despesa Fixa */}
-            <div className="rounded-xl border border-slate-200 overflow-hidden">
+            <div className="rounded-xl border border-[var(--border)] overflow-hidden">
               <button
                 type="button"
                 onClick={() => setForm((f) => ({ ...f, is_fixed: !f.is_fixed }))}
-                className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
+                className="w-full flex items-center justify-between px-4 py-3 bg-[var(--bg-card-alt)] hover:bg-[var(--bg-hover)] transition-colors"
               >
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
                   <Repeat size={15} className="text-slate-400" />
                   Despesa fixa
                 </div>
@@ -403,7 +403,7 @@ export default function Custos() {
 
               {/* Seção de recorrência — expande quando is_fixed = true */}
               {form.is_fixed && (
-                <div className="px-4 py-3 border-t border-slate-200 bg-white">
+                <div className="px-4 py-3 border-t border-[var(--border)] bg-[var(--bg-card)]">
                   <Campo label="Frequência de repetição">
                     <Select name="recurrence_period" value={form.recurrence_period} onChange={onChange}>
                       <option value="semanal">Semanal</option>
@@ -411,7 +411,7 @@ export default function Custos() {
                       <option value="anual">Anual</option>
                     </Select>
                   </Campo>
-                  <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
+                  <p className="text-xs text-[var(--text-muted)] mt-2 flex items-center gap-1">
                     <RefreshCw size={11} />
                     A próxima despesa será gerada automaticamente ao marcar esta como paga.
                   </p>
@@ -421,13 +421,13 @@ export default function Custos() {
 
             {/* Anexos — estilo Jira */}
             <div>
-              <p className="text-xs font-medium text-slate-600 mb-2">Anexos</p>
+              <p className="text-xs font-medium text-[var(--text-secondary)] mb-2">Anexos</p>
 
               {/* Anexos já salvos (modo edição) */}
               {editando?.anexos?.length > 0 && (
                 <div className="space-y-1 mb-2">
                   {editando.anexos.map((a) => (
-                    <div key={a.id} className="flex items-center justify-between gap-2 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200">
+                    <div key={a.id} className="flex items-center justify-between gap-2 px-3 py-1.5 bg-[var(--bg-card-alt)] rounded-lg border border-[var(--border)]">
                       <a
                         href={a.url}
                         target="_blank"
@@ -469,11 +469,11 @@ export default function Custos() {
               {/* Área de drop / botão */}
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="flex flex-col items-center justify-center gap-2 px-4 py-5 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 cursor-pointer transition-colors text-center"
+                className="flex flex-col items-center justify-center gap-2 px-4 py-5 rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--bg-card-alt)] hover:bg-[var(--bg-hover)] hover:border-[var(--border)] cursor-pointer transition-colors text-center"
               >
-                <Paperclip size={18} className="text-slate-400" />
-                <span className="text-xs text-slate-500 font-medium">Adicionar anexo</span>
-                <span className="text-[11px] text-slate-400">Clique para selecionar arquivos</span>
+                <Paperclip size={18} className="text-[var(--text-muted)]" />
+                <span className="text-xs text-[var(--text-secondary)] font-medium">Adicionar anexo</span>
+                <span className="text-[11px] text-[var(--text-muted)]">Clique para selecionar arquivos</span>
               </div>
               <input
                 ref={fileInputRef}
