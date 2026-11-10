@@ -50,11 +50,12 @@ class ApoiadorViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         apoiador = serializer.save()
+        actor = self.request.user.get_full_name() or self.request.user.username
         _notificar_admins(
-            mensagem=f'{apoiador.nome} foi cadastrado como apoiador.',
+            mensagem=f'{actor} cadastrou um novo apoiador: {apoiador.nome}.',
             tipo='apoiador',
-            actor_name=apoiador.nome,
-            action_text='foi cadastrado como apoiador',
+            actor_name=actor,
+            action_text=f'cadastrou um novo apoiador: {apoiador.nome}',
             target_type='apoiador',
             target_id=apoiador.id,
         )
@@ -74,11 +75,14 @@ class CampanhaViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         campanha = serializer.save()
+        actor = self.request.user.get_full_name() or self.request.user.username
+        meta = f'R$ {campanha.meta:.2f}'.replace('.', ',') if campanha.meta else None
+        meta_txt = f' (Meta: {meta})' if meta else ''
         _notificar_admins(
-            mensagem=f'Nova campanha "{campanha.titulo}" foi criada.',
+            mensagem=f'{actor} criou a campanha: {campanha.titulo}{meta_txt}.',
             tipo='campanha',
-            actor_name=campanha.titulo,
-            action_text='nova campanha criada',
+            actor_name=actor,
+            action_text=f'criou a campanha: {campanha.titulo}{meta_txt}',
             target_type='campanha',
             target_id=campanha.id,
         )
@@ -104,13 +108,14 @@ class DoacaoViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         doacao = serializer.save()
+        actor = self.request.user.get_full_name() or self.request.user.username
         valor = f'R$ {doacao.valor:.2f}'.replace('.', ',')
-        campanha_txt = f' para "{doacao.campanha.titulo}"' if doacao.campanha else ''
+        campanha_txt = f' para a campanha {doacao.campanha.titulo}' if doacao.campanha else ''
         _notificar_admins(
-            mensagem=f'{doacao.apoiador.nome} registrou uma nova doação de {valor}{campanha_txt}.',
+            mensagem=f'{actor} registrou uma nova doação de {valor} realizada por {doacao.apoiador.nome}{campanha_txt}.',
             tipo='doacao',
-            actor_name=doacao.apoiador.nome,
-            action_text=f'registrou uma nova doação de {valor}{campanha_txt}',
+            actor_name=actor,
+            action_text=f'registrou uma nova doação de {valor} realizada por {doacao.apoiador.nome}{campanha_txt}',
             target_type='doacao',
             target_id=doacao.id,
         )
@@ -391,6 +396,17 @@ class DespesaViewSet(viewsets.ModelViewSet):
         # Gera primeira recorrência ao criar despesa fixa
         if despesa.is_fixed and despesa.recurrence_period:
             despesa.gerar_proxima_recorrencia()
+        actor = self.request.user.get_full_name() or self.request.user.username
+        valor = f'R$ {despesa.valor:.2f}'.replace('.', ',')
+        tipo_txt = 'fixa' if despesa.is_fixed else 'variável'
+        _notificar_admins(
+            mensagem=f'{actor} registrou uma nova despesa {tipo_txt} de {valor} ({despesa.descricao}).',
+            tipo='despesa',
+            actor_name=actor,
+            action_text=f'registrou uma nova despesa {tipo_txt} de {valor} ({despesa.descricao})',
+            target_type='despesa',
+            target_id=despesa.id,
+        )
 
     def perform_update(self, serializer):
         status_anterior = serializer.instance.status

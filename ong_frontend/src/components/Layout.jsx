@@ -29,10 +29,11 @@ const titulos = {
   '/admin/relatorios': { titulo: 'Relatórios', sub: 'Análises e exportações' },
 }
 
-const tipoCor = {
-  doacao: '#22c55e',
-  campanha: '#f97316',
-  apoiador: '#3b82f6',
+const tipoBadge = {
+  doacao:   { label: 'Doação',   bg: '#dcfce7', color: '#16a34a' },
+  campanha: { label: 'Campanha', bg: '#dbeafe', color: '#2563eb' },
+  apoiador: { label: 'Apoiador', bg: '#f3e8ff', color: '#7c3aed' },
+  despesa:  { label: 'Despesa',  bg: '#fee2e2', color: '#dc2626' },
 }
 
 function formatarTempo(isoStr) {
@@ -298,15 +299,17 @@ export default function Layout() {
                                 {n.action_text || n.mensagem}
                               </p>
                               <div className="flex items-center gap-2 mt-1">
-                                <span
-                                  className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
-                                  style={{
-                                    backgroundColor: `${tipoCor[n.tipo] ?? '#94a3b8'}20`,
-                                    color: tipoCor[n.tipo] ?? '#94a3b8',
-                                  }}
-                                >
-                                  {n.tipo}
-                                </span>
+                                {(() => {
+                                  const b = tipoBadge[n.tipo] ?? { label: n.tipo, bg: '#f1f5f9', color: '#64748b' }
+                                  return (
+                                    <span
+                                      className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                                      style={{ backgroundColor: b.bg, color: b.color }}
+                                    >
+                                      {b.label}
+                                    </span>
+                                  )
+                                })()}
                                 <span className="text-[11px] text-slate-400">{formatarTempo(n.criada_em)}</span>
                               </div>
                             </div>
