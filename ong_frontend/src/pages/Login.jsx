@@ -96,7 +96,7 @@ export default function Login() {
             />
           </div>
           <p className="text-white/60 text-sm text-center max-w-xs leading-relaxed">
-            Gerencie campanhas, doações e apoiadores<br />com transparência e eficiência.
+            Gerencie campanhas, doações e membros<br />com transparência e eficiência.
           </p>
         </div>
 

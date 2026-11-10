@@ -70,7 +70,7 @@ function EditDoacao({ record, apoiadores, campanhas, onSaved, onCancel }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <Campo label="Apoiador">
+      <Campo label="Membro">
         <Select name="apoiador" value={form.apoiador} onChange={e => setForm(f => ({ ...f, apoiador: e.target.value }))} required>
           <option value="">Selecione...</option>
           {apoiadores.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
@@ -233,7 +233,7 @@ function DetalheApoiador({ record, onEdit }) {
       <button onClick={onEdit}
         className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity"
         style={{ backgroundColor: '#0f4c5c' }}>
-        <Pencil size={14} /> Editar Apoiador
+        <Pencil size={14} /> Editar Membro
       </button>
     </div>
   )
@@ -301,7 +301,7 @@ export default function RecordDetailDrawer({ target, onClose, onRefresh }) {
   const [campanhas, setCampanhas] = useState([])
 
   const endpointMap = { doacao: 'doacoes', campanha: 'campanhas', apoiador: 'apoiadores' }
-  const tituloMap = { doacao: 'Doação', campanha: 'Campanha', apoiador: 'Apoiador' }
+  const tituloMap = { doacao: 'Doação', campanha: 'Campanha', apoiador: 'Membro' }
 
   useEffect(() => {
     if (!target) return

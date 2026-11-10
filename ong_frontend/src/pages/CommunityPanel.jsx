@@ -106,7 +106,7 @@ export default function CommunityPanel() {
                   desc: 'em andamento agora',
                 },
                 {
-                  label: 'Apoiadores Ativos',
+                  label: 'Membros Ativos',
                   valor: dados.kpis.apoiadores_ativos,
                   icone: Users,
                   cor: '#0891b2',

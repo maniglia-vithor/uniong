@@ -42,7 +42,7 @@ const CONFIG = {
     colunas: COLUNAS_DOACOES_MES,
   },
   apoiadores_ativos: {
-    titulo: 'Apoiadores Ativos',
+    titulo: 'Membros Ativos',
     fetchFn: () => getKpiApoiadoresAtivos(),
     colunas: [
       { key: 'nome', label: 'Nome', tipo: 'texto' },

@@ -183,9 +183,9 @@ export default function Doacoes() {
       {modal && (
         <Modal titulo={editando ? 'Editar Doação' : 'Registrar Doação'} onFechar={fechar}>
           <form onSubmit={onSubmit} className="space-y-4">
-            <Campo label="Apoiador">
+            <Campo label="Membro">
               <Select name="apoiador" value={form.apoiador} onChange={onChange} required>
-                <option value="">Selecione um apoiador...</option>
+                <option value="">Selecione um membro...</option>
                 {apoiadores.map((a) => (
                   <option key={a.id} value={a.id}>{a.nome}</option>
                 ))}

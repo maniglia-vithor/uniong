@@ -6,7 +6,7 @@ const RELATORIOS = [
   {
     tipo: 'doacoes',
     titulo: 'Relatório de Doações',
-    descricao: 'Lista completa de todas as doações registradas com apoiador, campanha, valor, data e status.',
+    descricao: 'Lista completa de todas as doações registradas com membro, campanha, valor, data e status.',
     icone: HandCoins,
     cor: '#0f4c5c',
     arquivo: 'relatorio_doacoes.csv',
@@ -21,8 +21,8 @@ const RELATORIOS = [
   },
   {
     tipo: 'apoiadores',
-    titulo: 'Lista de Apoiadores',
-    descricao: 'Cadastro completo de apoiadores com nome, e-mail, data de cadastro, status e total doado.',
+    titulo: 'Lista de Membros',
+    descricao: 'Cadastro completo de membros com nome, e-mail, data de cadastro, status e total doado.',
     icone: Users,
     cor: '#0891b2',
     arquivo: 'relatorio_apoiadores.csv',

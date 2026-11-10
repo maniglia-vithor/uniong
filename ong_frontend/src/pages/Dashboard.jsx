@@ -118,7 +118,7 @@ export default function Dashboard() {
     },
     {
       id: 'apoiadores_ativos',
-      titulo: 'Apoiadores Ativos',
+      titulo: 'Membros Ativos',
       valor: resumo.apoiadores_ativos.value,
       trend_percentage: resumo.apoiadores_ativos.trend_percentage,
       trend_direction: resumo.apoiadores_ativos.trend_direction,
@@ -265,7 +265,7 @@ export default function Dashboard() {
 
         {/* Top Apoiadores */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
-          <h2 className="text-sm font-semibold text-slate-700 mb-4">Top Apoiadores</h2>
+          <h2 className="text-sm font-semibold text-slate-700 mb-4">Top Membros</h2>
           <div className="space-y-3">
             {topApoiadores.map((a, i) => (
               <div key={a.id} className="flex items-center gap-3">

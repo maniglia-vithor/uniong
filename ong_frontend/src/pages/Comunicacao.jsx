@@ -140,7 +140,7 @@ export default function Comunicacao() {
             <Campo label="Público-alvo">
               <Select name="publico_alvo" value={form.publico_alvo} onChange={onChange}>
                 <option value="publico">Público (visível no portal)</option>
-                <option value="apoiadores">Somente Apoiadores</option>
+                <option value="apoiadores">Somente Membros</option>
               </Select>
             </Campo>
             <div className="flex gap-3 pt-2">

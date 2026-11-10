@@ -37,7 +37,7 @@ export default function Apoiadores() {
     setCarregando(true)
     getApoiadores()
       .then((r) => setLista(r.data.results ?? r.data))
-      .catch(() => setErro('Erro ao carregar apoiadores.'))
+      .catch(() => setErro('Erro ao carregar membros.'))
       .finally(() => setCarregando(false))
   }
 
@@ -83,12 +83,12 @@ export default function Apoiadores() {
   }
 
   async function onExcluir(id, nome) {
-    if (!confirm(`Excluir o apoiador "${nome}"?`)) return
+    if (!confirm(`Excluir o membro "${nome}"?`)) return
     try {
       await excluirApoiador(id)
       carregar()
     } catch {
-      alert('Não é possível excluir: este apoiador possui doações vinculadas.')
+      alert('Não é possível excluir: este membro possui doações vinculadas.')
     }
   }
 
@@ -96,8 +96,8 @@ export default function Apoiadores() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold text-slate-800">Apoiadores</h1>
-          <p className="text-xs text-slate-400">Gerencie os apoiadores da organização</p>
+          <h1 className="text-lg font-bold text-slate-800">Membros</h1>
+          <p className="text-xs text-slate-400">Gerencie os membros da organização</p>
         </div>
         <button
           onClick={abrirNovo}
@@ -105,7 +105,7 @@ export default function Apoiadores() {
           style={{ backgroundColor: '#0f4c5c' }}
         >
           <UserPlus size={15} />
-          Novo Apoiador
+          Novo Membro
         </button>
       </div>
 
@@ -115,7 +115,7 @@ export default function Apoiadores() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100">
-                <th className="text-left text-xs font-medium text-slate-400 px-5 py-3">Apoiador</th>
+                <th className="text-left text-xs font-medium text-slate-400 px-5 py-3">Membro</th>
                 <th className="text-left text-xs font-medium text-slate-400 px-5 py-3">E-mail</th>
                 <th className="text-left text-xs font-medium text-slate-400 px-5 py-3">Cadastro</th>
                 <th className="text-right text-xs font-medium text-slate-400 px-5 py-3">Total Doado</th>
@@ -166,7 +166,7 @@ export default function Apoiadores() {
       </div>
 
       {modal && (
-        <Modal titulo={editando ? 'Editar Apoiador' : 'Novo Apoiador'} onFechar={fechar}>
+        <Modal titulo={editando ? 'Editar Membro' : 'Novo Membro'} onFechar={fechar}>
           <form onSubmit={onSubmit} className="space-y-4">
             <Campo label="Nome completo">
               <Input name="nome" value={form.nome} onChange={onChange} placeholder="Ex: Maria da Silva" required />

@@ -13,7 +13,7 @@ const navItems = [
   { to: '/admin', label: 'Painel', icon: LayoutDashboard, end: true },
   { to: '/admin/campanhas', label: 'Campanhas', icon: Megaphone },
   { to: '/admin/doacoes', label: 'Doações', icon: HandCoins },
-  { to: '/admin/apoiadores', label: 'Apoiadores', icon: Users },
+  { to: '/admin/apoiadores', label: 'Membros', icon: Users },
   { to: '/admin/comunicacao', label: 'Comunicação', icon: MessageSquare },
   { to: '/admin/custos', label: 'Custos', icon: Receipt },
   { to: '/admin/relatorios', label: 'Relatórios', icon: BarChart3 },
@@ -23,7 +23,7 @@ const titulos = {
   '/admin': { titulo: 'Painel Principal', sub: 'Visão geral da organização' },
   '/admin/campanhas': { titulo: 'Campanhas', sub: 'Gerencie as campanhas de arrecadação' },
   '/admin/doacoes': { titulo: 'Doações', sub: 'Histórico de doações' },
-  '/admin/apoiadores': { titulo: 'Apoiadores', sub: 'Gerencie os apoiadores' },
+  '/admin/apoiadores': { titulo: 'Membros', sub: 'Gerencie os membros da organização' },
   '/admin/comunicacao': { titulo: 'Comunicação', sub: 'Mensagens e notificações' },
   '/admin/custos': { titulo: 'Custos', sub: 'Gestão de despesas e transparência financeira' },
   '/admin/relatorios': { titulo: 'Relatórios', sub: 'Análises e exportações' },
@@ -32,7 +32,7 @@ const titulos = {
 const tipoBadge = {
   doacao:   { label: 'Doação',   bg: '#dcfce7', color: '#16a34a' },
   campanha: { label: 'Campanha', bg: '#dbeafe', color: '#2563eb' },
-  apoiador: { label: 'Apoiador', bg: '#f3e8ff', color: '#7c3aed' },
+  apoiador: { label: 'Membro', bg: '#f3e8ff', color: '#7c3aed' },
   despesa:  { label: 'Despesa',  bg: '#fee2e2', color: '#dc2626' },
 }
 

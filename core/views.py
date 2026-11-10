@@ -52,10 +52,10 @@ class ApoiadorViewSet(viewsets.ModelViewSet):
         apoiador = serializer.save()
         actor = self.request.user.get_full_name() or self.request.user.username
         _notificar_admins(
-            mensagem=f'{actor} cadastrou um novo apoiador: {apoiador.nome}.',
+            mensagem=f'{actor} cadastrou um novo membro: {apoiador.nome}.',
             tipo='apoiador',
             actor_name=actor,
-            action_text=f'cadastrou um novo apoiador: {apoiador.nome}',
+            action_text=f'cadastrou um novo membro: {apoiador.nome}',
             target_type='apoiador',
             target_id=apoiador.id,
         )
