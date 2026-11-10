@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
+import { useRole } from '../context/RoleContext'
 import { Plus, Pencil, Trash2, TrendingDown, AlertCircle, Tag, ChevronUp, ChevronDown, ChevronsUpDown, Paperclip, X, RefreshCw, Repeat } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import Modal from '../components/Modal'
@@ -66,6 +67,7 @@ function SortIcon({ dir }) {
 }
 
 export default function Custos() {
+  const { isAdmin } = useRole()
   const [lista, setLista] = useState([])
   const [resumo, setResumo] = useState(null)
   const [grafico, setGrafico] = useState([])
@@ -211,13 +213,13 @@ export default function Custos() {
           <h1 className="text-lg font-bold text-[var(--text-primary)]">Custos</h1>
           <p className="text-xs text-[var(--text-muted)]">{lista.length} registro{lista.length !== 1 ? 's' : ''}</p>
         </div>
-        <button
+        {isAdmin && <button
           onClick={abrirNovo}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity"
           style={{ backgroundColor: '#0f4c5c' }}
         >
           <Plus size={15} /> Novo Custo
-        </button>
+        </button>}
       </div>
 
       {erro && (
@@ -321,12 +323,12 @@ export default function Custos() {
                       <td className="px-5 py-3"><BadgeStatus status={d.status_efetivo} /></td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2 justify-end">
-                          <button onClick={() => abrirEdicao(d)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-700 transition-colors">
+                          {isAdmin && <button onClick={() => abrirEdicao(d)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-700 transition-colors">
                             <Pencil size={14} />
-                          </button>
-                          <button onClick={() => onExcluir(d.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
+                          </button>}
+                          {isAdmin && <button onClick={() => onExcluir(d.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
                             <Trash2 size={14} />
-                          </button>
+                          </button>}
                         </div>
                       </td>
                     </tr>

@@ -15,7 +15,7 @@ function formatBRL(v) {
 }
 
 export default function Campanhas() {
-  const { openDrawer } = useOutletContext() ?? {}
+  const { openDrawer, isAdmin } = useOutletContext() ?? {}
   const [lista, setLista] = useState([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
@@ -94,13 +94,13 @@ export default function Campanhas() {
           <h1 className="text-lg font-bold text-[var(--text-primary)]">Campanhas</h1>
           <p className="text-xs text-[var(--text-muted)]">Gerencie as campanhas de arrecadação</p>
         </div>
-        <button
+        {isAdmin && <button
           onClick={abrirNovo}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity"
           style={{ backgroundColor: '#0f4c5c' }}
         >
           <Plus size={15} /> Nova Campanha
-        </button>
+        </button>}
       </div>
 
       {erro && (
@@ -137,14 +137,14 @@ export default function Campanhas() {
 
               <div className="flex items-center justify-between mt-auto pt-2 border-t border-[var(--border-subtle)]">
                 <span className="text-xs text-[var(--text-muted)]">Início: {c.data_inicio}</span>
-                <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                {isAdmin && <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                   <button onClick={() => abrirEdicao(c)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-600 transition-colors">
                     <Pencil size={14} />
                   </button>
                   <button onClick={() => onExcluir(c.id, c.titulo)} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
                     <Trash2 size={14} />
                   </button>
-                </div>
+                </div>}
               </div>
             </div>
           ))}

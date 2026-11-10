@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { User, Bell, Shield, Palette, Save, Eye, EyeOff, Download, Sun, Moon } from 'lucide-react'
+import { User, Bell, Shield, Palette, Save, Eye, EyeOff, Download, Sun, Moon, Lock } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
+import { useRole } from '../context/RoleContext'
 import api from '../services/api'
 
 const ABAS = [
@@ -61,8 +62,21 @@ function salvarPrefs(prefs) {
 }
 
 export default function Configuracoes() {
+  const { isAdmin } = useRole()
   const { usuario } = useAuth()
   const { theme, toggleTheme } = useTheme()
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center h-80 gap-4">
+        <div className="w-14 h-14 rounded-2xl bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center">
+          <Lock size={22} className="text-[var(--text-muted)]" />
+        </div>
+        <p className="font-semibold text-[var(--text-primary)]">Acesso restrito</p>
+        <p className="text-sm text-[var(--text-muted)]">Apenas administradores podem acessar as configurações do sistema.</p>
+      </div>
+    )
+  }
   const [aba, setAba] = useState('aparencia')
 
   // ── Aparência ────────────────────────────────────────────────
