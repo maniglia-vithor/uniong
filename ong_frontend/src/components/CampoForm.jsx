@@ -1,7 +1,7 @@
 export function Campo({ label, erro, children }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
+      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">{label}</label>
       {children}
       {erro && <p className="text-xs text-red-500 mt-1">{erro}</p>}
     </div>
@@ -9,7 +9,7 @@ export function Campo({ label, erro, children }) {
 }
 
 const base =
-  'w-full px-3 py-2 text-sm border rounded-lg outline-none transition-colors focus:ring-2 focus:ring-offset-0 border-slate-200 focus:border-teal-500 focus:ring-teal-100 bg-white text-slate-800 placeholder-slate-300'
+  'w-full px-3 py-2 text-sm border rounded-lg outline-none transition-colors focus:ring-2 focus:ring-offset-0 border-[var(--border)] focus:border-teal-500 focus:ring-teal-100 bg-[var(--bg-input)] text-[var(--text-primary)] placeholder-[var(--text-muted)]'
 
 export function Input(props) {
   return <input className={base} {...props} />
@@ -41,7 +41,7 @@ export function BotaoCancelar({ onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="w-full py-2.5 px-4 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+      className="w-full py-2.5 px-4 rounded-lg text-sm font-medium text-[var(--text-secondary)] bg-[var(--bg-card-alt)] hover:bg-[var(--bg-hover)] transition-colors border border-[var(--border)]"
     >
       Cancelar
     </button>

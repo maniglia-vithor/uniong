@@ -2,9 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Megaphone, HandCoins, Users,
-  MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X, Settings,
+  MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X, Settings, Sun, Moon,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 import api from '../services/api'
 import logoIcon from '../assets/logo-icon-uniong.png.jpg'
 import RecordDetailDrawer from './RecordDetailDrawer'
@@ -59,6 +60,7 @@ function avatarCor(nome = '') {
 export default function Layout() {
   const { pathname } = useLocation()
   const { usuario, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const paginaAtual = titulos[pathname] || titulos['/admin']
 
@@ -203,20 +205,29 @@ export default function Layout() {
         {/* Main */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Topbar */}
-          <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
+          <header className="bg-[var(--bg-card)] border-b border-[var(--border)] px-6 py-3.5 flex items-center justify-between flex-shrink-0">
             <div>
-              <h1 className="text-base font-semibold text-slate-800">{paginaAtual.titulo}</h1>
-              <p className="text-xs text-slate-400">{paginaAtual.sub}</p>
+              <h1 className="text-base font-semibold text-[var(--text-primary)]">{paginaAtual.titulo}</h1>
+              <p className="text-xs text-[var(--text-muted)]">{paginaAtual.sub}</p>
             </div>
 
-            {/* Settings + Bell */}
+            {/* Theme + Settings + Bell */}
             <div className="flex items-center gap-1">
             <button
+              onClick={toggleTheme}
+              className="p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+              title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
+            >
+              {theme === 'dark'
+                ? <Sun size={18} className="text-amber-400" />
+                : <Moon size={18} className="text-slate-500" />}
+            </button>
+            <button
               onClick={() => navigate('/admin/configuracoes')}
-              className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+              className="p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
               title="Configurações"
             >
-              <Settings size={18} className="text-slate-500" />
+              <Settings size={18} className="text-[var(--text-muted)]" />
             </button>
 
             {/* Bell */}
@@ -239,12 +250,12 @@ export default function Layout() {
               {/* Dropdown */}
               {aberto && (
                 <div
-                  className="absolute right-0 top-11 w-96 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 flex flex-col overflow-hidden"
+                  className="absolute right-0 top-11 w-96 bg-[var(--bg-card)] rounded-xl shadow-2xl border border-[var(--border)] z-50 flex flex-col overflow-hidden"
                   style={{ maxHeight: '520px' }}
                 >
                   {/* Header */}
-                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
-                    <span className="font-semibold text-slate-800 text-sm">Notificações</span>
+                  <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between flex-shrink-0">
+                    <span className="font-semibold text-[var(--text-primary)] text-sm">Notificações</span>
                     {naoLidas > 0 && (
                       <button
                         onClick={marcarTodasLidas}
@@ -258,7 +269,7 @@ export default function Layout() {
                   </div>
 
                   {/* Abas lidas/não lidas */}
-                  <div className="flex border-b border-slate-100 flex-shrink-0">
+                  <div className="flex border-b border-[var(--border)] flex-shrink-0">
                     {[
                       { id: 'todas', label: 'Todas' },
                       { id: 'nao_lidas', label: `Não lidas${naoLidas > 0 ? ` (${naoLidas})` : ''}` },
@@ -278,7 +289,7 @@ export default function Layout() {
                   </div>
 
                   {/* Pills de categoria */}
-                  <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-slate-100 flex-shrink-0 overflow-x-auto">
+                  <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-[var(--border)] flex-shrink-0 overflow-x-auto">
                     <button
                       onClick={() => setFiltroTipo(null)}
                       className="whitespace-nowrap text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors flex-shrink-0"
@@ -323,8 +334,8 @@ export default function Layout() {
                           <button
                             key={n.id}
                             onClick={() => clicarNotificacao(n)}
-                            className="w-full text-left flex items-start gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors border-b border-slate-50 group relative"
-                            style={{ backgroundColor: n.lida ? '#fff' : '#f0f9ff' }}
+                            className="w-full text-left flex items-start gap-3 px-4 py-3.5 hover:bg-[var(--bg-hover)] transition-colors border-b border-[var(--border-subtle)] group relative"
+                            style={{ backgroundColor: n.lida ? 'var(--bg-card)' : 'var(--bg-card-alt)' }}
                           >
                             {/* Avatar */}
                             <div
@@ -336,8 +347,8 @@ export default function Layout() {
 
                             {/* Texto */}
                             <div className="flex-1 min-w-0 pr-4">
-                              <p className="text-xs text-slate-700 leading-snug">
-                                <span className="font-semibold text-slate-800">{actor}</span>
+                              <p className="text-xs text-[var(--text-secondary)] leading-snug">
+                                <span className="font-semibold text-[var(--text-primary)]">{actor}</span>
                                 {' '}
                                 {n.action_text || n.mensagem}
                               </p>
@@ -384,7 +395,7 @@ export default function Layout() {
           </header>
 
           {/* Content */}
-          <main className="flex-1 overflow-y-auto p-6">
+          <main className="flex-1 overflow-y-auto p-6 bg-[var(--bg-page)]">
             <Outlet context={{ openDrawer: setDrawerTarget }} />
           </main>
         </div>

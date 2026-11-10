@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { User, Bell, Shield, Palette, Save, Eye, EyeOff, Download } from 'lucide-react'
+import { User, Bell, Shield, Palette, Save, Eye, EyeOff, Download, Sun, Moon } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 import api from '../services/api'
 
 const ABAS = [
@@ -61,6 +62,7 @@ function salvarPrefs(prefs) {
 
 export default function Configuracoes() {
   const { usuario } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const [aba, setAba] = useState('aparencia')
 
   // ── Aparência ────────────────────────────────────────────────
@@ -224,22 +226,20 @@ export default function Configuracoes() {
                 <Row label="Tema" desc="Modo de cor da interface">
                   <div className="flex gap-2">
                     {[
-                      { id: 'claro', label: '☀ Claro' },
-                      { id: 'escuro', label: '🌙 Escuro' },
-                    ].map(t => (
+                      { id: 'light', label: 'Claro',  Icon: Sun },
+                      { id: 'dark',  label: 'Escuro', Icon: Moon },
+                    ].map(({ id, label, Icon }) => (
                       <button
-                        key={t.id}
-                        disabled
-                        title="Em breve"
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors opacity-50 cursor-not-allowed"
-                        style={t.id === 'claro'
-                          ? { borderColor: '#0f4c5c', color: '#0f4c5c', backgroundColor: 'rgba(15,76,92,0.06)' }
-                          : { borderColor: '#e2e8f0', color: '#94a3b8' }}
+                        key={id}
+                        onClick={() => id !== theme && toggleTheme()}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
+                        style={theme === id
+                          ? { borderColor: '#0f4c5c', color: '#0f4c5c', backgroundColor: 'rgba(15,76,92,0.08)' }
+                          : { borderColor: 'var(--border)', color: 'var(--text-muted)', backgroundColor: 'var(--bg-card-alt)' }}
                       >
-                        {t.label}
+                        <Icon size={12} /> {label}
                       </button>
                     ))}
-                    <span className="self-center text-[10px] text-slate-300 ml-1">em breve</span>
                   </div>
                 </Row>
                 <div className="border-t border-slate-50" />

@@ -106,8 +106,8 @@ export default function Doacoes() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold text-slate-800">Doações</h1>
-          <p className="text-xs text-slate-400">
+          <h1 className="text-lg font-bold text-[var(--text-primary)]">Doações</h1>
+          <p className="text-xs text-[var(--text-muted)]">
             {lista.length} registro{lista.length !== 1 ? 's' : ''} · Total confirmado:{' '}
             <span className="font-semibold" style={{ color: '#0f4c5c' }}>{formatBRL(totalFiltrado)}</span>
           </p>

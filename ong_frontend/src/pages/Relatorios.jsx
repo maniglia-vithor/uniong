@@ -55,12 +55,12 @@ export default function Relatorios() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-lg font-bold text-slate-800">Relatórios</h1>
-        <p className="text-xs text-slate-400">Exporte dados para prestação de contas e análises externas</p>
+        <h1 className="text-lg font-bold text-[var(--text-primary)]">Relatórios</h1>
+        <p className="text-xs text-[var(--text-muted)]">Exporte dados para prestação de contas e análises externas</p>
       </div>
 
       {/* Info */}
-      <div className="bg-blue-50 border border-blue-100 rounded-xl px-5 py-4 text-sm text-blue-700 flex items-start gap-3">
+      <div className="bg-blue-50 dark:bg-blue-950 border border-blue-100 dark:border-blue-900 rounded-xl px-5 py-4 text-sm text-blue-700 dark:text-blue-300 flex items-start gap-3">
         <div className="mt-0.5 flex-shrink-0">
           <CheckCircle size={16} className="text-blue-400" />
         </div>
@@ -79,18 +79,18 @@ export default function Relatorios() {
           const erro = estado === 'erro'
 
           return (
-            <div key={tipo} className="bg-white rounded-xl border border-slate-100 shadow-sm p-6 flex flex-col gap-4">
+            <div key={tipo} className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-6 flex flex-col gap-4">
               <div className="flex items-center gap-3">
                 <div
                   className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: `${cor}15` }}
+                  style={{ backgroundColor: `${cor}22` }}
                 >
                   <Icone size={22} style={{ color: cor }} />
                 </div>
-                <h3 className="font-semibold text-slate-800 leading-snug">{titulo}</h3>
+                <h3 className="font-semibold text-[var(--text-primary)] leading-snug">{titulo}</h3>
               </div>
 
-              <p className="text-sm text-slate-500 leading-relaxed flex-1">{descricao}</p>
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed flex-1">{descricao}</p>
 
               {erro && (
                 <div className="flex items-center gap-2 text-xs text-red-500">

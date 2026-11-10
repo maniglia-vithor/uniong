@@ -1,24 +1,68 @@
 @import "tailwindcss";
 
+/* ── Tailwind v4: habilita dark: via data-theme="dark" no <html> ── */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* ── Tokens de cor (light) ─────────────────────────────────────── */
+:root {
+  --bg-page:      #f1f5f9;
+  --bg-card:      #ffffff;
+  --bg-card-alt:  #f8fafc;
+  --bg-input:     #ffffff;
+  --bg-hover:     #f8fafc;
+  --text-primary:   #1e293b;
+  --text-secondary: #475569;
+  --text-muted:     #94a3b8;
+  --border:         #e2e8f0;
+  --border-subtle:  #f1f5f9;
+  --shadow:         0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+}
+
+/* ── Tokens de cor (dark) ──────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg-page:      #0f172a;
+  --bg-card:      #1e293b;
+  --bg-card-alt:  #263347;
+  --bg-input:     #1e293b;
+  --bg-hover:     #263347;
+  --text-primary:   #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted:     #64748b;
+  --border:         #334155;
+  --border-subtle:  #1e293b;
+  --shadow:         0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
+}
+
+/* ── Base ──────────────────────────────────────────────────────── */
 @layer base {
-  * {
-    box-sizing: border-box;
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    background-color: var(--bg-page);
+    color: var(--text-primary);
+    transition: background-color 0.2s, color 0.2s;
   }
+
   /* remove outline de foco em elementos SVG do Recharts */
   .recharts-wrapper, .recharts-wrapper * {
     outline: none !important;
   }
 
-  /* ── react-datepicker: ajustes visuais para o design system ── */
-  .react-datepicker-popper {
-    z-index: 9999 !important;
-  }
+  /* ── Scrollbar escura ── */
+  [data-theme="dark"] ::-webkit-scrollbar { width: 6px; height: 6px; }
+  [data-theme="dark"] ::-webkit-scrollbar-track { background: #1e293b; }
+  [data-theme="dark"] ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+
+  /* ── react-datepicker ── */
+  .react-datepicker-popper { z-index: 9999 !important; }
   .react-datepicker {
     font-family: 'Inter', 'Segoe UI', sans-serif;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--border);
     border-radius: 12px;
     box-shadow: 0 4px 24px rgba(15,76,92,0.10);
     overflow: hidden;
+    background-color: var(--bg-card);
   }
   .react-datepicker__header {
     background-color: #0f4c5c;
@@ -27,43 +71,24 @@
   }
   .react-datepicker__current-month,
   .react-datepicker__day-name,
-  .react-datepicker-time__header {
-    color: #fff;
-    font-weight: 600;
-    font-size: 12px;
-  }
-  .react-datepicker__day-name {
-    font-weight: 500;
-    opacity: 0.75;
-  }
-  .react-datepicker__navigation-icon::before {
-    border-color: #fff;
-  }
-  .react-datepicker__navigation:hover *::before {
-    border-color: #f97316;
-  }
+  .react-datepicker-time__header { color: #fff; font-weight: 600; font-size: 12px; }
+  .react-datepicker__day-name { font-weight: 500; opacity: 0.75; }
+  .react-datepicker__navigation-icon::before { border-color: #fff; }
+  .react-datepicker__navigation:hover *::before { border-color: #f97316; }
   .react-datepicker__day {
-    color: #334155;
+    color: var(--text-primary);
     font-size: 12px;
     border-radius: 6px;
   }
-  .react-datepicker__day:hover {
-    background-color: #e0f2f7;
-    color: #0f4c5c;
-  }
+  .react-datepicker__day:hover { background-color: #e0f2f7; color: #0f4c5c; }
   .react-datepicker__day--selected,
   .react-datepicker__day--keyboard-selected {
     background-color: #0f4c5c !important;
     color: #fff !important;
     border-radius: 6px;
   }
-  .react-datepicker__day--today {
-    font-weight: 700;
-    color: #f97316;
-  }
-  .react-datepicker__day--today.react-datepicker__day--selected {
-    color: #fff !important;
-  }
+  .react-datepicker__day--today { font-weight: 700; color: #f97316; }
+  .react-datepicker__day--today.react-datepicker__day--selected { color: #fff !important; }
   .react-datepicker__month-select,
   .react-datepicker__year-select {
     font-size: 11px;
@@ -74,13 +99,11 @@
     padding: 1px 4px;
   }
   .react-datepicker__month-select option,
-  .react-datepicker__year-select option {
-    color: #334155;
-    background: #fff;
+  .react-datepicker__year-select option { color: #334155; background: #fff; }
+
+  /* dark mode: dias do datepicker */
+  [data-theme="dark"] .react-datepicker__day:not(.react-datepicker__day--selected):not(.react-datepicker__day--keyboard-selected) {
+    color: #cbd5e1;
   }
-  body {
-    font-family: 'Inter', 'Segoe UI', sans-serif;
-    background-color: #f1f5f9;
-    color: #1e293b;
-  }
+  [data-theme="dark"] .react-datepicker__day:hover { background-color: #1e3a4a; color: #7dd3f0; }
 }

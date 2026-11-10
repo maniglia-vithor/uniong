@@ -47,7 +47,7 @@ export default function CampoData({ name, value, onChange, required, placeholder
       showMonthDropdown
       showYearDropdown
       dropdownMode="select"
-      className="w-full px-3 py-2 text-sm border rounded-lg outline-none transition-colors focus:ring-2 focus:ring-offset-0 border-slate-200 focus:border-teal-500 focus:ring-teal-100 bg-white text-slate-800 placeholder-slate-300"
+      className="w-full px-3 py-2 text-sm border rounded-lg outline-none transition-colors focus:ring-2 focus:ring-offset-0 border-[var(--border)] focus:border-teal-500 focus:ring-teal-100 bg-[var(--bg-input)] text-[var(--text-primary)] placeholder-[var(--text-muted)]"
       wrapperClassName="w-full"
       popperClassName="z-[9999]"
     />

@@ -14,12 +14,12 @@ export default function Modal({ titulo, onFechar, children }) {
       style={{ backgroundColor: 'rgba(15,76,92,0.35)', backdropFilter: 'blur(2px)' }}
       onClick={(e) => e.target === e.currentTarget && onFechar()}
     >
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h3 className="font-semibold text-slate-800">{titulo}</h3>
+      <div className="bg-[var(--bg-card)] rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col border border-[var(--border)]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+          <h3 className="font-semibold text-[var(--text-primary)]">{titulo}</h3>
           <button
             onClick={onFechar}
-            className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600"
+            className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
           >
             <X size={16} />
           </button>
