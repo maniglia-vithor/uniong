@@ -109,7 +109,7 @@ export default function Campanhas() {
 
       {carregando ? (
         <div className="flex justify-center py-16">
-          <div className="w-8 h-8 border-4 border-slate-200 rounded-full animate-spin" style={{ borderTopColor: '#0f4c5c' }} />
+          <div className="w-8 h-8 border-4 border-[var(--border)] rounded-full animate-spin" style={{ borderTopColor: '#0f4c5c' }} />
         </div>
       ) : !erro && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

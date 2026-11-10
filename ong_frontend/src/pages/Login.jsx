@@ -139,7 +139,7 @@ export default function Login() {
           </div>
 
           {/* Card */}
-          <div className="bg-white rounded-2xl shadow-xl p-8 border border-slate-100">
+          <div className="bg-[var(--bg-card)] rounded-2xl shadow-xl p-8 border border-[var(--border)]">
 
             {/* Barra topo do card */}
             <div
@@ -148,8 +148,8 @@ export default function Login() {
             />
 
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-800">Bem-vindo de volta</h2>
-              <p className="text-sm text-slate-400 mt-1">Acesse o painel administrativo</p>
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">Bem-vindo de volta</h2>
+              <p className="text-sm text-[var(--text-muted)] mt-1">Acesse o painel administrativo</p>
             </div>
 
             <form onSubmit={onSubmit} className="space-y-4">
@@ -165,7 +165,7 @@ export default function Login() {
                   onChange={onChange}
                   placeholder="admin"
                   required
-                  className="w-full px-3 py-2.5 text-sm border rounded-lg outline-none bg-slate-50 focus:bg-white transition-colors"
+                  className="w-full px-3 py-2.5 text-sm border rounded-lg outline-none bg-[var(--bg-card-alt)] focus:bg-[var(--bg-input)] text-[var(--text-primary)] transition-colors"
                   style={{ borderColor: '#cbd5e1' }}
                   onFocus={e => { e.target.style.borderColor = '#0f4c5c'; e.target.style.boxShadow = '0 0 0 3px rgba(15,76,92,0.1)' }}
                   onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none' }}
@@ -185,7 +185,7 @@ export default function Login() {
                     onChange={onChange}
                     placeholder="••••••••"
                     required
-                    className="w-full px-3 py-2.5 pr-10 text-sm border rounded-lg outline-none bg-slate-50 focus:bg-white transition-colors"
+                    className="w-full px-3 py-2.5 pr-10 text-sm border rounded-lg outline-none bg-[var(--bg-card-alt)] focus:bg-[var(--bg-input)] text-[var(--text-primary)] transition-colors"
                     style={{ borderColor: '#cbd5e1' }}
                     onFocus={e => { e.target.style.borderColor = '#0f4c5c'; e.target.style.boxShadow = '0 0 0 3px rgba(15,76,92,0.1)' }}
                     onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none' }}
@@ -236,9 +236,9 @@ export default function Login() {
 
             {/* Divider */}
             <div className="flex items-center gap-3 my-5">
-              <div className="flex-1 h-px bg-slate-100" />
-              <span className="text-xs text-slate-400 font-medium">OU</span>
-              <div className="flex-1 h-px bg-slate-100" />
+              <div className="flex-1 h-px bg-[var(--border)]" />
+              <span className="text-xs text-[var(--text-muted)] font-medium">OU</span>
+              <div className="flex-1 h-px bg-[var(--border)]" />
             </div>
 
             {/* Botão Google */}
@@ -247,12 +247,12 @@ export default function Login() {
               onClick={() => googleLogin()}
               disabled={carregandoGoogle}
               className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors border disabled:opacity-60"
-              style={{ color: '#334155', borderColor: '#e2e8f0', backgroundColor: '#fff' }}
-              onMouseEnter={e => { if (!carregandoGoogle) e.currentTarget.style.backgroundColor = '#f8fafc' }}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = '#fff'}
+              style={{ color: 'var(--text-primary)', borderColor: 'var(--border)', backgroundColor: 'var(--bg-card-alt)' }}
+              onMouseEnter={e => { if (!carregandoGoogle) e.currentTarget.style.backgroundColor = 'var(--bg-hover)' }}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--bg-card-alt)'}
             >
               {carregandoGoogle ? (
-                <div className="w-4 h-4 border-2 border-slate-200 border-t-slate-500 rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-[var(--border)] border-t-[var(--text-secondary)] rounded-full animate-spin" />
               ) : (
                 <svg width="16" height="16" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                   <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -266,7 +266,7 @@ export default function Login() {
             </button>
           </div>
 
-          <p className="text-center text-xs text-slate-400 mt-5">
+          <p className="text-center text-xs text-[var(--text-muted)] mt-5">
             UniONG · Portal Unificado para Pequenas ONG's
           </p>
         </div>

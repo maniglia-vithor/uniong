@@ -168,7 +168,7 @@ export default function KpiDetailPanel({ kpi, onClose }) {
           {carregando ? (
             <div className="flex justify-center py-16">
               <div
-                className="w-8 h-8 border-4 border-slate-200 rounded-full animate-spin"
+                className="w-8 h-8 border-4 border-[var(--border)] rounded-full animate-spin"
                 style={{ borderTopColor: '#0f4c5c' }}
               />
             </div>

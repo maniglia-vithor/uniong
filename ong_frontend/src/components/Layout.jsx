@@ -2,10 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Megaphone, HandCoins, Users,
-  MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X, Settings, Sun, Moon,
+  MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X, Settings,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { useTheme } from '../context/ThemeContext'
+
 import api from '../services/api'
 import logoIcon from '../assets/logo-icon-uniong.png.jpg'
 import RecordDetailDrawer from './RecordDetailDrawer'
@@ -60,7 +60,7 @@ function avatarCor(nome = '') {
 export default function Layout() {
   const { pathname } = useLocation()
   const { usuario, logout } = useAuth()
-  const { theme, toggleTheme } = useTheme()
+
   const navigate = useNavigate()
   const paginaAtual = titulos[pathname] || titulos['/admin']
 
@@ -214,15 +214,6 @@ export default function Layout() {
             {/* Theme + Settings + Bell */}
             <div className="flex items-center gap-1">
             <button
-              onClick={toggleTheme}
-              className="p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
-              title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
-            >
-              {theme === 'dark'
-                ? <Sun size={18} className="text-amber-400" />
-                : <Moon size={18} className="text-slate-500" />}
-            </button>
-            <button
               onClick={() => navigate('/admin/configuracoes')}
               className="p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
               title="Configurações"
@@ -236,7 +227,7 @@ export default function Layout() {
                 onClick={() => setAberto(v => !v)}
                 className="relative p-2 rounded-lg hover:bg-slate-100 transition-colors"
               >
-                <Bell size={18} className="text-slate-500" />
+                <Bell size={18} className="text-[var(--text-muted)]" />
                 {naoLidas > 0 && (
                   <span
                     className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full text-[10px] font-bold text-white flex items-center justify-center px-1"
@@ -324,7 +315,7 @@ export default function Layout() {
                     {lista.length === 0 ? (
                       <div className="py-12 text-center">
                         <Bell size={32} className="mx-auto mb-3 text-slate-200" />
-                        <p className="text-sm text-slate-400">Nenhuma notificação</p>
+                        <p className="text-sm text-[var(--text-muted)]">Nenhuma notificação</p>
                       </div>
                     ) : (
                       lista.map(n => {
@@ -364,7 +355,7 @@ export default function Layout() {
                                     </span>
                                   )
                                 })()}
-                                <span className="text-[11px] text-slate-400">{formatarTempo(n.criada_em)}</span>
+                                <span className="text-[11px] text-[var(--text-muted)]">{formatarTempo(n.criada_em)}</span>
                               </div>
                             </div>
 
@@ -381,7 +372,7 @@ export default function Layout() {
                               onClick={e => remover(e, n.id)}
                               className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-slate-200 transition-all"
                             >
-                              <X size={12} className="text-slate-400" />
+                              <X size={12} className="text-[var(--text-muted)]" />
                             </button>
                           </button>
                         )

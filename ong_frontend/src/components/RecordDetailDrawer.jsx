@@ -374,7 +374,7 @@ export default function RecordDetailDrawer({ target, onClose, onRefresh }) {
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {carregando ? (
             <div className="flex justify-center py-16">
-              <div className="w-8 h-8 border-4 border-slate-200 rounded-full animate-spin" style={{ borderTopColor: '#0f4c5c' }} />
+              <div className="w-8 h-8 border-4 border-[var(--border)] rounded-full animate-spin" style={{ borderTopColor: '#0f4c5c' }} />
             </div>
           ) : !record ? (
             <p className="text-slate-400 text-sm text-center py-12">Registro não encontrado.</p>
