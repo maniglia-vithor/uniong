@@ -63,6 +63,7 @@ export default function Layout() {
 
   const [notificacoes, setNotificacoes] = useState([])
   const [abaAtiva, setAbaAtiva] = useState('todas')
+  const [filtroTipo, setFiltroTipo] = useState(null)
   const [aberto, setAberto] = useState(false)
   const [drawerTarget, setDrawerTarget] = useState(null)
   const dropdownRef = useRef(null)
@@ -121,9 +122,9 @@ export default function Layout() {
     navigate('/login', { replace: true })
   }
 
-  const lista = abaAtiva === 'nao_lidas'
-    ? notificacoes.filter(n => !n.lida)
-    : notificacoes
+  const lista = notificacoes
+    .filter(n => abaAtiva === 'nao_lidas' ? !n.lida : true)
+    .filter(n => filtroTipo ? n.tipo === filtroTipo : true)
 
   return (
     <>
@@ -245,7 +246,7 @@ export default function Layout() {
                     )}
                   </div>
 
-                  {/* Abas */}
+                  {/* Abas lidas/não lidas */}
                   <div className="flex border-b border-slate-100 flex-shrink-0">
                     {[
                       { id: 'todas', label: 'Todas' },
@@ -263,6 +264,37 @@ export default function Layout() {
                         {aba.label}
                       </button>
                     ))}
+                  </div>
+
+                  {/* Pills de categoria */}
+                  <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-slate-100 flex-shrink-0 overflow-x-auto">
+                    <button
+                      onClick={() => setFiltroTipo(null)}
+                      className="whitespace-nowrap text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors flex-shrink-0"
+                      style={filtroTipo === null
+                        ? { backgroundColor: '#0f4c5c', color: '#fff' }
+                        : { backgroundColor: '#f1f5f9', color: '#64748b' }}
+                    >
+                      Todos
+                    </button>
+                    {Object.entries(tipoBadge).map(([tipo, b]) => {
+                      const count = notificacoes.filter(n => n.tipo === tipo && (abaAtiva === 'nao_lidas' ? !n.lida : true)).length
+                      if (count === 0) return null
+                      const ativo = filtroTipo === tipo
+                      return (
+                        <button
+                          key={tipo}
+                          onClick={() => setFiltroTipo(ativo ? null : tipo)}
+                          className="whitespace-nowrap text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors flex-shrink-0 flex items-center gap-1"
+                          style={ativo
+                            ? { backgroundColor: b.color, color: '#fff' }
+                            : { backgroundColor: b.bg, color: b.color }}
+                        >
+                          {b.label}
+                          <span className="opacity-70">{count}</span>
+                        </button>
+                      )
+                    })}
                   </div>
 
                   {/* Lista estilo Jira */}
