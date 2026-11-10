@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Megaphone, HandCoins, Users,
-  MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X,
+  MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X, Settings,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import api from '../services/api'
@@ -27,6 +27,7 @@ const titulos = {
   '/admin/comunicacao': { titulo: 'Comunicação', sub: 'Mensagens e notificações' },
   '/admin/custos': { titulo: 'Custos', sub: 'Gestão de despesas e transparência financeira' },
   '/admin/relatorios': { titulo: 'Relatórios', sub: 'Análises e exportações' },
+  '/admin/configuracoes': { titulo: 'Configurações', sub: 'Preferências e gerenciamento do sistema' },
 }
 
 const tipoBadge = {
@@ -208,6 +209,16 @@ export default function Layout() {
               <p className="text-xs text-slate-400">{paginaAtual.sub}</p>
             </div>
 
+            {/* Settings + Bell */}
+            <div className="flex items-center gap-1">
+            <button
+              onClick={() => navigate('/admin/configuracoes')}
+              className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+              title="Configurações"
+            >
+              <Settings size={18} className="text-slate-500" />
+            </button>
+
             {/* Bell */}
             <div className="relative" ref={dropdownRef}>
               <button
@@ -368,6 +379,7 @@ export default function Layout() {
                   </div>
                 </div>
               )}
+            </div>
             </div>
           </header>
 

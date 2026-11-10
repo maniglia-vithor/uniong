@@ -12,6 +12,7 @@ import Apoiadores from './pages/Apoiadores'
 import Comunicacao from './pages/Comunicacao'
 import Custos from './pages/Custos'
 import Relatorios from './pages/Relatorios'
+import Configuracoes from './pages/Configuracoes'
 
 export default function App() {
   return (
@@ -36,6 +37,7 @@ export default function App() {
               <Route path="comunicacao" element={<Comunicacao />} />
               <Route path="custos" element={<Custos />} />
               <Route path="relatorios" element={<Relatorios />} />
+              <Route path="configuracoes" element={<Configuracoes />} />
             </Route>
           </Route>
 
