@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Megaphone, HandCoins, Users,
   MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X, Settings,
-  ChevronUp, ShieldCheck, Eye, Globe,
+  ChevronUp, ShieldCheck, Eye,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useRole } from '../context/RoleContext'
@@ -20,7 +20,6 @@ const navItems = [
   { to: '/admin/comunicacao', label: 'Comunicação', icon: MessageSquare },
   { to: '/admin/custos', label: 'Custos', icon: Receipt },
   { to: '/admin/relatorios', label: 'Relatórios', icon: BarChart3 },
-  { to: '/admin/transparencia', label: 'Transparência', icon: Globe },
 ]
 
 const titulos = {
@@ -32,7 +31,6 @@ const titulos = {
   '/admin/custos': { titulo: 'Custos', sub: 'Gestão de despesas e transparência financeira' },
   '/admin/relatorios': { titulo: 'Relatórios', sub: 'Análises e exportações' },
   '/admin/configuracoes': { titulo: 'Configurações', sub: 'Preferências e gerenciamento do sistema' },
-  '/admin/transparencia': { titulo: 'Transparência', sub: 'Dados públicos e prestação de contas' },
 }
 
 const tipoBadge = {
@@ -236,7 +234,7 @@ export default function Layout() {
                       onClick={() => {
                         switchRole(id)
                         setSwitcherAberto(false)
-                        navigate(id === 'membro' ? '/admin/transparencia' : '/admin')
+                        navigate(id === 'membro' ? '/transparencia' : '/admin')
                       }}
                       className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 transition-colors"
                     >

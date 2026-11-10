@@ -4,7 +4,6 @@ import { AuthProvider } from './context/AuthContext'
 import RotaProtegida from './components/RotaProtegida'
 import Layout from './components/Layout'
 import Login from './pages/Login'
-import CommunityPanel from './pages/CommunityPanel'
 import Dashboard from './pages/Dashboard'
 import Campanhas from './pages/Campanhas'
 import Doacoes from './pages/Doacoes'
@@ -25,7 +24,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/transparencia" replace />} />
 
           {/* Rotas públicas */}
-          <Route path="/transparencia" element={<CommunityPanel />} />
+          <Route path="/transparencia" element={<Transparencia />} />
           <Route path="/login" element={<Login />} />
 
           {/* Rotas administrativas protegidas */}
@@ -39,7 +38,6 @@ export default function App() {
               <Route path="custos" element={<Custos />} />
               <Route path="relatorios" element={<Relatorios />} />
               <Route path="configuracoes" element={<Configuracoes />} />
-              <Route path="transparencia" element={<Transparencia />} />
             </Route>
           </Route>
 

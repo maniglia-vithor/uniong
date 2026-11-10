@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   HeartHandshake, DollarSign, Megaphone, Users, TrendingUp,
-  Receipt, ShieldOff,
+  Receipt, ShieldOff, ShieldCheck, ExternalLink, ArrowLeft,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -9,6 +10,7 @@ import {
 } from 'recharts'
 import axios from 'axios'
 import BarraProgresso from '../components/BarraProgresso'
+import { useRole } from '../context/RoleContext'
 
 function formatBRL(v) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v ?? 0)
@@ -42,9 +44,16 @@ function KpiCard({ label, valor, desc, icone: Icon, cor }) {
 }
 
 export default function Transparencia() {
+  const { role, switchRole } = useRole()
+  const navigate = useNavigate()
   const [dados, setDados] = useState(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
+
+  function voltarParaAdmin() {
+    switchRole('admin')
+    navigate('/admin')
+  }
 
   useEffect(() => {
     axios.get('/api/public/transparencia/')
@@ -68,7 +77,42 @@ export default function Transparencia() {
   })).filter(c => c.value > 0) ?? []
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-[var(--bg-page)]">
+      {/* Header */}
+      <header className="bg-[var(--bg-card)] border-b border-[var(--border)] sticky top-0 z-10">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#0f4c5c' }}>
+              <HeartHandshake size={18} className="text-white" />
+            </div>
+            <div>
+              <p className="font-bold text-[var(--text-primary)] text-sm leading-tight">UniONG</p>
+              <p className="text-xs text-[var(--text-muted)]">Portal de Transparência</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {role === 'membro' && (
+              <button
+                onClick={voltarParaAdmin}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border"
+                style={{ color: '#7c3aed', borderColor: '#7c3aed40', backgroundColor: '#7c3aed10' }}
+              >
+                <ArrowLeft size={12} />
+                Voltar ao Painel
+              </button>
+            )}
+            <Link
+              to="/login"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors border border-[var(--border)]"
+            >
+              <ShieldCheck size={13} />
+              Área Restrita
+            </Link>
+          </div>
+        </div>
+      </header>
+
+    <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
       {/* Hero */}
       <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-6 flex items-center gap-4">
         <div
@@ -290,6 +334,17 @@ export default function Transparencia() {
           </div>
         </>
       )}
+    </div>
+
+      {/* Footer */}
+      <footer className="border-t border-[var(--border)] bg-[var(--bg-card)] mt-12">
+        <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between text-xs text-[var(--text-muted)]">
+          <span>© {new Date().getFullYear()} UniONG · Portal de Transparência</span>
+          <Link to="/login" className="flex items-center gap-1 hover:text-[var(--text-secondary)] transition-colors">
+            <ExternalLink size={11} /> Acesso Administrativo
+          </Link>
+        </div>
+      </footer>
     </div>
   )
 }
