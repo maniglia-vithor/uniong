@@ -160,6 +160,7 @@ export default function Dashboard() {
           rotuloTendencia={`Receitas ${formatBRL(resumo.saldo_mes.receitas_mes)} − despesas pagas ${formatBRL(resumo.saldo_mes.despesas_mes)}`}
           icone={Scale}
           cor="#16a34a"
+          onClick={() => setPainelKpi('saldo_mes')}
         />
         {resumo.voluntarios_ativos && (
           <>
@@ -170,6 +171,7 @@ export default function Dashboard() {
               rotuloTendencia="Cadastros com situação Ativo"
               icone={HandHeart}
               cor="#db2777"
+              onClick={() => setPainelKpi('voluntarios_ativos')}
             />
             <KpiCard
               titulo="Horas de Voluntariado no Mês"
@@ -178,6 +180,7 @@ export default function Dashboard() {
               rotuloTendencia="Horas registradas nas atividades do mês"
               icone={Clock}
               cor="#0891b2"
+              onClick={() => setPainelKpi('horas_voluntariado_mes')}
             />
           </>
         )}

@@ -20,7 +20,7 @@ from rest_framework.response import Response
 
 from django.db import transaction
 
-from .models import Apoiador, Campanha, Contribuicao, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoInstituicao, ConfiguracaoPix, LogAlteracao
+from .models import Apoiador, Campanha, Contribuicao, Doacao, InscricaoAtividade, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoInstituicao, ConfiguracaoPix, LogAlteracao
 from .anexos import TIPOS_PERMITIDOS, validar_anexo
 from .doacao_publica import DoacaoPublicaSerializer, ativar_membro_interessado, registrar_doacao_publica
 from . import comunicados, indicadores, lgpd, recibos
@@ -427,6 +427,55 @@ class DashboardViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'], url_path='kpi-doacoes-mes')
     def kpi_doacoes_mes(self, request):
         return Response(self._lista_doacoes(indicadores.doacoes_do_mes()))
+
+    @action(detail=False, methods=['get'], url_path='kpi-saldo-mes')
+    def kpi_saldo_mes(self, request):
+        """Movimentos que compõem o saldo do mês: doações confirmadas (+) e despesas pagas (−)."""
+        receitas = [
+            {
+                'id': f'doacao-{d.id}', 'data': d.data.isoformat(), 'tipo': 'Receita',
+                'descricao': f'Doação de {d.nome_doador}' + (f' — {d.campanha.titulo}' if d.campanha else ''),
+                'valor': float(d.valor),
+            }
+            for d in indicadores.doacoes_do_mes().select_related('apoiador', 'campanha')
+        ]
+        despesas = [
+            {
+                'id': f'despesa-{d.id}', 'data': d.data_pagamento.isoformat(), 'tipo': 'Despesa',
+                'descricao': f'{d.descricao} ({d.get_categoria_display()})',
+                'valor': -float(d.valor),
+            }
+            for d in indicadores.despesas_pagas_no_mes()
+        ]
+        return Response(sorted(receitas + despesas, key=lambda m: (m['data'], m['id']), reverse=True))
+
+    @action(detail=False, methods=['get'], url_path='kpi-voluntarios-ativos')
+    def kpi_voluntarios_ativos(self, request):
+        qs = indicadores.voluntarios_ativos().annotate(horas=Sum('inscricoes__horas')).order_by('nome')
+        return Response([
+            {
+                'id': v.id, 'nome': v.nome, 'contato': ' · '.join(x for x in (v.email, v.telefone) if x),
+                'areas_interesse': v.areas_interesse, 'horas_total': float(v.horas or 0),
+            }
+            for v in qs
+        ])
+
+    @action(detail=False, methods=['get'], url_path='kpi-horas-voluntariado-mes')
+    def kpi_horas_voluntariado_mes(self, request):
+        """Inscrições com horas registradas em atividades do mês."""
+        inicio, fim = indicadores.limites_mes()
+        qs = (
+            InscricaoAtividade.objects.select_related('voluntario', 'atividade')
+            .filter(atividade__data__gte=inicio, atividade__data__lte=fim, horas__isnull=False)
+            .order_by('-atividade__data', 'voluntario__nome')
+        )
+        return Response([
+            {
+                'id': i.id, 'voluntario': i.voluntario.nome, 'atividade': i.atividade.titulo,
+                'data': i.atividade.data.isoformat(), 'horas': float(i.horas),
+            }
+            for i in qs
+        ])
 
     @action(detail=False, methods=['get'], url_path='kpi-apoiadores-ativos')
     def kpi_apoiadores_ativos(self, request):

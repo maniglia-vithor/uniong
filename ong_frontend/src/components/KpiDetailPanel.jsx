@@ -8,6 +8,9 @@ import {
   getKpiApoiadoresAtivos,
   getKpiCampanhasAtivas,
   getDoacoesPorMes,
+  getKpiSaldoMes,
+  getKpiVoluntariosAtivos,
+  getKpiHorasVoluntariadoMes,
 } from '../services/api'
 
 function formatBRL(v) {
@@ -18,6 +21,10 @@ function formatData(iso) {
   if (!iso) return '—'
   const [y, m, d] = iso.split('-')
   return `${d}/${m}/${y}`
+}
+
+function formatHoras(h) {
+  return `${Number(h ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} h`
 }
 
 const COLUNAS_DOACOES_MES = [
@@ -60,6 +67,36 @@ const CONFIG = {
       { key: 'data_fim', label: 'Encerramento', tipo: 'data', render: formatData },
       { key: 'meta_valor', label: 'Meta', tipo: 'numero', render: formatBRL },
       { key: 'valor_arrecadado', label: 'Arrecadado', tipo: 'numero', render: formatBRL },
+    ],
+  },
+  saldo_mes: {
+    titulo: 'Saldo do Mês — Doações Confirmadas e Despesas Pagas',
+    fetchFn: () => getKpiSaldoMes(),
+    colunas: [
+      { key: 'data', label: 'Data', tipo: 'data', render: formatData },
+      { key: 'tipo', label: 'Tipo', tipo: 'texto' },
+      { key: 'descricao', label: 'Descrição', tipo: 'texto' },
+      { key: 'valor', label: 'Valor', tipo: 'numero', render: formatBRL },
+    ],
+  },
+  voluntarios_ativos: {
+    titulo: 'Voluntários Ativos',
+    fetchFn: () => getKpiVoluntariosAtivos(),
+    colunas: [
+      { key: 'nome', label: 'Nome', tipo: 'texto' },
+      { key: 'contato', label: 'Contato', tipo: 'texto', render: (v) => v || '—' },
+      { key: 'areas_interesse', label: 'Áreas de interesse', tipo: 'texto', render: (v) => v || '—' },
+      { key: 'horas_total', label: 'Horas (total)', tipo: 'numero', render: formatHoras },
+    ],
+  },
+  horas_voluntariado_mes: {
+    titulo: 'Horas de Voluntariado no Mês',
+    fetchFn: () => getKpiHorasVoluntariadoMes(),
+    colunas: [
+      { key: 'data', label: 'Data', tipo: 'data', render: formatData },
+      { key: 'atividade', label: 'Atividade', tipo: 'texto' },
+      { key: 'voluntario', label: 'Voluntário', tipo: 'texto' },
+      { key: 'horas', label: 'Horas', tipo: 'numero', render: formatHoras },
     ],
   },
 }

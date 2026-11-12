@@ -66,6 +66,9 @@ export const getKpiDoacoes          = () => api.get('/dashboard/kpi-doacoes/')
 export const getKpiDoacoesMes       = () => api.get('/dashboard/kpi-doacoes-mes/')
 export const getKpiApoiadoresAtivos = () => api.get('/dashboard/kpi-apoiadores-ativos/')
 export const getKpiCampanhasAtivas  = () => api.get('/dashboard/kpi-campanhas-ativas/')
+export const getKpiSaldoMes         = () => api.get('/dashboard/kpi-saldo-mes/')
+export const getKpiVoluntariosAtivos = () => api.get('/dashboard/kpi-voluntarios-ativos/')
+export const getKpiHorasVoluntariadoMes = () => api.get('/dashboard/kpi-horas-voluntariado-mes/')
 export const getDoacoesPorMes       = (mes) => api.get(`/dashboard/doacoes-por-mes/?mes=${mes}`)
 
 // Apoiadores

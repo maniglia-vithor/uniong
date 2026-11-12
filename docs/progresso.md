@@ -277,5 +277,6 @@ Decisões tomadas:
 Branch `fase-8-visao-membro` (a partir de `fase-7-artigo`), a pedido do autor, para a demonstração na banca.
 - [x] Controle “Administrador | Membro” no topo do painel. “Membro” abre o portal público (`/transparencia`), que é o que um membro vê. No portal, quem está logado vê o botão “Voltar à visão de administrador”.
 - [x] Configurações → Instituição: bloco “Portal de transparência” com o endereço público (`<origem>/transparencia`) e os botões “Abrir portal” e “Copiar link”.
+- [x] Painel: os cartões “Saldo do Mês”, “Voluntários Ativos” e “Horas de Voluntariado no Mês” abrem a lista detalhada, como os demais. Endpoints novos: `/api/dashboard/kpi-saldo-mes/` (doações confirmadas e despesas pagas do mês, com sinal), `kpi-voluntarios-ativos/` e `kpi-horas-voluntariado-mes/`, com testes.
 
 Decisão: é só um atalho de navegação, sem papel simulado nem mudança de permissões. Por isso não reverte a decisão do CLAUDE.md que removeu o seletor simulado de perfil: membros continuam sem login, e o papel exibido continua vindo do backend.

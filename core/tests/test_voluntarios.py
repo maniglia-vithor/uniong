@@ -78,3 +78,34 @@ class VoluntariosTests(TestCase):
         atividade = Atividade.objects.create(titulo='X', data=date(2026, 3, 1), vagas=5)
         InscricaoAtividade.objects.create(atividade=atividade, voluntario=v)
         self.assertEqual(self.cliente.delete(f'/api/voluntarios/{v.id}/').status_code, 400)
+
+
+class KpisNovosTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.cliente = APIClient()
+        self.cliente.force_authenticate(criar_staff())
+
+    def test_detalhes_de_voluntarios_e_horas_do_mes(self):
+        ana = criar_voluntario(nome='Ana')
+        criar_voluntario(nome='Inativo', status='inativo')
+        marco = Atividade.objects.create(titulo='Mutirão', data=date(2026, 3, 10), vagas=5)
+        fevereiro = Atividade.objects.create(titulo='Bazar', data=date(2026, 2, 10), vagas=5)
+        InscricaoAtividade.objects.create(atividade=marco, voluntario=ana, horas=Decimal('3.5'))
+        InscricaoAtividade.objects.create(atividade=fevereiro, voluntario=ana, horas=Decimal('2'))
+        with relogio(2026, 3, 20):
+            horas = self.cliente.get('/api/dashboard/kpi-horas-voluntariado-mes/').data
+        self.assertEqual([(h['voluntario'], h['atividade'], h['horas']) for h in horas], [('Ana', 'Mutirão', 3.5)])
+        ativos = self.cliente.get('/api/dashboard/kpi-voluntarios-ativos/').data
+        self.assertEqual([(v['nome'], v['horas_total']) for v in ativos], [('Ana', 5.5)])
+
+    def test_detalhe_do_saldo_do_mes(self):
+        from .factories import criar_despesa, criar_doacao
+        criar_doacao(valor=Decimal('100'), data=date(2026, 3, 5))
+        criar_doacao(valor=Decimal('50'), data=date(2026, 2, 5))
+        criar_despesa(valor=Decimal('30'), status='pago', data_vencimento=date(2026, 3, 1), data_pagamento=date(2026, 3, 2))
+        with relogio(2026, 3, 20):
+            movimentos = self.cliente.get('/api/dashboard/kpi-saldo-mes/').data
+            saldo = indicadores.resumo_painel()['saldo_mes']['value']
+        self.assertEqual([(m['tipo'], m['valor']) for m in movimentos], [('Receita', 100.0), ('Despesa', -30.0)])
+        self.assertEqual(sum(m['valor'] for m in movimentos), saldo)
