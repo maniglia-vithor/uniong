@@ -136,15 +136,45 @@ Decisões tomadas:
 
 Teste manual sugerido: cadastrar uma despesa paga ligada a uma campanha com anexo marcado como público; abrir o portal, a campanha e o link `/c/<id>/`; gerar a prestação de contas do ano em Relatórios e imprimir; editar uma doação e conferir a aba Histórico.
 
-## Fase 5 — Funcionalidades essenciais que faltam
-- [ ] 1. Equipe (usuários do painel)
-- [ ] 2. Recuperação de senha
-- [ ] 3. Doações mais realistas
-- [ ] 4. Recibos
-- [ ] 5. Dados da instituição
-- [ ] 6. Comunicados para membros
-- [ ] 7. LGPD
-- [ ] 8. Módulo de voluntários (escopo original do artigo)
+## Fase 5 — Funcionalidades essenciais que faltam ✅
+Branch `fase-5-funcionalidades` (a partir de `fase-4-transparencia`). 238 testes passando; oxlint 0 erros, 12 avisos (os mesmos da fase 4).
+- [x] 1. Equipe: tela “Equipe” (só superusuário) com convite por e-mail (link de 72 h, token próprio), reenviar convite, desativar/reativar, administrador geral × operador; bloqueia ficar sem administrador geral ativo. `EMAIL_*` no `.env`.
+- [x] 2. Recuperação de senha: `/api/auth/recuperar-senha/` (sempre 200, mesmo texto, com limite por IP) e `/api/auth/redefinir-senha/`; páginas `/recuperar-senha` e `/redefinir-senha/:uid/:token`; link no login.
+- [x] 3. Doações: anônimas (`apoiador` opcional), `forma_pagamento` (padrão pix), `observacao`, comprovante privado, tipo financeira | bens (bens com valor 0, fora de todos os totais, indicador e coluna próprios), `Contribuicao` + `gerar_contribuicoes` (migração 0025).
+- [x] 4. Recibos: modelo `Recibo` (número = id, sequencial, reemissão mantém o número), `Apoiador.documento` com validação de CPF/CNPJ, valor por extenso, página imprimível e envio por e-mail (migração 0027).
+- [x] 5. Dados da instituição: nome, CNPJ, descrição, logo, contatos e redes (migração 0026); aba “Instituição” em Configurações; usados no menu, portal, prestação de contas, recibos e `og:site_name`.
+- [x] 6. Comunicados por e-mail aos membros ativos, em lotes, com registro de quantidade/data e link de descadastro (`recebe_comunicados`, migração 0028); comando `enviar_comunicado` acima do limite.
+- [x] 7. LGPD: anonimizar membro (superusuário, com confirmação) e exportar dados em JSON (migração 0029).
+- [x] 8. Voluntários: `Voluntario`, `Atividade`, `InscricaoAtividade` com vagas e horas (migração 0030); tela, dois indicadores no painel e total de horas no portal.
+
+Telas novas (descrição):
+- Menu “Equipe” (superusuário): tabela com nome, e-mail, papel, situação (Ativo / Convite pendente / Desativado, com texto além da cor) e último acesso; botões de convite, reenviar, desativar/reativar e trocar papel.
+- Páginas públicas simples (cartão branco no centro): “Defina sua senha”, “Recuperar senha”, “Nova senha” e “Comunicados por e-mail” (descadastro com botão de confirmação).
+- Doações: formulário com “Doação anônima”, tipo (financeira ou bens), forma de pagamento, observação e comprovante; coluna de valor mostra a forma de pagamento ou “Bens (≈ R$ …)”; cabeçalho mostra o total em bens; botão “Gerar recibo”/“Ver recibo” nas confirmadas.
+- Recibo: página branca imprimível com logo e dados da instituição, número, texto com valor por extenso, linha de assinatura e botão “Enviar para <e-mail>”.
+- Ficha do membro (painel lateral): seção “Contribuições periódicas” (lista, pausar/reativar, nova) e “Dados pessoais (LGPD)” com “Exportar dados (JSON)” e “Anonimizar membro”.
+- Configurações: aba “Instituição” (superusuário) com logo e campos de contato.
+- Comunicação: caixa “Enviar por e-mail aos membros ativos (N destinatários)” e botão “Enviar por e-mail” nos cards; o card mostra quando e para quantos foi enviado.
+- Menu “Voluntários”: abas Voluntários (cadastro e horas totais) e Atividades (vagas, inscritos, horas; modal “Inscrições e horas”). Painel: cards “Voluntários Ativos” e “Horas de Voluntariado no Mês”. Portal: frase com o total de horas.
+
+Decisões tomadas:
+- Usuário convidado é criado inativo e sem senha utilizável; o `username` é o e-mail. O token do convite usa sal próprio (não serve como redefinição de senha) e fica inválido quando a senha é definida. Redefinição: 2 h (`PASSWORD_RESET_TIMEOUT`).
+- Recuperação de senha só envia e-mail para membros ativos da equipe (`is_staff`); a resposta é idêntica para qualquer e-mail.
+- `EMAIL_BACKEND` padrão é o console (as mensagens aparecem no terminal do `runserver`); em produção, SMTP pelo `.env`.
+- Doação em bens grava `valor = 0` e o valor estimado em campo próprio: assim nenhuma soma financeira muda, mesmo em consultas antigas. A migração 0025 dá `forma_pagamento = pix` a todas as doações existentes (padrão do campo); as do portal também ficam pix.
+- Contribuições: a doação gerada fica pendente, com data no dia de vencimento do mês de competência; a restrição única (contribuição, competência) garante a idempotência. Agendar `python manage.py gerar_contribuicoes` diariamente no cron (exemplo no `--help`).
+- Recibo só para doação confirmada; doação com recibo não pode ser excluída (PROTECT; o caminho é cancelar). Número exibido como `AAAA/000123` (ano da emissão + id).
+- Logo da instituição fica no `MEDIA_ROOT` e é servido por rota da API (`/api/public/instituicao/logo/`), como a imagem de campanha. Sem nome cadastrado, as telas mostram “Nossa organização” e a inicial no lugar do logo. O login continua com a marca UniONG (é a tela do sistema); o rodapé do portal diz “desenvolvido com UniONG”.
+- Comunicados: envio síncrono em lotes de 50 (`COMUNICADOS_LOTE`) até 300 destinatários (`COMUNICADOS_LIMITE_SINCRONO`); acima disso a API recusa e indica o comando `enviar_comunicado <id>`. Um comunicado é enviado uma única vez. O link de descadastro é assinado (`django.core.signing`) e o descadastro só acontece com POST (leitores de e-mail que abrem links não descadastram ninguém).
+- LGPD: a anonimização também apaga os valores antigos da trilha de auditoria do membro e troca o nome nas notificações; as doações permanecem ligadas ao registro anônimo. A exportação fica registrada no histórico.
+- Voluntário com atividades não pode ser excluído (inative-o); excluir uma atividade apaga suas inscrições. O portal mostra apenas o total de horas, sem nomes.
+- Uma execução da suíte de testes levou ~100 min uma única vez (travamento do ambiente/MySQL); repetida, roda em ~42 s.
+
+Não feito / limitações:
+- Recibo em PDF gerado no servidor: mantido HTML imprimível (decisão da fase 4); o e-mail leva o recibo em texto/HTML, sem anexo PDF.
+- Fila assíncrona (Celery etc.) para e-mails: não adicionada para não incluir dependências; documentado o comando para listas grandes.
+
+Teste manual sugerido: em Equipe, convidar um e-mail e copiar o link do terminal do `runserver` para definir a senha; usar “Esqueci minha senha” no login; cadastrar uma doação anônima, uma em bens e uma com comprovante; gerar e enviar um recibo; preencher a aba Instituição e conferir menu, portal e prestação de contas; criar um comunicado “Somente Membros” com envio por e-mail e abrir o link de descadastro; cadastrar uma contribuição na ficha de um membro e rodar `python manage.py gerar_contribuicoes`; cadastrar voluntários e uma atividade com 1 vaga, inscrever e registrar horas.
 
 ## Fase 6 — Implantação, qualidade e acessibilidade
 - [ ] 1. Implantação
