@@ -23,6 +23,9 @@ ong_frontend/node_modules/
 ong_frontend/dist/
 ong_frontend/.env.local
 
+# Prompts das fases (descrevem falhas ainda não corrigidas)
+docs/prompts/
+
 # IDEs
 .vscode/
 .idea/
