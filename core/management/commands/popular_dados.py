@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
-from django.core.management.base import BaseCommand
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError
 from core.models import Apoiador, Campanha, Doacao
 
 
@@ -32,9 +33,22 @@ DOACOES_MENSAIS = [
 
 
 class Command(BaseCommand):
-    help = 'Popula o banco de dados com dados de demonstração'
+    help = 'APAGA doações, campanhas e membros e popula o banco com dados de demonstração (só com DEBUG=True)'
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--confirmar', action='store_true',
+            help='Confirma que todas as doações, campanhas e membros atuais serão apagados.',
+        )
 
     def handle(self, *args, **options):
+        if not settings.DEBUG:
+            raise CommandError('popular_dados só pode ser executado com DEBUG=True (nunca em produção).')
+        if not options['confirmar']:
+            raise CommandError(
+                'Este comando APAGA todas as doações, campanhas e membros. '
+                'Execute novamente com --confirmar para prosseguir.'
+            )
         self.stdout.write('Limpando dados existentes...')
         Doacao.objects.all().delete()
         Campanha.objects.all().delete()

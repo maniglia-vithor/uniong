@@ -1,14 +1,26 @@
 from datetime import timedelta
 from pathlib import Path
-from decouple import config
+from decouple import Csv, config
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-chave-de-desenvolvimento-troque-em-producao')
+DEBUG = config('DEBUG', default=False, cast=bool)
 
-DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+def _obrigatoria_em_producao(nome, valor_dev):
+    """Em desenvolvimento usa o valor padrão; com DEBUG=False a variável precisa estar no .env."""
+    valor = config(nome, default='')
+    if valor:
+        return valor
+    if DEBUG:
+        return valor_dev
+    raise ImproperlyConfigured(f'Defina {nome} no .env: obrigatória com DEBUG=False.')
+
+
+SECRET_KEY = _obrigatoria_em_producao('SECRET_KEY', 'django-insecure-chave-somente-para-desenvolvimento')
+
+ALLOWED_HOSTS = Csv()(_obrigatoria_em_producao('ALLOWED_HOSTS', 'localhost,127.0.0.1'))
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -95,12 +107,26 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:5173,http://localhost:3000'
-).split(',')
+CORS_ALLOWED_ORIGINS = Csv()(
+    _obrigatoria_em_producao('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:3000')
+)
 
 CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
+
+# Segurança HTTPS: ativa por padrão quando DEBUG=False, cada item ajustável pelo .env.
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+if not DEBUG:
+    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
+    SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=True, cast=bool)
+    CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=True, cast=bool)
+    SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=31536000, cast=int)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = config('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=True, cast=bool)
+    SECURE_HSTS_PRELOAD = config('SECURE_HSTS_PRELOAD', default=False, cast=bool)
+    if config('USAR_PROXY_HTTPS', default=False, cast=bool):
+        SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
