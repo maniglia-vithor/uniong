@@ -74,6 +74,8 @@ export const getApoiadoresOpcoes   = () => api.get('/apoiadores/opcoes/')
 export const criarApoiador         = (data) => api.post('/apoiadores/', data)
 export const atualizarApoiador     = (id, data) => api.put(`/apoiadores/${id}/`, data)
 export const excluirApoiador       = (id) => api.delete(`/apoiadores/${id}/`)
+export const anonimizarApoiador      = (id) => api.post(`/apoiadores/${id}/anonimizar/`, { confirmar: true })
+export const exportarDadosApoiador   = (id) => api.get(`/apoiadores/${id}/exportar/`, { responseType: 'blob' })
 
 // Campanhas
 export const getCampanhas          = (params) => api.get('/campanhas/', { params })

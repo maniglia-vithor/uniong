@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Pencil, Save, XCircle } from 'lucide-react'
-import api, { baixarComprovanteDoacao, getContribuicoes, criarContribuicao, atualizarContribuicao, excluirContribuicao } from '../services/api'
+import api, { anonimizarApoiador, exportarDadosApoiador, baixarComprovanteDoacao, getContribuicoes, criarContribuicao, atualizarContribuicao, excluirContribuicao } from '../services/api'
 import BadgeStatus from './BadgeStatus'
 import BarraProgresso from './BarraProgresso'
 import { Campo, Input, Select } from './CampoForm'
@@ -286,7 +286,35 @@ function EditCampanha({ record, onSaved, onCancel }) {
 }
 
 // ── Detalhe Apoiador ────────────────────────────────────────
-function DetalheApoiador({ record, onEdit }) {
+function DetalheApoiador({ record, onEdit, onAlterado }) {
+  const { usuario } = useAuth()
+
+  async function exportar() {
+    try {
+      const { data } = await exportarDadosApoiador(record.id)
+      const url = URL.createObjectURL(data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `dados_membro_${record.id}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert(mensagemErro(err, 'Não foi possível exportar os dados.'))
+    }
+  }
+
+  async function anonimizar() {
+    const aviso = `Anonimizar ${record.nome}?\n\nNome, e-mail, celular e CPF/CNPJ serão substituídos por valores neutros, ` +
+      'inclusive no histórico. As doações continuam registradas, sem identificação. Esta ação não pode ser desfeita.'
+    if (!confirm(aviso)) return
+    try {
+      await anonimizarApoiador(record.id)
+      onAlterado?.()
+    } catch (err) {
+      alert(mensagemErro(err, 'Não foi possível anonimizar o membro.'))
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-4">
@@ -310,6 +338,23 @@ function DetalheApoiador({ record, onEdit }) {
         <Pencil size={14} /> Editar Membro
       </button>
       <ContribuicoesDoMembro apoiadorId={record.id} />
+      <section className="space-y-2 pt-2 border-t border-[var(--border-subtle)]">
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Dados pessoais (LGPD)</h3>
+        {record.anonimizado_em ? (
+          <p className="text-xs text-[var(--text-muted)]">Dados anonimizados em {formatarMomento(record.anonimizado_em)}.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={exportar} className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
+              Exportar dados (JSON)
+            </button>
+            {usuario?.is_superuser && (
+              <button type="button" onClick={anonimizar} className="px-3 py-1.5 rounded-lg text-xs font-medium border border-red-200 text-red-700 hover:bg-red-50">
+                Anonimizar membro
+              </button>
+            )}
+          </div>
+        )}
+      </section>
     </div>
   )
 }
@@ -696,7 +741,7 @@ export default function RecordDetailDrawer({ target, onClose, onRefresh }) {
             <>
               {target.type === 'doacao' && <DetalheDoacao record={record} onEdit={() => setEditando(true)} />}
               {target.type === 'campanha' && <DetalheCampanha record={record} onEdit={() => setEditando(true)} />}
-              {target.type === 'apoiador' && <DetalheApoiador record={record} onEdit={() => setEditando(true)} />}
+              {target.type === 'apoiador' && <DetalheApoiador record={record} onEdit={() => setEditando(true)} onAlterado={handleSaved} />}
               {target.type === 'despesa' && <DetalheDespesa record={record} />}
             </>
           )}

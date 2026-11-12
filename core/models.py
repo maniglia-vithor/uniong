@@ -28,6 +28,8 @@ class Apoiador(models.Model):
     documento = models.CharField(max_length=14, blank=True, default='')
     # Desligado pelo link de descadastro dos e-mails de comunicados.
     recebe_comunicados = models.BooleanField(default=True)
+    # Preenchido quando os dados pessoais foram anonimizados a pedido do titular (LGPD).
+    anonimizado_em = models.DateTimeField(null=True, blank=True)
     data_cadastro = models.DateField(auto_now_add=True)
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='ativo')
 

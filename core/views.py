@@ -23,7 +23,7 @@ from django.db import transaction
 from .models import Apoiador, Campanha, Contribuicao, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoInstituicao, ConfiguracaoPix, LogAlteracao
 from .anexos import TIPOS_PERMITIDOS, validar_anexo
 from .doacao_publica import DoacaoPublicaSerializer, ativar_membro_interessado, registrar_doacao_publica
-from . import comunicados, indicadores, recibos
+from . import comunicados, indicadores, lgpd, recibos
 from .auditoria import AuditoriaMixin, registrar as registrar_auditoria
 from .campanhas_publicas import avisar_meta_atingida, validar_imagem
 from .paginacao import filtrar_periodo
@@ -81,6 +81,28 @@ class ApoiadorViewSet(AuditoriaMixin, ExclusaoProtegidaMixin, viewsets.ModelView
         if status:
             qs = qs.filter(status=status)
         return qs
+
+    @action(detail=True, methods=['post'])
+    def anonimizar(self, request, pk=None):
+        """LGPD: só superusuário e com {"confirmar": true}. Mantém as doações (sem identificação)."""
+        if not request.user.is_superuser:
+            return Response({'erro': 'Apenas superusuários podem anonimizar membros.'}, status=403)
+        if request.data.get('confirmar') is not True:
+            return Response({'erro': 'Confirme a anonimização enviando "confirmar": true.'}, status=400)
+        apoiador = self.get_object()
+        if apoiador.anonimizado_em:
+            return Response({'erro': 'Este membro já foi anonimizado.'}, status=400)
+        lgpd.anonimizar(apoiador, request.user)
+        return Response(self.get_serializer(self.get_queryset().get(pk=apoiador.pk)).data)
+
+    @action(detail=True, methods=['get'])
+    def exportar(self, request, pk=None):
+        """LGPD: todos os dados do membro em JSON, para atender pedido do titular."""
+        apoiador = self.get_object()
+        registrar_auditoria(request.user, apoiador, 'edicao', 'exportação de dados', '', 'dados exportados (LGPD)')
+        resposta = Response(lgpd.exportar(apoiador))
+        resposta['Content-Disposition'] = f'attachment; filename="dados_membro_{apoiador.pk}.json"'
+        return resposta
 
     @action(detail=False, methods=['get'], pagination_class=None, filter_backends=[])
     def opcoes(self, request):

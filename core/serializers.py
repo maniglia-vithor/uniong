@@ -104,7 +104,8 @@ class ApoiadorSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Apoiador
-        fields = ['id', 'nome', 'email', 'celular', 'documento', 'documento_formatado', 'recebe_comunicados', 'data_cadastro', 'status', 'total_doado']
+        fields = ['id', 'nome', 'email', 'celular', 'documento', 'documento_formatado', 'recebe_comunicados', 'anonimizado_em', 'data_cadastro', 'status', 'total_doado']
+        read_only_fields = ['anonimizado_em']
 
     def get_documento_formatado(self, obj):
         return formatar_documento(obj.documento)
