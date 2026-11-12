@@ -74,6 +74,8 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD', default=''),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='3306'),
+        # Cada requisição é uma transação: um erro no meio não deixa registros pela metade.
+        'ATOMIC_REQUESTS': True,
         'OPTIONS': {
             'charset': 'utf8mb4',
         },

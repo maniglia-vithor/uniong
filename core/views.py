@@ -80,7 +80,7 @@ class CampanhaViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         campanha = serializer.save()
         actor = self.request.user.get_full_name() or self.request.user.username
-        meta = f'R$ {campanha.meta:.2f}'.replace('.', ',') if campanha.meta else None
+        meta = f'R$ {campanha.meta_valor:.2f}'.replace('.', ',') if campanha.meta_valor else None
         meta_txt = f' (Meta: {meta})' if meta else ''
         _notificar_admins(
             mensagem=f'{actor} criou a campanha: {campanha.titulo}{meta_txt}.',
