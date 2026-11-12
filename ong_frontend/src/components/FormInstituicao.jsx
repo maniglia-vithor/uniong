@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Save } from 'lucide-react'
+import { Save, ExternalLink, Copy, Check } from 'lucide-react'
 import api from '../services/api'
 import { instituicaoAlterada } from '../hooks/useInstituicao'
 import { mensagemErro } from '../utils/formatos'
@@ -18,6 +18,49 @@ const CAMPOS = [
   ['linkedin', 'LinkedIn', { type: 'url', placeholder: 'https://linkedin.com/company/...' }],
   ['youtube', 'YouTube', { type: 'url', placeholder: 'https://youtube.com/@...' }],
 ]
+
+/** Endereço público do portal de transparência, com atalhos para abrir e copiar. */
+function LinkPortal() {
+  const url = `${window.location.origin}/transparencia`
+  const [copiado, setCopiado] = useState(false)
+
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopiado(true)
+      setTimeout(() => setCopiado(false), 2500)
+    } catch {
+      window.prompt('Copie o endereço do portal:', url)
+    }
+  }
+
+  return (
+    <section aria-labelledby="titulo-portal" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card-alt)] p-4 space-y-2">
+      <h4 id="titulo-portal" className="text-sm font-semibold text-[var(--text-primary)]">Portal de transparência</h4>
+      <p className="text-xs text-[var(--text-muted)]">Página pública da organização, vista por membros, doadores e visitantes, sem login.</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <a href={url} className="text-sm font-medium underline break-all" style={{ color: 'var(--marca-texto)' }}>{url}</a>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <a
+          href="/transparencia"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white hover:opacity-90"
+          style={{ backgroundColor: '#0f4c5c' }}
+        >
+          <ExternalLink size={13} aria-hidden="true" /> Abrir portal
+        </a>
+        <button
+          type="button"
+          onClick={copiar}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+        >
+          {copiado ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
+          {copiado ? 'Link copiado' : 'Copiar link'}
+        </button>
+      </div>
+    </section>
+  )
+}
 
 /** Dados públicos da instituição (só superusuário). Aparecem no portal, no painel, nos recibos e nos relatórios. */
 export default function FormInstituicao({ avisar }) {
@@ -85,6 +128,7 @@ export default function FormInstituicao({ avisar }) {
 
   return (
     <form onSubmit={salvar} className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-6 space-y-4">
+      <LinkPortal />
       <div>
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">Dados da instituição</h3>
         <p className="text-xs text-[var(--text-muted)] mt-1">

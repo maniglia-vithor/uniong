@@ -276,5 +276,6 @@ Decisões tomadas:
 ## Extra — Alternância de visão para a apresentação ✅
 Branch `fase-8-visao-membro` (a partir de `fase-7-artigo`), a pedido do autor, para a demonstração na banca.
 - [x] Controle “Administrador | Membro” no topo do painel. “Membro” abre o portal público (`/transparencia`), que é o que um membro vê. No portal, quem está logado vê o botão “Voltar à visão de administrador”.
+- [x] Configurações → Instituição: bloco “Portal de transparência” com o endereço público (`<origem>/transparencia`) e os botões “Abrir portal” e “Copiar link”.
 
 Decisão: é só um atalho de navegação, sem papel simulado nem mudança de permissões. Por isso não reverte a decisão do CLAUDE.md que removeu o seletor simulado de perfil: membros continuam sem login, e o papel exibido continua vindo do backend.
