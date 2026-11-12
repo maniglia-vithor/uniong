@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
-import api from '../services/api'
+import api, { buscarTodas } from '../services/api'
 import logoIcon from '../assets/Gemini_Generated_Image_g792fng792fng792.jpg'
 import RecordDetailDrawer from './RecordDetailDrawer'
 
@@ -75,8 +75,7 @@ export default function Layout() {
 
   const buscarNotificacoes = useCallback(async () => {
     try {
-      const { data } = await api.get('/notificacoes/?page_size=50')
-      setNotificacoes(data.results ?? data)
+      setNotificacoes(await buscarTodas('/notificacoes/'))
     } catch { /* silencia erros de polling */ }
   }, [])
 

@@ -1,11 +1,14 @@
-import { useEffect, useState, useMemo, useRef } from 'react'
-import { Plus, Pencil, Trash2, TrendingDown, AlertCircle, Tag, ChevronUp, ChevronDown, ChevronsUpDown, Paperclip, X, RefreshCw, Repeat } from 'lucide-react'
+import { useCallback, useEffect, useState, useRef } from 'react'
+import { Plus, Pencil, Trash2, TrendingDown, AlertCircle, Tag, Paperclip, X, RefreshCw, Repeat } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import Modal from '../components/Modal'
 import { Campo, Input, Select, BotaoSubmit, BotaoCancelar } from '../components/CampoForm'
 import CampoData from '../components/CampoData'
 import BadgeStatus from '../components/BadgeStatus'
 import TabelaVazia from '../components/TabelaVazia'
+import Paginacao from '../components/Paginacao'
+import { CabecalhoOrdenavel, CampoBusca } from '../components/CabecalhoOrdenavel'
+import useListaPaginada from '../hooks/useListaPaginada'
 import {
   getDespesas, criarDespesa, atualizarDespesa, excluirDespesa,
   removerAnexoDespesa, baixarAnexoDespesa, getDespesasResumo, getDespesasPorCategoria,
@@ -59,41 +62,33 @@ function KpiCusto({ titulo, valor, subtitulo, icone: Icone, cor }) {
   )
 }
 
-function SortIcon({ dir }) {
-  if (dir === 'asc') return <ChevronUp size={12} className="inline-block ml-1" />
-  if (dir === 'desc') return <ChevronDown size={12} className="inline-block ml-1" />
-  return <ChevronsUpDown size={12} className="inline-block ml-1 opacity-30" />
-}
-
 export default function Custos() {
-  const [lista, setLista] = useState([])
+  const lista = useListaPaginada(getDespesas)
   const [resumo, setResumo] = useState(null)
   const [grafico, setGrafico] = useState([])
-  const [carregando, setCarregando] = useState(true)
-  const [erro, setErro] = useState(null)
   const [modal, setModal] = useState(false)
   const [editando, setEditando] = useState(null)
   const [form, setForm] = useState(VAZIO)
   const [novosAnexos, setNovosAnexos] = useState([])
   const [salvando, setSalvando] = useState(false)
-  const [sortCol, setSortCol] = useState(null)
-  const [sortDir, setSortDir] = useState('asc')
+
   const fileInputRef = useRef(null)
 
-  const carregar = () => {
-    setCarregando(true)
-    setErro(null)
-    Promise.all([getDespesas(), getDespesasResumo(), getDespesasPorCategoria()])
-      .then(([d, r, g]) => {
-        setLista(d.data.results ?? d.data)
+  const carregarResumo = useCallback(() => {
+    Promise.all([getDespesasResumo(), getDespesasPorCategoria()])
+      .then(([r, g]) => {
         setResumo(r.data)
         setGrafico(g.data)
       })
-      .catch(() => setErro('Erro ao carregar dados. Verifique se o servidor está rodando.'))
-      .finally(() => setCarregando(false))
-  }
+      .catch(() => {})
+  }, [])
 
-  useEffect(() => { carregar() }, [])
+  useEffect(() => { carregarResumo() }, [carregarResumo])
+
+  function carregar() {
+    lista.recarregar()
+    carregarResumo()
+  }
 
   function abrirNovo() {
     setEditando(null)
@@ -186,47 +181,13 @@ export default function Custos() {
     carregar()
   }
 
-  function handleSort(col) {
-    if (sortCol === col) {
-      if (sortDir === 'asc') setSortDir('desc')
-      else { setSortCol(null); setSortDir('asc') }
-    } else { setSortCol(col); setSortDir('asc') }
-  }
-
-  const TIPO_COL = {
-    descricao: 'texto', categoria_display: 'texto',
-    data_vencimento: 'data', valor: 'numero', status_efetivo: 'texto',
-  }
-
-  const listaOrdenada = useMemo(() => {
-    if (!sortCol) return lista
-    return [...lista].sort((a, b) => {
-      let va = a[sortCol]; let vb = b[sortCol]
-      if (va == null) va = TIPO_COL[sortCol] === 'numero' ? -Infinity : ''
-      if (vb == null) vb = TIPO_COL[sortCol] === 'numero' ? -Infinity : ''
-      const cmp = TIPO_COL[sortCol] === 'numero'
-        ? va - vb
-        : String(va).localeCompare(String(vb), 'pt-BR')
-      return sortDir === 'asc' ? cmp : -cmp
-    })
-  }, [lista, sortCol, sortDir])
-
-  const colHeader = (key, label, align = 'left') => (
-    <th
-      onClick={() => handleSort(key)}
-      className={`text-${align} text-xs font-medium text-[var(--text-muted)] px-5 py-3 cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors whitespace-nowrap`}
-    >
-      {label}<SortIcon dir={sortCol === key ? sortDir : null} />
-    </th>
-  )
-
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-[var(--text-primary)]">Custos</h1>
-          <p className="text-xs text-[var(--text-muted)]">{lista.length} registro{lista.length !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-[var(--text-muted)]">{lista.total} registro{lista.total !== 1 ? 's' : ''}</p>
         </div>
         <button
           onClick={abrirNovo}
@@ -237,8 +198,8 @@ export default function Custos() {
         </button>
       </div>
 
-      {erro && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-center text-red-600 text-sm">{erro}</div>
+      {lista.erro && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-center text-red-600 text-sm">{lista.erro}</div>
       )}
 
       {/* KPI Cards */}
@@ -301,25 +262,28 @@ export default function Custos() {
 
         {/* Tabela */}
         <div className="lg:col-span-2 bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border)]">
+          <div className="p-3 border-b border-[var(--border)]">
+            <CampoBusca valor={lista.busca} onMudar={lista.setBusca} placeholder="Buscar por descrição" />
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--border)]">
-                  {colHeader('descricao', 'Descrição')}
-                  {colHeader('categoria_display', 'Categoria')}
-                  {colHeader('data_vencimento', 'Vencimento')}
-                  {colHeader('valor', 'Valor', 'right')}
-                  {colHeader('status_efetivo', 'Status')}
+                  <CabecalhoOrdenavel lista={lista} campo="descricao" rotulo="Descrição" />
+                  <CabecalhoOrdenavel lista={lista} campo="categoria" rotulo="Categoria" />
+                  <CabecalhoOrdenavel lista={lista} campo="data_vencimento" rotulo="Vencimento" />
+                  <CabecalhoOrdenavel lista={lista} campo="valor" rotulo="Valor" alinhamento="right" />
+                  <CabecalhoOrdenavel lista={lista} campo="status" rotulo="Status" />
                   <th className="px-5 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-subtle)]">
-                {carregando ? (
+                {lista.carregando ? (
                   <tr><td colSpan={6} className="text-center py-10 text-[var(--text-muted)] text-sm">Carregando...</td></tr>
-                ) : listaOrdenada.length === 0 ? (
+                ) : lista.itens.length === 0 ? (
                   <TabelaVazia />
                 ) : (
-                  listaOrdenada.map((d) => (
+                  lista.itens.map((d) => (
                     <tr key={d.id} className="hover:bg-[var(--bg-hover)] transition-colors">
                       <td className="px-5 py-3 font-medium text-[var(--text-primary)] max-w-[200px] truncate">{d.descricao}</td>
                       <td className="px-5 py-3">
@@ -338,10 +302,10 @@ export default function Custos() {
                       <td className="px-5 py-3"><BadgeStatus status={d.status_efetivo} /></td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2 justify-end">
-                          <button onClick={() => abrirEdicao(d)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-700 transition-colors">
+                          <button onClick={() => abrirEdicao(d)} aria-label={`Editar ${d.descricao}`} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-700 transition-colors">
                             <Pencil size={14} />
                           </button>
-                          <button onClick={() => onExcluir(d.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
+                          <button onClick={() => onExcluir(d.id)} aria-label={`Excluir ${d.descricao}`} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
                             <Trash2 size={14} />
                           </button>
                         </div>
@@ -352,6 +316,7 @@ export default function Custos() {
               </tbody>
             </table>
           </div>
+          <Paginacao pagina={lista.pagina} total={lista.total} tamanhoPagina={lista.tamanhoPagina} onMudar={lista.setPagina} />
         </div>
       </div>
 

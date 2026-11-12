@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { User, Bell, Shield, Palette, Save, Eye, EyeOff, Download, Sun, Moon } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
-import api from '../services/api'
+import api, { buscarTodas } from '../services/api'
 
 const ABAS = [
   { id: 'aparencia', label: 'Geral & Aparência', icon: Palette },
@@ -174,15 +174,15 @@ export default function Configuracoes() {
     setExportando(true)
     try {
       const [doacoes, membros, campanhas] = await Promise.all([
-        api.get('/doacoes/?page_size=9999'),
-        api.get('/apoiadores/?page_size=9999'),
-        api.get('/campanhas/?page_size=9999'),
+        buscarTodas('/doacoes/'),
+        buscarTodas('/apoiadores/'),
+        buscarTodas('/campanhas/'),
       ])
       const dados = {
         exportado_em: new Date().toISOString(),
-        doacoes: doacoes.data.results ?? doacoes.data,
-        membros: membros.data.results ?? membros.data,
-        campanhas: campanhas.data.results ?? campanhas.data,
+        doacoes,
+        membros,
+        campanhas,
       }
       const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)

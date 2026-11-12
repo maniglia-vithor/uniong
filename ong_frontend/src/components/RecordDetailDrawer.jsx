@@ -310,14 +310,26 @@ export default function RecordDetailDrawer({ target, onClose, onRefresh }) {
     const ep = endpointMap[target.type]
     const reqs = [api.get(`/${ep}/${target.id}/`)]
     if (target.type === 'doacao') {
-      reqs.push(api.get('/apoiadores/?page_size=200'))
-      reqs.push(api.get('/campanhas/?page_size=200'))
+      reqs.push(api.get('/apoiadores/opcoes/'))
+      reqs.push(api.get('/campanhas/opcoes/'))
     }
     Promise.all(reqs)
       .then(([r, a, c]) => {
         setRecord(r.data)
-        if (a) setApoiadores(a.data.results ?? a.data)
-        if (c) setCampanhas(c.data.results ?? c.data)
+        if (a) {
+          const membros = a.data
+          if (r.data.apoiador && !membros.some(m => m.id === r.data.apoiador)) {
+            membros.unshift({ id: r.data.apoiador, nome: r.data.apoiador_nome })
+          }
+          setApoiadores(membros)
+        }
+        if (c) {
+          const camps = c.data
+          if (r.data.campanha && !camps.some(x => x.id === r.data.campanha)) {
+            camps.unshift({ id: r.data.campanha, titulo: `${r.data.campanha_titulo} (encerrada)` })
+          }
+          setCampanhas(camps)
+        }
       })
       .catch(() => setRecord(null))
       .finally(() => setCarregando(false))

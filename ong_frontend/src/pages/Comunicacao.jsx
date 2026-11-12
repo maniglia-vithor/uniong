@@ -1,7 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Pencil, Trash2, Plus, Megaphone, Globe, Users } from 'lucide-react'
 import Modal from '../components/Modal'
 import { Campo, Input, Select, BotaoSubmit, BotaoCancelar } from '../components/CampoForm'
+import Paginacao from '../components/Paginacao'
+import { CampoBusca } from '../components/CabecalhoOrdenavel'
+import useListaPaginada from '../hooks/useListaPaginada'
+import { mensagemErro } from '../utils/formatos'
 import { getComunicados, criarComunicado, atualizarComunicado, excluirComunicado } from '../services/api'
 
 const VAZIO = { titulo: '', conteudo: '', publico_alvo: 'publico' }
@@ -18,23 +22,13 @@ function PublicoIcon({ tipo }) {
 }
 
 export default function Comunicacao() {
-  const [lista, setLista] = useState([])
-  const [carregando, setCarregando] = useState(true)
+  const lista = useListaPaginada(getComunicados)
   const [modal, setModal] = useState(false)
   const [editando, setEditando] = useState(null)
   const [form, setForm] = useState(VAZIO)
   const [salvando, setSalvando] = useState(false)
-  const [erro, setErro] = useState(null)
 
-  const carregar = () => {
-    setCarregando(true)
-    getComunicados()
-      .then((r) => setLista(r.data.results ?? r.data))
-      .catch(() => setErro('Erro ao carregar comunicados.'))
-      .finally(() => setCarregando(false))
-  }
-
-  useEffect(() => { carregar() }, [])
+  const carregar = lista.recarregar
 
   function abrirNovo() { setEditando(null); setForm(VAZIO); setModal(true) }
   function abrirEdicao(item) {
@@ -52,13 +46,13 @@ export default function Comunicacao() {
       if (editando) await atualizarComunicado(editando.id, form)
       else await criarComunicado(form)
       fechar(); carregar()
-    } catch { alert('Erro ao salvar comunicado.') }
+    } catch (err) { alert(mensagemErro(err, 'Erro ao salvar comunicado.')) }
     finally { setSalvando(false) }
   }
 
   async function onExcluir(id, titulo) {
     if (!confirm(`Excluir o comunicado "${titulo}"?`)) return
-    await excluirComunicado(id); carregar()
+    try { await excluirComunicado(id); carregar() } catch (err) { alert(mensagemErro(err, 'Não foi possível excluir o comunicado.')) }
   }
 
   return (
@@ -77,13 +71,15 @@ export default function Comunicacao() {
         </button>
       </div>
 
-      {erro && <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-600">{erro}</div>}
+      <CampoBusca valor={lista.busca} onMudar={lista.setBusca} placeholder="Buscar comunicados" />
 
-      {carregando ? (
+      {lista.erro && <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-600">{lista.erro}</div>}
+
+      {lista.carregando ? (
         <div className="flex justify-center py-16">
           <div className="w-8 h-8 border-4 border-[var(--border)] rounded-full animate-spin" style={{ borderTopColor: '#0f4c5c' }} />
         </div>
-      ) : lista.length === 0 ? (
+      ) : lista.itens.length === 0 ? (
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm flex flex-col items-center justify-center py-16 gap-3">
           <Megaphone size={32} className="text-[var(--text-muted)]" />
           <p className="text-[var(--text-muted)] text-sm">Nenhum comunicado publicado ainda.</p>
@@ -93,7 +89,7 @@ export default function Comunicacao() {
         </div>
       ) : (
         <div className="space-y-3">
-          {lista.map((c) => (
+          {lista.itens.map((c) => (
             <div key={c.id} className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
@@ -117,6 +113,7 @@ export default function Comunicacao() {
               </div>
             </div>
           ))}
+          <Paginacao pagina={lista.pagina} total={lista.total} tamanhoPagina={lista.tamanhoPagina} onMudar={lista.setPagina} />
         </div>
       )}
 

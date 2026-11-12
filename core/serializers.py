@@ -38,7 +38,9 @@ class ApoiadorSerializer(serializers.ModelSerializer):
         fields = ['id', 'nome', 'email', 'celular', 'data_cadastro', 'status', 'total_doado']
 
     def get_total_doado(self, obj):
-        total = obj.doacoes.filter(status='confirmada').aggregate(total=Sum('valor'))['total']
+        total = getattr(obj, 'total_doado', None)
+        if total is None:
+            total = obj.doacoes.filter(status='confirmada').aggregate(total=Sum('valor'))['total']
         return float(total) if total else 0.0
 
     def validate_email(self, value):

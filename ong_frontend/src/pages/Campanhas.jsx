@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useState } from 'react'
 import { Pencil, Trash2, Plus, ArrowUpDown } from 'lucide-react'
 import { useOutletContext } from 'react-router-dom'
 import Modal from '../components/Modal'
@@ -6,6 +6,9 @@ import { Campo, Input, Select, BotaoSubmit, BotaoCancelar } from '../components/
 import CampoData from '../components/CampoData'
 import BadgeStatus from '../components/BadgeStatus'
 import BarraProgresso from '../components/BarraProgresso'
+import Paginacao from '../components/Paginacao'
+import { CampoBusca } from '../components/CabecalhoOrdenavel'
+import useListaPaginada from '../hooks/useListaPaginada'
 import { formatData, mensagemErro } from '../utils/formatos'
 import { getCampanhas, criarCampanha, atualizarCampanha, excluirCampanha, encerrarCampanha } from '../services/api'
 
@@ -17,41 +20,11 @@ function formatBRL(v) {
 
 export default function Campanhas() {
   const { openDrawer } = useOutletContext() ?? {}
-  const [lista, setLista] = useState([])
-  const [carregando, setCarregando] = useState(true)
-  const [erro, setErro] = useState(null)
+  const lista = useListaPaginada(getCampanhas, { ordenacaoInicial: '-data_inicio' })
   const [modal, setModal] = useState(false)
   const [editando, setEditando] = useState(null)
   const [form, setForm] = useState(VAZIO)
   const [salvando, setSalvando] = useState(false)
-  const [sortKey, setSortKey] = useState('data_inicio_desc')
-
-  const listaOrdenada = useMemo(() => {
-    return [...lista].sort((a, b) => {
-      switch (sortKey) {
-        case 'titulo_asc': return a.titulo.localeCompare(b.titulo, 'pt-BR')
-        case 'titulo_desc': return b.titulo.localeCompare(a.titulo, 'pt-BR')
-        case 'meta_asc': return a.meta_valor - b.meta_valor
-        case 'meta_desc': return b.meta_valor - a.meta_valor
-        case 'progresso_asc': return a.percentual_progresso - b.percentual_progresso
-        case 'progresso_desc': return b.percentual_progresso - a.percentual_progresso
-        case 'data_inicio_asc': return a.data_inicio.localeCompare(b.data_inicio)
-        case 'data_inicio_desc': return b.data_inicio.localeCompare(a.data_inicio)
-        default: return 0
-      }
-    })
-  }, [lista, sortKey])
-
-  const carregar = () => {
-    setCarregando(true)
-    setErro(null)
-    getCampanhas()
-      .then((r) => setLista(r.data.results ?? r.data))
-      .catch(() => setErro('Erro ao carregar campanhas. Verifique se o servidor está rodando.'))
-      .finally(() => setCarregando(false))
-  }
-
-  useEffect(() => { carregar() }, [])
 
   function abrirNovo() {
     setEditando(null)
@@ -87,7 +60,7 @@ export default function Campanhas() {
         await criarCampanha(payload)
       }
       fechar()
-      carregar()
+      lista.recarregar()
     } catch (err) {
       alert(mensagemErro(err))
     } finally {
@@ -99,7 +72,7 @@ export default function Campanhas() {
     if (!confirm(`Excluir a campanha "${titulo}"?`)) return
     try {
       await excluirCampanha(id)
-      carregar()
+      lista.recarregar()
     } catch (err) {
       alert(mensagemErro(err, 'Não foi possível excluir a campanha.'))
     }
@@ -109,7 +82,7 @@ export default function Campanhas() {
     if (!confirm(`Encerrar a campanha "${campanha.titulo}"? Ela deixa de receber doações.`)) return
     try {
       await encerrarCampanha(campanha.id)
-      carregar()
+      lista.recarregar()
     } catch (err) {
       alert(mensagemErro(err, 'Não foi possível encerrar a campanha.'))
     }
@@ -126,18 +99,19 @@ export default function Campanhas() {
           <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
             <ArrowUpDown size={13} />
             <select
-              value={sortKey}
-              onChange={e => setSortKey(e.target.value)}
+              value={lista.ordenacao}
+              onChange={e => lista.setOrdenacao(e.target.value)}
+              aria-label="Ordenar campanhas"
               className="text-xs border border-[var(--border)] rounded-lg px-2 py-1.5 bg-[var(--bg-card)] text-[var(--text-secondary)] outline-none focus:border-teal-500 cursor-pointer"
             >
-              <option value="data_inicio_desc">Mais recentes</option>
-              <option value="data_inicio_asc">Mais antigas</option>
-              <option value="titulo_asc">Título A→Z</option>
-              <option value="titulo_desc">Título Z→A</option>
-              <option value="meta_desc">Maior meta</option>
-              <option value="meta_asc">Menor meta</option>
-              <option value="progresso_desc">Maior progresso</option>
-              <option value="progresso_asc">Menor progresso</option>
+              <option value="-data_inicio">Mais recentes</option>
+              <option value="data_inicio">Mais antigas</option>
+              <option value="titulo">Título A→Z</option>
+              <option value="-titulo">Título Z→A</option>
+              <option value="-meta_valor">Maior meta</option>
+              <option value="meta_valor">Menor meta</option>
+              <option value="-progresso">Maior progresso</option>
+              <option value="progresso">Menor progresso</option>
             </select>
           </div>
           <button
@@ -150,17 +124,19 @@ export default function Campanhas() {
         </div>
       </div>
 
-      {erro && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-center text-red-600 text-sm">{erro}</div>
+      <CampoBusca valor={lista.busca} onMudar={lista.setBusca} placeholder="Buscar por título" />
+
+      {lista.erro && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-center text-red-600 text-sm">{lista.erro}</div>
       )}
 
-      {carregando ? (
+      {lista.carregando ? (
         <div className="flex justify-center py-16">
           <div className="w-8 h-8 border-4 border-[var(--border)] rounded-full animate-spin" style={{ borderTopColor: '#0f4c5c' }} />
         </div>
-      ) : !erro && (
+      ) : !lista.erro && (<>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {listaOrdenada.map((c, i) => (
+          {lista.itens.map((c, i) => (
             <div
               key={c.id}
               className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border)] p-5 flex flex-col gap-3 cursor-pointer hover:shadow-md transition-shadow"
@@ -193,21 +169,22 @@ export default function Campanhas() {
                       Encerrar campanha
                     </button>
                   )}
-                  <button onClick={() => abrirEdicao(c)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-600 transition-colors">
+                  <button onClick={() => abrirEdicao(c)} aria-label={`Editar ${c.titulo}`} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-600 transition-colors">
                     <Pencil size={14} />
                   </button>
-                  <button onClick={() => onExcluir(c.id, c.titulo)} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
+                  <button onClick={() => onExcluir(c.id, c.titulo)} aria-label={`Excluir ${c.titulo}`} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
                     <Trash2 size={14} />
                   </button>
                 </div>
               </div>
             </div>
           ))}
-          {lista.length === 0 && (
-            <p className="col-span-3 text-center py-16 text-[var(--text-muted)] text-sm">Nenhuma campanha cadastrada.</p>
+          {lista.itens.length === 0 && (
+            <p className="col-span-3 text-center py-16 text-[var(--text-muted)] text-sm">Nenhuma campanha encontrada.</p>
           )}
         </div>
-      )}
+        <Paginacao pagina={lista.pagina} total={lista.total} tamanhoPagina={lista.tamanhoPagina} onMudar={lista.setPagina} />
+      </>)}
 
       {modal && (
         <Modal titulo={editando ? 'Editar Campanha' : 'Nova Campanha'} onFechar={fechar}>

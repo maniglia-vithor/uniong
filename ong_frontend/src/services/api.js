@@ -68,26 +68,29 @@ export const getKpiCampanhasAtivas  = () => api.get('/dashboard/kpi-campanhas-at
 export const getDoacoesPorMes       = (mes) => api.get(`/dashboard/doacoes-por-mes/?mes=${mes}`)
 
 // Apoiadores
-export const getApoiadores         = () => api.get('/apoiadores/')
+export const getApoiadores         = (params) => api.get('/apoiadores/', { params })
+export const getApoiadoresOpcoes   = () => api.get('/apoiadores/opcoes/')
 export const criarApoiador         = (data) => api.post('/apoiadores/', data)
 export const atualizarApoiador     = (id, data) => api.put(`/apoiadores/${id}/`, data)
 export const excluirApoiador       = (id) => api.delete(`/apoiadores/${id}/`)
 
 // Campanhas
-export const getCampanhas          = () => api.get('/campanhas/')
+export const getCampanhas          = (params) => api.get('/campanhas/', { params })
+export const getCampanhasOpcoes    = () => api.get('/campanhas/opcoes/')
 export const criarCampanha         = (data) => api.post('/campanhas/', data)
 export const atualizarCampanha     = (id, data) => api.put(`/campanhas/${id}/`, data)
 export const excluirCampanha       = (id) => api.delete(`/campanhas/${id}/`)
 export const encerrarCampanha      = (id) => api.patch(`/campanhas/${id}/`, { status: 'encerrada' })
 
 // Doações
-export const getDoacoes            = () => api.get('/doacoes/')
+export const getDoacoes            = (params) => api.get('/doacoes/', { params })
+export const getDoacoesResumo      = (params) => api.get('/doacoes/resumo/', { params })
 export const criarDoacao           = (data) => api.post('/doacoes/', data)
 export const atualizarDoacao       = (id, data) => api.put(`/doacoes/${id}/`, data)
 export const excluirDoacao         = (id) => api.delete(`/doacoes/${id}/`)
 
 // Despesas
-export const getDespesas             = () => api.get('/despesas/')
+export const getDespesas             = (params) => api.get('/despesas/', { params })
 export const criarDespesa            = (fd) => api.post('/despesas/', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
 export const atualizarDespesa        = (id, fd) => api.put(`/despesas/${id}/`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
 export const excluirDespesa          = (id) => api.delete(`/despesas/${id}/`)
@@ -97,7 +100,7 @@ export const getDespesasResumo       = () => api.get('/despesas/resumo/')
 export const getDespesasPorCategoria = () => api.get('/despesas/por-categoria/')
 
 // Comunicados
-export const getComunicados        = () => api.get('/comunicados/')
+export const getComunicados        = (params) => api.get('/comunicados/', { params })
 export const criarComunicado       = (data) => api.post('/comunicados/', data)
 export const atualizarComunicado   = (id, data) => api.put(`/comunicados/${id}/`, data)
 export const excluirComunicado     = (id) => api.delete(`/comunicados/${id}/`)
@@ -108,6 +111,19 @@ export function downloadRelatorio(tipo) {
   return fetch(`/api/relatorios/${tipo}/`, {
     headers: { Authorization: `Bearer ${token}` },
   })
+}
+
+// Percorre todas as páginas de um endpoint paginado e devolve a lista completa.
+export async function buscarTodas(url, params = {}) {
+  const itens = []
+  let pagina = 1
+  for (;;) {
+    const { data } = await api.get(url, { params: { ...params, page: pagina, page_size: 500 } })
+    if (!Array.isArray(data.results)) return data
+    itens.push(...data.results)
+    if (!data.next) return itens
+    pagina += 1
+  }
 }
 
 export default api

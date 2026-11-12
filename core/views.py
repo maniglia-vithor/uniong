@@ -9,7 +9,10 @@ from google.auth.exceptions import GoogleAuthError
 from google.auth.transport import requests as google_requests
 from rest_framework_simplejwt.tokens import RefreshToken
 from dateutil.relativedelta import relativedelta
-from django.db.models import ProtectedError, Q, Sum
+from decimal import Decimal
+
+from django.db.models import Case, Count, DecimalField, F, ProtectedError, Q, Sum, Value, When
+from django.db.models.functions import Coalesce
 from django.http import FileResponse, HttpResponse
 from rest_framework import viewsets
 from rest_framework.permissions import AllowAny
@@ -22,6 +25,7 @@ from django.db import transaction
 from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoPix, LogAlteracao
 from .anexos import TIPOS_PERMITIDOS, validar_anexo
 from .normalizacao import normalizar_email
+from .paginacao import filtrar_periodo
 from .pix import mascarar
 from .throttles import AuthThrottle, DoacaoPublicaThrottle
 from .serializers import ApoiadorSerializer, CampanhaSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer
@@ -57,16 +61,30 @@ class ExclusaoProtegidaMixin:
 
 
 class ApoiadorViewSet(ExclusaoProtegidaMixin, viewsets.ModelViewSet):
-    queryset = Apoiador.objects.all()
     serializer_class = ApoiadorSerializer
     mensagem_exclusao_protegida = 'Não é possível excluir: este membro possui doações vinculadas.'
+    search_fields = ['nome', 'email']
+    ordering_fields = ['nome', 'email', 'celular', 'data_cadastro', 'status', 'total_doado']
+    ordering = ['-data_cadastro', '-id']
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = Apoiador.objects.annotate(
+            total_doado=Coalesce(
+                Sum('doacoes__valor', filter=Q(doacoes__status='confirmada')),
+                Value(Decimal('0')),
+                output_field=DecimalField(max_digits=14, decimal_places=2),
+            )
+        )
         status = self.request.query_params.get('status')
         if status:
             qs = qs.filter(status=status)
         return qs
+
+    @action(detail=False, methods=['get'], pagination_class=None, filter_backends=[])
+    def opcoes(self, request):
+        """Lista leve para seleção: membros ativos (id e nome), sem paginação."""
+        dados = Apoiador.objects.filter(status='ativo').order_by('nome').values('id', 'nome')
+        return Response(list(dados))
 
     def perform_create(self, serializer):
         apoiador = serializer.save()
@@ -82,18 +100,32 @@ class ApoiadorViewSet(ExclusaoProtegidaMixin, viewsets.ModelViewSet):
 
 
 class CampanhaViewSet(ExclusaoProtegidaMixin, viewsets.ModelViewSet):
-    queryset = Campanha.objects.com_arrecadado().order_by('-data_inicio', '-id')
     serializer_class = CampanhaSerializer
     mensagem_exclusao_protegida = (
         'Não é possível excluir: existem doações vinculadas a esta campanha. Encerre a campanha em vez de excluí-la.'
     )
+    search_fields = ['titulo']
+    ordering_fields = ['titulo', 'meta_valor', 'arrecadado', 'progresso', 'data_inicio', 'data_fim', 'status']
+    ordering = ['-data_inicio', '-id']
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = Campanha.objects.com_arrecadado().annotate(
+            progresso=Case(
+                When(meta_valor__gt=0, then=F('arrecadado') * 100 / F('meta_valor')),
+                default=Value(Decimal('0')),
+                output_field=DecimalField(max_digits=14, decimal_places=2),
+            )
+        )
         status = self.request.query_params.get('status')
         if status:
             qs = qs.filter(status=status)
         return qs
+
+    @action(detail=False, methods=['get'], pagination_class=None, filter_backends=[])
+    def opcoes(self, request):
+        """Lista leve para seleção: campanhas ativas (id e título), sem paginação."""
+        dados = Campanha.objects.filter(status='ativa').order_by('titulo').values('id', 'titulo')
+        return Response(list(dados))
 
     def perform_create(self, serializer):
         campanha = serializer.save()
@@ -111,11 +143,13 @@ class CampanhaViewSet(ExclusaoProtegidaMixin, viewsets.ModelViewSet):
 
 
 class DoacaoViewSet(viewsets.ModelViewSet):
-    queryset = Doacao.objects.select_related('apoiador', 'campanha').all()
     serializer_class = DoacaoSerializer
+    search_fields = ['apoiador__nome', 'campanha__titulo']
+    ordering_fields = ['apoiador__nome', 'campanha__titulo', 'valor', 'data', 'status']
+    ordering = ['-data', '-id']
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = Doacao.objects.select_related('apoiador', 'campanha')
         status = self.request.query_params.get('status')
         campanha = self.request.query_params.get('campanha')
         apoiador = self.request.query_params.get('apoiador')
@@ -125,7 +159,18 @@ class DoacaoViewSet(viewsets.ModelViewSet):
             qs = qs.filter(campanha_id=campanha)
         if apoiador:
             qs = qs.filter(apoiador_id=apoiador)
-        return qs
+        return filtrar_periodo(qs, self.request, 'data')
+
+    @action(detail=False, methods=['get'], pagination_class=None)
+    def resumo(self, request):
+        """Totais de todos os registros que atendem aos filtros (não só da página)."""
+        qs = self.filter_queryset(self.get_queryset())
+        confirmadas = qs.filter(status='confirmada').aggregate(total=Sum('valor'), quantidade=Count('id'))
+        return Response({
+            'quantidade': qs.count(),
+            'total_confirmado': float(confirmadas['total'] or 0),
+            'quantidade_confirmadas': confirmadas['quantidade'],
+        })
 
     def perform_create(self, serializer):
         doacao = serializer.save()
@@ -381,23 +426,20 @@ class DashboardViewSet(viewsets.ViewSet):
 
 
 class DespesaViewSet(viewsets.ModelViewSet):
-    queryset = Despesa.objects.prefetch_related('anexos').all()
     serializer_class = DespesaSerializer
-
-    def get_serializer_context(self):
-        ctx = super().get_serializer_context()
-        ctx['request'] = self.request
-        return ctx
+    search_fields = ['descricao']
+    ordering_fields = ['descricao', 'categoria', 'data_vencimento', 'data_pagamento', 'valor', 'status']
+    ordering = ['-data_vencimento', '-id']
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = Despesa.objects.prefetch_related('anexos')
         status = self.request.query_params.get('status')
         categoria = self.request.query_params.get('categoria')
         if status:
             qs = qs.filter(status=status)
         if categoria:
             qs = qs.filter(categoria=categoria)
-        return qs
+        return filtrar_periodo(qs, self.request, 'data_vencimento')
 
     def _anexos_validados(self):
         arquivos = self.request.FILES.getlist('anexos')
@@ -532,6 +574,9 @@ class DespesaViewSet(viewsets.ModelViewSet):
 class ComunicadoViewSet(viewsets.ModelViewSet):
     queryset = Comunicado.objects.all()
     serializer_class = ComunicadoSerializer
+    search_fields = ['titulo', 'conteudo']
+    ordering_fields = ['titulo', 'data_publicacao', 'publico_alvo']
+    ordering = ['-data_publicacao', '-id']
 
 
 def _csv_response(filename):
