@@ -1,7 +1,7 @@
 from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import serializers
-from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoInstituicao, ConfiguracaoPix, LogAlteracao
+from .models import Apoiador, Campanha, Contribuicao, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoInstituicao, ConfiguracaoPix, LogAlteracao
 from .normalizacao import normalizar_celular, normalizar_email
 from .pix import normalizar_chave_pix
 
@@ -61,7 +61,7 @@ class ApoiadorSerializer(serializers.ModelSerializer):
     def get_total_doado(self, obj):
         total = getattr(obj, 'total_doado', None)
         if total is None:
-            total = obj.doacoes.filter(status='confirmada').aggregate(total=Sum('valor'))['total']
+            total = obj.doacoes.filter(status='confirmada', tipo='financeira').aggregate(total=Sum('valor'))['total']
         return float(total) if total else 0.0
 
     def validate_email(self, value):
@@ -179,19 +179,28 @@ class DespesaSerializer(serializers.ModelSerializer):
 
 
 class DoacaoSerializer(serializers.ModelSerializer):
-    apoiador_nome = serializers.CharField(source='apoiador.nome', read_only=True)
+    apoiador_nome = serializers.CharField(source='nome_doador', read_only=True)
     campanha_titulo = serializers.CharField(source='campanha.titulo', read_only=True, default=None)
+    forma_pagamento_display = serializers.CharField(source='get_forma_pagamento_display', read_only=True)
+    tem_comprovante = serializers.SerializerMethodField()
+    anonima = serializers.SerializerMethodField()
 
     class Meta:
         model = Doacao
         fields = [
-            'id', 'apoiador', 'apoiador_nome', 'campanha', 'campanha_titulo',
-            'valor', 'data', 'status', 'origem', 'consentimento_em',
+            'id', 'apoiador', 'apoiador_nome', 'anonima', 'campanha', 'campanha_titulo',
+            'tipo', 'valor', 'descricao_bens', 'valor_estimado',
+            'data', 'status', 'origem', 'forma_pagamento', 'forma_pagamento_display', 'observacao',
+            'tem_comprovante', 'comprovante_nome', 'contribuicao', 'competencia', 'consentimento_em',
         ]
-        read_only_fields = ['origem', 'consentimento_em']
+        read_only_fields = ['origem', 'consentimento_em', 'comprovante_nome', 'contribuicao', 'competencia']
+        extra_kwargs = {'valor': {'required': False}}
 
-    def validate_valor(self, value):
-        return _positivo(value, 'O valor deve ser maior que zero.')
+    def get_tem_comprovante(self, obj):
+        return bool(obj.comprovante)
+
+    def get_anonima(self, obj):
+        return obj.apoiador_id is None
 
     def validate_data(self, value):
         if value > timezone.localdate():
@@ -202,4 +211,49 @@ class DoacaoSerializer(serializers.ModelSerializer):
         mesma_de_antes = self.instance is not None and value is not None and self.instance.campanha_id == value.pk
         if value is not None and not value.aceita_doacoes and not mesma_de_antes:
             raise serializers.ValidationError('Não é possível registrar doações em uma campanha encerrada ou pausada.')
+        return value
+
+    def validate(self, attrs):
+        tipo = attrs.get('tipo', getattr(self.instance, 'tipo', 'financeira'))
+        if tipo == 'bens':
+            descricao = (attrs.get('descricao_bens', getattr(self.instance, 'descricao_bens', '')) or '').strip()
+            if not descricao:
+                raise serializers.ValidationError({'descricao_bens': 'Descreva os itens doados.'})
+            estimado = attrs.get('valor_estimado')
+            if estimado is not None and estimado < 0:
+                raise serializers.ValidationError({'valor_estimado': 'O valor estimado não pode ser negativo.'})
+            attrs.update(valor=0, descricao_bens=descricao, forma_pagamento='')
+        else:
+            valor = attrs.get('valor', getattr(self.instance, 'valor', None))
+            if valor is None or valor <= 0:
+                raise serializers.ValidationError({'valor': 'O valor deve ser maior que zero.'})
+            attrs.update(descricao_bens='', valor_estimado=None)
+            if not attrs.get('forma_pagamento', getattr(self.instance, 'forma_pagamento', '')):
+                attrs['forma_pagamento'] = 'pix'
+        return attrs
+
+
+class ContribuicaoSerializer(serializers.ModelSerializer):
+    apoiador_nome = serializers.CharField(source='apoiador.nome', read_only=True)
+    periodicidade_display = serializers.CharField(source='get_periodicidade_display', read_only=True)
+
+    class Meta:
+        model = Contribuicao
+        fields = [
+            'id', 'apoiador', 'apoiador_nome', 'valor', 'periodicidade', 'periodicidade_display',
+            'dia_vencimento', 'data_inicio', 'forma_pagamento', 'ativa', 'criada_em',
+        ]
+        read_only_fields = ['criada_em']
+
+    def validate_valor(self, value):
+        return _positivo(value, 'O valor deve ser maior que zero.')
+
+    def validate_dia_vencimento(self, value):
+        if not 1 <= value <= 28:
+            raise serializers.ValidationError('Use um dia entre 1 e 28 (existe em todos os meses).')
+        return value
+
+    def validate_forma_pagamento(self, value):
+        if value not in dict(Doacao.FORMA_PAGAMENTO_CHOICES):
+            raise serializers.ValidationError('Forma de pagamento inválida.')
         return value

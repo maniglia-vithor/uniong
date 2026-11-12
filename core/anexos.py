@@ -43,6 +43,11 @@ def caminho_anexo(instance, filename):
     return f'despesas/anexos/{uuid.uuid4().hex}{extensao}'
 
 
+def caminho_comprovante_doacao(instance, filename):
+    extensao = os.path.splitext(filename)[1].lower()
+    return f'doacoes/comprovantes/{uuid.uuid4().hex}{extensao}'
+
+
 def _tipo_pela_assinatura(cabecalho):
     if cabecalho.startswith(b'%PDF-'):
         return 'application/pdf'

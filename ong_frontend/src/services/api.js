@@ -96,6 +96,19 @@ export const acaoEmLoteDoacoes     = (ids, acao) => api.post('/doacoes/acao-em-l
 export const criarDoacao           = (data) => api.post('/doacoes/', data)
 export const atualizarDoacao       = (id, data) => api.put(`/doacoes/${id}/`, data)
 export const excluirDoacao         = (id) => api.delete(`/doacoes/${id}/`)
+export const enviarComprovanteDoacao = (id, arquivo) => {
+  const fd = new FormData()
+  fd.append('comprovante', arquivo)
+  return api.post(`/doacoes/${id}/comprovante/`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+}
+export const baixarComprovanteDoacao = (id) => api.get(`/doacoes/${id}/comprovante/`, { responseType: 'blob' })
+export const removerComprovanteDoacao = (id) => api.delete(`/doacoes/${id}/comprovante/`)
+
+// Contribuições periódicas
+export const getContribuicoes      = (params) => api.get('/contribuicoes/', { params })
+export const criarContribuicao     = (data) => api.post('/contribuicoes/', data)
+export const atualizarContribuicao = (id, data) => api.patch(`/contribuicoes/${id}/`, data)
+export const excluirContribuicao   = (id) => api.delete(`/contribuicoes/${id}/`)
 
 // Despesas
 export const getDespesas             = (params) => api.get('/despesas/', { params })

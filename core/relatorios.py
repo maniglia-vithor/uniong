@@ -49,11 +49,20 @@ def relatorio_doacoes(request):
     qs = Doacao.objects.select_related('apoiador', 'campanha').order_by('-data', '-id')
     qs = filtrar_periodo(_status(qs, request), request, 'data')
     resposta, csv_out = _resposta('relatorio_doacoes.csv')
-    csv_out.writerow(['ID', 'Membro', 'Campanha', 'Valor (R$)', 'Data', 'Status'])
+    tipo = request.query_params.get('tipo')
+    if tipo:
+        qs = qs.filter(tipo=tipo)
+    csv_out.writerow([
+        'ID', 'Membro', 'Campanha', 'Tipo', 'Valor (R$)', 'Itens doados', 'Valor estimado (R$)',
+        'Forma de pagamento', 'Data', 'Status', 'Observação',
+    ])
     for d in qs:
         csv_out.writerow([
-            d.id, texto(d.apoiador.nome), texto(d.campanha.titulo if d.campanha else ''),
-            moeda(d.valor), data_br(d.data), d.get_status_display(),
+            d.id, texto(d.nome_doador), texto(d.campanha.titulo if d.campanha else ''), d.get_tipo_display(),
+            moeda(d.valor) if d.tipo == 'financeira' else '', texto(d.descricao_bens),
+            moeda(d.valor_estimado) if d.valor_estimado is not None else '',
+            d.get_forma_pagamento_display() if d.forma_pagamento else '',
+            data_br(d.data), d.get_status_display(), texto(d.observacao),
         ])
     return resposta
 
@@ -105,7 +114,7 @@ def relatorio_prestacao_contas(request):
     if fim < inicio:
         raise ValidationError({'data_fim': 'O fim do período não pode ser anterior ao início.'})
 
-    doacoes = Doacao.objects.filter(status='confirmada', data__gte=inicio, data__lte=fim)
+    doacoes = Doacao.objects.filter(status='confirmada', tipo='financeira', data__gte=inicio, data__lte=fim)
     receitas = [
         {'campanha': d['campanha__titulo'] or 'Doações gerais (sem campanha)', 'total': float(d['total'])}
         for d in doacoes.values('campanha__titulo').annotate(total=Sum('valor')).order_by('-total')
@@ -154,7 +163,7 @@ def _data(request, nome):
 def relatorio_apoiadores(request):
     qs = Apoiador.objects.annotate(
         total_doado=Coalesce(
-            Sum('doacoes__valor', filter=Q(doacoes__status='confirmada')),
+            Sum('doacoes__valor', filter=Q(doacoes__status='confirmada', doacoes__tipo='financeira')),
             Value(Decimal('0')),
             output_field=DecimalField(max_digits=14, decimal_places=2),
         )

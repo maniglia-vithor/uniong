@@ -10,7 +10,7 @@ from django.db.models import OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from .anexos import armazenamento_privado, caminho_anexo
+from .anexos import armazenamento_privado, caminho_anexo, caminho_comprovante_doacao
 
 
 class Apoiador(models.Model):
@@ -63,7 +63,7 @@ class CampanhaQuerySet(models.QuerySet):
     def com_arrecadado(self):
         """Anota `arrecadado` (doações confirmadas) e `gasto` (despesas pagas vinculadas)."""
         return self.annotate(
-            arrecadado=_soma_por_campanha(Doacao, status='confirmada'),
+            arrecadado=_soma_por_campanha(Doacao, status='confirmada', tipo='financeira'),
             gasto=_soma_por_campanha(Despesa, status='pago'),
         )
 
@@ -99,7 +99,7 @@ class Campanha(models.Model):
             return self.arrecadado
         if self.pk is None:
             return Decimal('0')
-        total = self.doacoes.filter(status='confirmada').aggregate(total=Sum('valor'))['total']
+        total = self.doacoes.filter(status='confirmada', tipo='financeira').aggregate(total=Sum('valor'))['total']
         return total or Decimal('0')
 
     @property
@@ -171,37 +171,110 @@ class Notificacao(models.Model):
         return self.mensagem
 
 
+class Contribuicao(models.Model):
+    """Mensalidade/contribuição periódica de um membro; gera doações pendentes (gerar_contribuicoes)."""
+
+    PERIODICIDADE_CHOICES = [
+        ('mensal', 'Mensal'),
+        ('trimestral', 'Trimestral'),
+        ('semestral', 'Semestral'),
+        ('anual', 'Anual'),
+    ]
+    MESES_POR_PERIODO = {'mensal': 1, 'trimestral': 3, 'semestral': 6, 'anual': 12}
+
+    apoiador = models.ForeignKey(Apoiador, on_delete=models.CASCADE, related_name='contribuicoes')
+    valor = models.DecimalField(max_digits=10, decimal_places=2)
+    periodicidade = models.CharField(max_length=10, choices=PERIODICIDADE_CHOICES, default='mensal')
+    # 1 a 28, para existir em todos os meses.
+    dia_vencimento = models.PositiveSmallIntegerField(default=10)
+    data_inicio = models.DateField()
+    forma_pagamento = models.CharField(max_length=15, default='pix')
+    ativa = models.BooleanField(default=True)
+    criada_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Contribuição periódica'
+        verbose_name_plural = 'Contribuições periódicas'
+        ordering = ['-ativa', 'apoiador__nome']
+
+    def vence_no_mes(self, competencia):
+        """True se a contribuição tem parcela no mês de `competencia` (primeiro dia do mês)."""
+        inicio = self.data_inicio.replace(day=1)
+        meses = (competencia.year - inicio.year) * 12 + (competencia.month - inicio.month)
+        return meses >= 0 and meses % self.MESES_POR_PERIODO[self.periodicidade] == 0
+
+    def __str__(self):
+        return f'{self.apoiador.nome} — R$ {self.valor} ({self.get_periodicidade_display().lower()})'
+
+
 class Doacao(models.Model):
     STATUS_CHOICES = [
         ('confirmada', 'Confirmada'),
         ('pendente', 'Pendente'),
         ('cancelada', 'Cancelada'),
     ]
+    ORIGEM_CHOICES = [
+        ('painel', 'Painel'),
+        ('portal', 'Portal público'),
+        ('contribuicao', 'Contribuição periódica'),
+    ]
+    FORMA_PAGAMENTO_CHOICES = [
+        ('pix', 'PIX'),
+        ('dinheiro', 'Dinheiro'),
+        ('transferencia', 'Transferência bancária'),
+        ('boleto', 'Boleto'),
+        ('cartao', 'Cartão'),
+        ('outro', 'Outro'),
+    ]
+    TIPO_CHOICES = [
+        ('financeira', 'Financeira'),
+        ('bens', 'Bens / em espécie'),
+    ]
 
+    # Vazio = doação anônima.
     apoiador = models.ForeignKey(
-        Apoiador, on_delete=models.PROTECT, related_name='doacoes'
+        Apoiador, on_delete=models.PROTECT, null=True, blank=True, related_name='doacoes'
     )
     campanha = models.ForeignKey(
         Campanha, on_delete=models.PROTECT, null=True, blank=True, related_name='doacoes'
     )
-    ORIGEM_CHOICES = [
-        ('painel', 'Painel'),
-        ('portal', 'Portal público'),
-    ]
-
+    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, default='financeira')
+    # Doações em bens gravam valor 0: não entram em nenhum total financeiro.
     valor = models.DecimalField(max_digits=10, decimal_places=2)
+    descricao_bens = models.TextField(blank=True, default='')
+    valor_estimado = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     data = models.DateField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='confirmada')
-    origem = models.CharField(max_length=10, choices=ORIGEM_CHOICES, default='painel')
+    origem = models.CharField(max_length=12, choices=ORIGEM_CHOICES, default='painel')
+    forma_pagamento = models.CharField(max_length=15, choices=FORMA_PAGAMENTO_CHOICES, blank=True, default='pix')
+    observacao = models.TextField(blank=True, default='')
+    comprovante = models.FileField(
+        upload_to=caminho_comprovante_doacao, storage=armazenamento_privado, blank=True, default=''
+    )
+    comprovante_nome = models.CharField(max_length=255, blank=True, default='')
     consentimento_em = models.DateTimeField(null=True, blank=True)
+    # Preenchidos quando a doação foi gerada por uma contribuição periódica (uma por mês de competência).
+    contribuicao = models.ForeignKey(
+        Contribuicao, on_delete=models.SET_NULL, null=True, blank=True, related_name='doacoes'
+    )
+    competencia = models.DateField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'Doação'
         verbose_name_plural = 'Doações'
         ordering = ['-data']
+        constraints = [
+            models.UniqueConstraint(fields=['contribuicao', 'competencia'], name='doacao_unica_por_competencia'),
+        ]
+
+    @property
+    def nome_doador(self):
+        return self.apoiador.nome if self.apoiador_id else 'Anônimo'
 
     def __str__(self):
-        return f'R$ {self.valor} — {self.apoiador.nome} em {self.data}'
+        if self.tipo == 'bens':
+            return f'Bens — {self.nome_doador} em {self.data}'
+        return f'R$ {self.valor} — {self.nome_doador} em {self.data}'
 
 
 class Despesa(models.Model):

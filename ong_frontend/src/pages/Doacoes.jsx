@@ -9,13 +9,16 @@ import TabelaVazia from '../components/TabelaVazia'
 import Paginacao from '../components/Paginacao'
 import { CabecalhoOrdenavel, CampoBusca } from '../components/CabecalhoOrdenavel'
 import useListaPaginada from '../hooks/useListaPaginada'
-import { formatBRL, formatData, mensagemErro } from '../utils/formatos'
+import { FORMAS_PAGAMENTO, formatBRL, formatData, mensagemErro } from '../utils/formatos'
 import {
   getDoacoes, getDoacoesResumo, criarDoacao, atualizarDoacao, excluirDoacao,
-  getApoiadoresOpcoes, getCampanhasOpcoes, acaoEmLoteDoacoes,
+  getApoiadoresOpcoes, getCampanhasOpcoes, acaoEmLoteDoacoes, enviarComprovanteDoacao,
 } from '../services/api'
 
-const VAZIO = { apoiador: '', campanha: '', valor: '', data: '', status: 'confirmada' }
+const VAZIO = {
+  apoiador: '', anonima: false, campanha: '', tipo: 'financeira', valor: '', descricao_bens: '', valor_estimado: '',
+  data: '', status: 'confirmada', forma_pagamento: 'pix', observacao: '',
+}
 const LIMITE_SEM_BUSCA = 50
 const ABAS_STATUS = [['', 'Todas'], ['pendente', 'Pendentes'], ['confirmada', 'Confirmadas'], ['cancelada', 'Canceladas']]
 
@@ -49,7 +52,8 @@ export default function Doacoes() {
   const [filtroStatus, setFiltroStatus] = useState('')
   const filtros = useMemo(() => (filtroStatus ? { status: filtroStatus } : {}), [filtroStatus])
   const lista = useListaPaginada(getDoacoes, { filtros })
-  const [resumo, setResumo] = useState({ quantidade: 0, total_confirmado: 0 })
+  const [resumo, setResumo] = useState({ quantidade: 0, total_confirmado: 0, bens_quantidade: 0, bens_valor_estimado: 0 })
+  const [comprovante, setComprovante] = useState(null)
   const [pendentes, setPendentes] = useState(0)
   const [selecionadas, setSelecionadas] = useState([])
   const [apoiadores, setApoiadores] = useState([])
@@ -95,27 +99,49 @@ export default function Doacoes() {
   async function abrirEdicao(item) {
     setEditando(item)
     setForm({
-      apoiador: item.apoiador,
+      apoiador: item.apoiador ?? '',
+      anonima: item.anonima,
       campanha: item.campanha || '',
-      valor: item.valor,
+      tipo: item.tipo,
+      valor: item.tipo === 'bens' ? '' : item.valor,
+      descricao_bens: item.descricao_bens || '',
+      valor_estimado: item.valor_estimado ?? '',
       data: item.data,
       status: item.status,
+      forma_pagamento: item.forma_pagamento || 'pix',
+      observacao: item.observacao || '',
     })
     await carregarOpcoes(item)
     setModal(true)
   }
 
-  function fechar() { setModal(false); setEditando(null) }
+  function fechar() { setModal(false); setEditando(null); setComprovante(null) }
 
-  function onChange(e) { setForm((f) => ({ ...f, [e.target.name]: e.target.value })) }
+  function onChange(e) {
+    const { name, type, checked, value } = e.target
+    setForm((f) => ({ ...f, [name]: type === 'checkbox' ? checked : value }))
+  }
 
   async function onSubmit(e) {
     e.preventDefault()
     setSalvando(true)
-    const payload = { ...form, campanha: form.campanha || null }
+    const { anonima, ...resto } = form
+    const payload = {
+      ...resto,
+      apoiador: anonima ? null : form.apoiador,
+      campanha: form.campanha || null,
+      valor_estimado: form.valor_estimado === '' ? null : form.valor_estimado,
+    }
+    if (form.tipo === 'bens') delete payload.valor
     try {
-      if (editando) await atualizarDoacao(editando.id, payload)
-      else await criarDoacao(payload)
+      const { data } = editando ? await atualizarDoacao(editando.id, payload) : await criarDoacao(payload)
+      if (comprovante) {
+        try {
+          await enviarComprovanteDoacao(data.id, comprovante)
+        } catch (err) {
+          alert(`Doação salva, mas o comprovante não foi aceito: ${mensagemErro(err)}`)
+        }
+      }
       fechar()
       lista.recarregar()
     } catch (err) {
@@ -156,6 +182,11 @@ export default function Doacoes() {
           <p className="text-xs text-[var(--text-muted)]">
             {resumo.quantidade} registro{resumo.quantidade !== 1 ? 's' : ''} · Total confirmado:{' '}
             <span className="font-semibold" style={{ color: '#0f4c5c' }}>{formatBRL(resumo.total_confirmado)}</span>
+            {resumo.bens_quantidade > 0 && (
+              <> · Em bens: {resumo.bens_quantidade} doaç{resumo.bens_quantidade !== 1 ? 'ões' : 'ão'}
+                {resumo.bens_valor_estimado > 0 && <> (estimado {formatBRL(resumo.bens_valor_estimado)}, fora dos totais)</>}
+              </>
+            )}
           </p>
         </div>
         <button
@@ -195,7 +226,7 @@ export default function Doacoes() {
             )
           })}
         </div>
-        <CampoBusca valor={lista.busca} onMudar={lista.setBusca} placeholder="Buscar por doador ou campanha" />
+        <CampoBusca valor={lista.busca} onMudar={lista.setBusca} placeholder="Buscar por doador, campanha ou itens" />
       </div>
 
       {filtroStatus === 'pendente' && selecionadas.length > 0 && (
@@ -268,7 +299,18 @@ export default function Doacoes() {
                       </div>
                     </td>
                     <td className="px-5 py-3 text-[var(--text-secondary)]">{d.campanha_titulo || <span className="text-[var(--text-muted)]">—</span>}</td>
-                    <td className="px-5 py-3 text-right font-semibold text-[var(--text-primary)]">{formatBRL(d.valor)}</td>
+                    <td className="px-5 py-3 text-right font-semibold text-[var(--text-primary)]">
+                      {d.tipo === 'bens' ? (
+                        <span title={d.descricao_bens} className="text-xs font-medium text-[var(--text-secondary)]">
+                          Bens{d.valor_estimado ? ` (≈ ${formatBRL(d.valor_estimado)})` : ''}
+                        </span>
+                      ) : (
+                        <>
+                          {formatBRL(d.valor)}
+                          <span className="block text-[10px] font-normal text-[var(--text-muted)]">{d.forma_pagamento_display}</span>
+                        </>
+                      )}
+                    </td>
                     <td className="px-5 py-3 text-[var(--text-secondary)]">{formatData(d.data)}</td>
                     <td className="px-5 py-3"><BadgeStatus status={d.status} /></td>
                     <td className="px-5 py-3">
@@ -303,28 +345,82 @@ export default function Doacoes() {
       {modal && (
         <Modal titulo={editando ? 'Editar Doação' : 'Registrar Doação'} onFechar={fechar}>
           <form onSubmit={onSubmit} className="space-y-4">
-            <Campo label="Membro">
-              <SelecaoComBusca name="apoiador" value={form.apoiador} onChange={onChange} opcoes={apoiadores}
-                rotulo="membros" vazio="Selecione um membro..." required />
+            <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+              <input type="checkbox" name="anonima" checked={form.anonima} onChange={onChange} />
+              Doação anônima (sem membro vinculado)
+            </label>
+            {!form.anonima && (
+              <Campo label="Membro">
+                <SelecaoComBusca name="apoiador" value={form.apoiador} onChange={onChange} opcoes={apoiadores}
+                  rotulo="membros" vazio="Selecione um membro..." required />
+              </Campo>
+            )}
+            <Campo label="Tipo">
+              <Select name="tipo" value={form.tipo} onChange={onChange}>
+                <option value="financeira">Financeira (dinheiro)</option>
+                <option value="bens">Bens / em espécie (alimentos, roupas, materiais...)</option>
+              </Select>
             </Campo>
             <Campo label="Campanha (opcional)">
               <SelecaoComBusca name="campanha" value={form.campanha} onChange={onChange} opcoes={campanhas}
                 rotulo="campanhas" vazio="Sem campanha vinculada" />
             </Campo>
-            <div className="grid grid-cols-2 gap-3">
-              <Campo label="Valor (R$)">
-                <Input name="valor" type="number" min="0.01" step="0.01" value={form.valor} onChange={onChange} placeholder="0,00" required />
-              </Campo>
-              <Campo label="Data">
-                <CampoData name="data" value={form.data} onChange={onChange} required />
-              </Campo>
-            </div>
+            {form.tipo === 'bens' ? (
+              <>
+                <Campo label="Itens doados">
+                  <textarea
+                    name="descricao_bens" value={form.descricao_bens} onChange={onChange} rows={2} required
+                    placeholder="Ex.: 20 cestas básicas e 15 kg de roupas"
+                    className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg outline-none focus:border-teal-500 resize-none bg-[var(--bg-input)] text-[var(--text-primary)]"
+                  />
+                </Campo>
+                <div className="grid grid-cols-2 gap-3">
+                  <Campo label="Valor estimado (R$, opcional)">
+                    <Input name="valor_estimado" type="number" min="0" step="0.01" value={form.valor_estimado} onChange={onChange} placeholder="0,00" />
+                  </Campo>
+                  <Campo label="Data">
+                    <CampoData name="data" value={form.data} onChange={onChange} required />
+                  </Campo>
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)] -mt-2">Doações em bens não entram nos totais financeiros; aparecem em indicador e relatório próprios.</p>
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <Campo label="Valor (R$)">
+                    <Input name="valor" type="number" min="0.01" step="0.01" value={form.valor} onChange={onChange} placeholder="0,00" required />
+                  </Campo>
+                  <Campo label="Data">
+                    <CampoData name="data" value={form.data} onChange={onChange} required />
+                  </Campo>
+                </div>
+                <Campo label="Forma de pagamento">
+                  <Select name="forma_pagamento" value={form.forma_pagamento} onChange={onChange}>
+                    {FORMAS_PAGAMENTO.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
+                  </Select>
+                </Campo>
+              </>
+            )}
             <Campo label="Status">
               <Select name="status" value={form.status} onChange={onChange}>
                 <option value="confirmada">Confirmada</option>
                 <option value="pendente">Pendente</option>
                 <option value="cancelada">Cancelada</option>
               </Select>
+            </Campo>
+            <Campo label="Observação (opcional)">
+              <textarea
+                name="observacao" value={form.observacao} onChange={onChange} rows={2}
+                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg outline-none focus:border-teal-500 resize-none bg-[var(--bg-input)] text-[var(--text-primary)]"
+              />
+            </Campo>
+            <Campo label={editando?.tem_comprovante ? `Comprovante (atual: ${editando.comprovante_nome}; envie outro para substituir)` : 'Comprovante (opcional)'}>
+              <input
+                type="file" accept=".pdf,.jpg,.jpeg,.png,.webp"
+                onChange={(e) => setComprovante(e.target.files?.[0] ?? null)}
+                className="block w-full text-xs text-[var(--text-secondary)]"
+              />
+              <p className="text-[11px] text-[var(--text-muted)] mt-1">PDF, JPG, PNG ou WEBP até 5 MB. Fica visível só para a equipe.</p>
             </Campo>
             <div className="flex gap-3 pt-2">
               <BotaoCancelar onClick={fechar} />

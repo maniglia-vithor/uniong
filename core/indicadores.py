@@ -30,7 +30,8 @@ def _soma(qs, campo='valor'):
 
 # ── Doações ─────────────────────────────────────────────────────────────────
 def doacoes_confirmadas():
-    return Doacao.objects.filter(status='confirmada')
+    """Doações financeiras confirmadas (bens em espécie ficam fora dos totais)."""
+    return Doacao.objects.filter(status='confirmada', tipo='financeira')
 
 
 def doacoes_do_mes(referencia=None):
@@ -243,7 +244,7 @@ def fluxo_mensal(meses=12, referencia=None, ano=None):
 
 
 def anos_com_movimento():
-    anos = set(Doacao.objects.filter(status='confirmada').dates('data', 'year').values_list('data__year', flat=True))
+    anos = set(doacoes_confirmadas().dates('data', 'year').values_list('data__year', flat=True))
     anos |= set(
         Despesa.objects.filter(status='pago', data_pagamento__isnull=False)
         .dates('data_pagamento', 'year').values_list('data_pagamento__year', flat=True)

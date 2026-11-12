@@ -39,10 +39,12 @@ class RelatoriosCsvTests(APITestCase):
         camp = criar_campanha(titulo='Natal; crianças')
         criar_doacao(campanha=camp, valor=Decimal('1234.50'), data=date(2026, 3, 9))
         linhas = ler_csv(self.client.get('/api/relatorios/doacoes/'))
-        self.assertEqual(len(linhas[1]), 6)
+        self.assertEqual(len(linhas[1]), 11)
         self.assertEqual(linhas[1][2], 'Natal; crianças')
-        self.assertEqual(linhas[1][3], '1234,50')
-        self.assertEqual(linhas[1][4], '09/03/2026')
+        self.assertEqual(linhas[1][3], 'Financeira')
+        self.assertEqual(linhas[1][4], '1234,50')
+        self.assertEqual(linhas[1][7], 'PIX')
+        self.assertEqual(linhas[1][8], '09/03/2026')
 
     def test_filtros_de_periodo_e_status(self):
         criar_doacao(data=date(2026, 1, 5))
@@ -50,7 +52,7 @@ class RelatoriosCsvTests(APITestCase):
         criar_doacao(data=date(2026, 2, 6), status='pendente')
         linhas = ler_csv(self.client.get('/api/relatorios/doacoes/?data_inicio=2026-02-01&data_fim=2026-02-28&status=confirmada'))
         self.assertEqual(len(linhas), 2)
-        self.assertEqual(linhas[1][4], '05/02/2026')
+        self.assertEqual(linhas[1][8], '05/02/2026')
 
     def test_campanhas(self):
         criar_campanha(titulo='Agasalho', meta_valor=Decimal('100'))

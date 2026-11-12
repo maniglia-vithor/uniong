@@ -20,7 +20,7 @@ from rest_framework.response import Response
 
 from django.db import transaction
 
-from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoInstituicao, ConfiguracaoPix, LogAlteracao
+from .models import Apoiador, Campanha, Contribuicao, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoInstituicao, ConfiguracaoPix, LogAlteracao
 from .anexos import TIPOS_PERMITIDOS, validar_anexo
 from .doacao_publica import DoacaoPublicaSerializer, ativar_membro_interessado, registrar_doacao_publica
 from . import indicadores
@@ -30,7 +30,7 @@ from .paginacao import filtrar_periodo
 from .portal import CATEGORIA_AGREGADA, despesas_publicas
 from .pix import mascarar
 from .throttles import AuthThrottle, DoacaoPublicaThrottle
-from .serializers import ApoiadorSerializer, CampanhaSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer, ConfiguracaoInstituicaoSerializer, LogAlteracaoSerializer
+from .serializers import ApoiadorSerializer, CampanhaSerializer, ContribuicaoSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer, ConfiguracaoInstituicaoSerializer, LogAlteracaoSerializer
 
 
 def _notificar_admins(mensagem, tipo, actor_name='', action_text='', target_type='', target_id=None):
@@ -72,7 +72,7 @@ class ApoiadorViewSet(AuditoriaMixin, ExclusaoProtegidaMixin, viewsets.ModelView
     def get_queryset(self):
         qs = Apoiador.objects.annotate(
             total_doado=Coalesce(
-                Sum('doacoes__valor', filter=Q(doacoes__status='confirmada')),
+                Sum('doacoes__valor', filter=Q(doacoes__status='confirmada', doacoes__tipo='financeira')),
                 Value(Decimal('0')),
                 output_field=DecimalField(max_digits=14, decimal_places=2),
             )
@@ -179,8 +179,8 @@ class CampanhaViewSet(AuditoriaMixin, ExclusaoProtegidaMixin, viewsets.ModelView
 
 class DoacaoViewSet(AuditoriaMixin, viewsets.ModelViewSet):
     serializer_class = DoacaoSerializer
-    search_fields = ['apoiador__nome', 'campanha__titulo']
-    ordering_fields = ['apoiador__nome', 'campanha__titulo', 'valor', 'data', 'status']
+    search_fields = ['apoiador__nome', 'campanha__titulo', 'descricao_bens', 'observacao']
+    ordering_fields = ['apoiador__nome', 'campanha__titulo', 'valor', 'data', 'status', 'forma_pagamento']
     ordering = ['-data', '-id']
 
     def get_queryset(self):
@@ -194,18 +194,57 @@ class DoacaoViewSet(AuditoriaMixin, viewsets.ModelViewSet):
             qs = qs.filter(campanha_id=campanha)
         if apoiador:
             qs = qs.filter(apoiador_id=apoiador)
+        for campo in ('tipo', 'forma_pagamento'):
+            valor = self.request.query_params.get(campo)
+            if valor:
+                qs = qs.filter(**{campo: valor})
+        if self.request.query_params.get('anonima') == 'true':
+            qs = qs.filter(apoiador__isnull=True)
         return filtrar_periodo(qs, self.request, 'data')
 
     @action(detail=False, methods=['get'], pagination_class=None)
     def resumo(self, request):
         """Totais de todos os registros que atendem aos filtros (não só da página)."""
         qs = self.filter_queryset(self.get_queryset())
-        confirmadas = qs.filter(status='confirmada').aggregate(total=Sum('valor'), quantidade=Count('id'))
+        confirmadas = qs.filter(status='confirmada', tipo='financeira').aggregate(total=Sum('valor'), quantidade=Count('id'))
+        bens = qs.filter(status='confirmada', tipo='bens').aggregate(estimado=Sum('valor_estimado'), quantidade=Count('id'))
         return Response({
             'quantidade': qs.count(),
             'total_confirmado': float(confirmadas['total'] or 0),
             'quantidade_confirmadas': confirmadas['quantidade'],
+            'bens_quantidade': bens['quantidade'],
+            'bens_valor_estimado': float(bens['estimado'] or 0),
         })
+
+    @action(detail=True, methods=['get', 'post', 'delete'], url_path='comprovante')
+    def comprovante(self, request, pk=None):
+        """GET baixa, POST (multipart, campo "comprovante") envia/substitui, DELETE remove o comprovante."""
+        doacao = self.get_object()
+        if request.method == 'GET':
+            if not doacao.comprovante:
+                return Response({'erro': 'Esta doação não tem comprovante.'}, status=404)
+            return _resposta_arquivo(doacao.comprovante, doacao.comprovante_nome)
+        anterior = doacao.comprovante_nome
+        if request.method == 'DELETE':
+            if doacao.comprovante:
+                doacao.comprovante.delete(save=False)
+            Doacao.objects.filter(pk=doacao.pk).update(comprovante='', comprovante_nome='')
+            registrar_auditoria(request.user, doacao, 'edicao', 'comprovante', anterior, '')
+            return Response(status=204)
+        arquivo = request.FILES.get('comprovante')
+        if arquivo is None:
+            return Response({'comprovante': 'Envie um arquivo no campo "comprovante".'}, status=400)
+        try:
+            validar_anexo(arquivo)
+        except ValueError as e:
+            return Response({'comprovante': str(e)}, status=400)
+        if doacao.comprovante:
+            doacao.comprovante.delete(save=False)
+        doacao.comprovante_nome = os.path.basename(arquivo.name)[:255]
+        doacao.comprovante = arquivo
+        doacao.save(update_fields=['comprovante', 'comprovante_nome'])
+        registrar_auditoria(request.user, doacao, 'edicao', 'comprovante', anterior, doacao.comprovante_nome)
+        return Response(DoacaoSerializer(doacao).data)
 
     def perform_update(self, serializer):
         doacao = serializer.save()
@@ -238,16 +277,29 @@ class DoacaoViewSet(AuditoriaMixin, viewsets.ModelViewSet):
         if doacao.status == 'confirmada' and doacao.campanha_id:
             avisar_meta_atingida(doacao.campanha)
         actor = self.request.user.get_full_name() or self.request.user.username
-        valor = f'R$ {doacao.valor:.2f}'.replace('.', ',')
+        valor = 'em bens' if doacao.tipo == 'bens' else f'de R$ {doacao.valor:.2f}'.replace('.', ',')
         campanha_txt = f' para a campanha {doacao.campanha.titulo}' if doacao.campanha else ''
         _notificar_admins(
-            mensagem=f'{actor} registrou uma nova doação de {valor} realizada por {doacao.apoiador.nome}{campanha_txt}.',
+            mensagem=f'{actor} registrou uma nova doação {valor} realizada por {doacao.nome_doador}{campanha_txt}.'[:300],
             tipo='doacao',
             actor_name=actor,
-            action_text=f'registrou uma nova doação de {valor} realizada por {doacao.apoiador.nome}{campanha_txt}',
+            action_text=f'registrou uma nova doação {valor} realizada por {doacao.nome_doador}{campanha_txt}'[:200],
             target_type='doacao',
             target_id=doacao.id,
         )
+
+
+class ContribuicaoViewSet(AuditoriaMixin, viewsets.ModelViewSet):
+    """Contribuições periódicas (mensalidades). ?apoiador=<id> filtra pela ficha do membro."""
+    serializer_class = ContribuicaoSerializer
+    ordering = ['-ativa', 'apoiador__nome', 'id']
+
+    def get_queryset(self):
+        qs = Contribuicao.objects.select_related('apoiador')
+        apoiador = self.request.query_params.get('apoiador')
+        if apoiador:
+            qs = qs.filter(apoiador_id=apoiador)
+        return qs
 
 
 class NotificacaoViewSet(viewsets.ModelViewSet):
@@ -287,7 +339,7 @@ class DashboardViewSet(viewsets.ViewSet):
     def top_apoiadores(self, request):
         top = (
             Apoiador.objects
-            .filter(doacoes__status='confirmada')
+            .filter(doacoes__status='confirmada', doacoes__tipo='financeira')
             .annotate(total_doado=Sum('doacoes__valor'))
             .order_by('-total_doado')[:5]
         )
@@ -306,7 +358,7 @@ class DashboardViewSet(viewsets.ViewSet):
         return [
             {
                 'id': d.id,
-                'apoiador_nome': d.apoiador.nome,
+                'apoiador_nome': d.nome_doador,
                 'valor': float(d.valor),
                 'data': d.data.isoformat(),
                 'campanha': d.campanha.titulo if d.campanha else None,
@@ -592,14 +644,20 @@ RESPOSTA_PORTAL_DESLIGADO = {'erro': 'Portal indisponível.'}
 
 
 def _resposta_anexo(anexo):
-    """Download seguro: sempre como anexo, com tipo fixo pela extensão e nosniff."""
-    if anexo is None or not anexo.arquivo.storage.exists(anexo.arquivo.name):
+    if anexo is None:
         return Response({'erro': 'Anexo não encontrado.'}, status=404)
-    extensao = os.path.splitext(anexo.arquivo.name)[1].lower()
+    return _resposta_arquivo(anexo.arquivo, anexo.nome_original)
+
+
+def _resposta_arquivo(arquivo, nome=''):
+    """Download seguro: sempre como anexo, com tipo fixo pela extensão e nosniff."""
+    if not arquivo or not arquivo.storage.exists(arquivo.name):
+        return Response({'erro': 'Anexo não encontrado.'}, status=404)
+    extensao = os.path.splitext(arquivo.name)[1].lower()
     resposta = FileResponse(
-        anexo.arquivo.open('rb'),
+        arquivo.open('rb'),
         as_attachment=True,
-        filename=anexo.nome_original or os.path.basename(anexo.arquivo.name),
+        filename=nome or os.path.basename(arquivo.name),
         content_type=TIPOS_PERMITIDOS.get(extensao, 'application/octet-stream'),
     )
     resposta['X-Content-Type-Options'] = 'nosniff'

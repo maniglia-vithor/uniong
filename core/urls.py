@@ -7,7 +7,7 @@ from .relatorios import (
     relatorio_apoiadores, relatorio_campanhas, relatorio_despesas, relatorio_doacoes, relatorio_prestacao_contas,
 )
 from .views import (
-    ApoiadorViewSet, CampanhaViewSet, DoacaoViewSet, DashboardViewSet,
+    ApoiadorViewSet, CampanhaViewSet, ContribuicaoViewSet, DoacaoViewSet, DashboardViewSet,
     ComunicadoViewSet, NotificacaoViewSet, DespesaViewSet, HistoricoViewSet,
     painel_transparencia, public_doacao, configuracao_pix, configuracao_instituicao, google_login, prestacao_contas_publica, comprovante_publico,
 )
@@ -16,6 +16,7 @@ router = DefaultRouter()
 router.register(r'apoiadores', ApoiadorViewSet, basename='apoiador')
 router.register(r'campanhas', CampanhaViewSet, basename='campanha')
 router.register(r'doacoes', DoacaoViewSet, basename='doacao')
+router.register(r'contribuicoes', ContribuicaoViewSet, basename='contribuicao')
 router.register(r'dashboard', DashboardViewSet, basename='dashboard')
 router.register(r'comunicados', ComunicadoViewSet, basename='comunicado')
 router.register(r'notificacoes', NotificacaoViewSet, basename='notificacao')

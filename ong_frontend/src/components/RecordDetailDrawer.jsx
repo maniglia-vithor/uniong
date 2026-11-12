@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Pencil, Save, XCircle } from 'lucide-react'
-import api from '../services/api'
+import api, { baixarComprovanteDoacao, getContribuicoes, criarContribuicao, atualizarContribuicao, excluirContribuicao } from '../services/api'
 import BadgeStatus from './BadgeStatus'
 import BarraProgresso from './BarraProgresso'
 import { Campo, Input, Select } from './CampoForm'
 import CampoData from './CampoData'
 import { useAuth } from '../context/AuthContext'
-import { formatarMomento } from '../utils/formatos'
+import { FORMAS_PAGAMENTO, formatarMomento, mensagemErro } from '../utils/formatos'
 
 function formatBRL(v) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v ?? 0)
@@ -19,6 +19,20 @@ function formatData(iso) {
 }
 function iniciais(nome = '') {
   return nome.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()
+}
+
+async function baixarDoComprovante(record) {
+  try {
+    const { data } = await baixarComprovanteDoacao(record.id)
+    const url = URL.createObjectURL(data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = record.comprovante_nome || 'comprovante'
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    alert(mensagemErro(err, 'Não foi possível baixar o comprovante.'))
+  }
 }
 
 // ── Detalhe Doação ──────────────────────────────────────────
@@ -36,11 +50,25 @@ function DetalheDoacao({ record, onEdit }) {
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <InfoBox label="Valor" value={formatBRL(record.valor)} destaque />
+        {record.tipo === 'bens' ? (
+          <InfoBox label="Valor estimado" value={record.valor_estimado ? formatBRL(record.valor_estimado) : 'Não informado'} destaque />
+        ) : (
+          <InfoBox label="Valor" value={formatBRL(record.valor)} destaque />
+        )}
         <InfoBox label="Data" value={formatData(record.data)} />
         <InfoBox label="Status" value={<BadgeStatus status={record.status} />} />
         <InfoBox label="Campanha" value={record.campanha_titulo || '—'} />
+        <InfoBox label="Tipo" value={record.tipo === 'bens' ? 'Bens / em espécie' : 'Financeira'} />
+        {record.tipo !== 'bens' && <InfoBox label="Forma de pagamento" value={record.forma_pagamento_display || '—'} />}
       </div>
+      {record.tipo === 'bens' && <InfoBox label="Itens doados" value={record.descricao_bens} />}
+      {record.observacao && <InfoBox label="Observação" value={record.observacao} />}
+      {record.tem_comprovante && (
+        <button type="button" onClick={() => baixarDoComprovante(record)}
+          className="text-xs font-semibold underline" style={{ color: '#0f4c5c' }}>
+          Baixar comprovante ({record.comprovante_nome})
+        </button>
+      )}
       <button onClick={onEdit}
         className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity"
         style={{ backgroundColor: '#0f4c5c' }}>
@@ -52,32 +80,43 @@ function DetalheDoacao({ record, onEdit }) {
 
 function EditDoacao({ record, apoiadores, campanhas, onSaved, onCancel }) {
   const [form, setForm] = useState({
-    apoiador: record.apoiador,
+    apoiador: record.apoiador ?? '',
+    anonima: record.anonima,
     campanha: record.campanha || '',
     valor: record.valor,
     data: record.data,
     status: record.status,
   })
   const [salvando, setSalvando] = useState(false)
+  const bens = record.tipo === 'bens'
 
   async function onSubmit(e) {
     e.preventDefault()
     setSalvando(true)
+    const { anonima, ...resto } = form
+    const payload = { ...resto, apoiador: anonima ? null : form.apoiador, campanha: form.campanha || null }
+    if (bens) delete payload.valor
     try {
-      await api.put(`/doacoes/${record.id}/`, { ...form, campanha: form.campanha || null })
+      await api.patch(`/doacoes/${record.id}/`, payload)
       onSaved()
-    } catch { alert('Erro ao salvar.') }
+    } catch (err) { alert(mensagemErro(err, 'Erro ao salvar.')) }
     finally { setSalvando(false) }
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <Campo label="Membro">
-        <Select name="apoiador" value={form.apoiador} onChange={e => setForm(f => ({ ...f, apoiador: e.target.value }))} required>
-          <option value="">Selecione...</option>
-          {apoiadores.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
-        </Select>
-      </Campo>
+      <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+        <input type="checkbox" checked={form.anonima} onChange={e => setForm(f => ({ ...f, anonima: e.target.checked }))} />
+        Doação anônima
+      </label>
+      {!form.anonima && (
+        <Campo label="Membro">
+          <Select name="apoiador" value={form.apoiador} onChange={e => setForm(f => ({ ...f, apoiador: e.target.value }))} required>
+            <option value="">Selecione...</option>
+            {apoiadores.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+          </Select>
+        </Campo>
+      )}
       <Campo label="Campanha (opcional)">
         <Select name="campanha" value={form.campanha} onChange={e => setForm(f => ({ ...f, campanha: e.target.value }))}>
           <option value="">Sem campanha</option>
@@ -85,10 +124,12 @@ function EditDoacao({ record, apoiadores, campanhas, onSaved, onCancel }) {
         </Select>
       </Campo>
       <div className="grid grid-cols-2 gap-3">
-        <Campo label="Valor (R$)">
-          <Input name="valor" type="number" min="0.01" step="0.01" value={form.valor}
-            onChange={e => setForm(f => ({ ...f, valor: e.target.value }))} required />
-        </Campo>
+        {!bens && (
+          <Campo label="Valor (R$)">
+            <Input name="valor" type="number" min="0.01" step="0.01" value={form.valor}
+              onChange={e => setForm(f => ({ ...f, valor: e.target.value }))} required />
+          </Campo>
+        )}
         <Campo label="Data">
           <CampoData name="data" value={form.data}
             onChange={e => setForm(f => ({ ...f, data: e.target.value }))} required />
@@ -263,7 +304,118 @@ function DetalheApoiador({ record, onEdit }) {
         style={{ backgroundColor: '#0f4c5c' }}>
         <Pencil size={14} /> Editar Membro
       </button>
+      <ContribuicoesDoMembro apoiadorId={record.id} />
     </div>
+  )
+}
+
+const CONTRIBUICAO_VAZIA = { valor: '', periodicidade: 'mensal', dia_vencimento: 10, data_inicio: '', forma_pagamento: 'pix' }
+
+function ContribuicoesDoMembro({ apoiadorId }) {
+  const [itens, setItens] = useState(null)
+  const [form, setForm] = useState(null)
+  const [versao, setVersao] = useState(0)
+
+  useEffect(() => {
+    getContribuicoes({ apoiador: apoiadorId, page_size: 100 })
+      .then(({ data }) => setItens(data.results ?? data))
+      .catch(() => setItens([]))
+  }, [apoiadorId, versao])
+
+  async function salvar(e) {
+    e.preventDefault()
+    try {
+      await criarContribuicao({ ...form, apoiador: apoiadorId })
+      setForm(null)
+      setVersao(v => v + 1)
+    } catch (err) { alert(mensagemErro(err)) }
+  }
+
+  async function alternar(c) {
+    try {
+      await atualizarContribuicao(c.id, { ativa: !c.ativa })
+      setVersao(v => v + 1)
+    } catch (err) { alert(mensagemErro(err)) }
+  }
+
+  async function excluir(c) {
+    if (!confirm('Excluir esta contribuição? As doações já geradas são mantidas.')) return
+    try {
+      await excluirContribuicao(c.id)
+      setVersao(v => v + 1)
+    } catch (err) { alert(mensagemErro(err)) }
+  }
+
+  const muda = (campo) => (e) => setForm(f => ({ ...f, [campo]: e.target.value }))
+
+  return (
+    <section className="space-y-2 pt-2 border-t border-[var(--border-subtle)]">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Contribuições periódicas</h3>
+        {!form && (
+          <button type="button" onClick={() => setForm(CONTRIBUICAO_VAZIA)} className="text-xs font-semibold" style={{ color: '#0f4c5c' }}>
+            + Nova contribuição
+          </button>
+        )}
+      </div>
+      <p className="text-[11px] text-[var(--text-muted)]">Geram doações pendentes a cada período (comando gerar_contribuicoes); a equipe confirma ao receber.</p>
+      {itens === null ? (
+        <p className="text-xs text-[var(--text-muted)]">Carregando…</p>
+      ) : itens.length === 0 && !form ? (
+        <p className="text-xs text-[var(--text-muted)]">Nenhuma contribuição cadastrada.</p>
+      ) : (
+        <ul className="divide-y divide-[var(--border-subtle)] border border-[var(--border)] rounded-lg">
+          {itens.map(c => (
+            <li key={c.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+              <div>
+                <p className="text-[var(--text-primary)]">{formatBRL(c.valor)} · {c.periodicidade_display}</p>
+                <p className="text-[11px] text-[var(--text-muted)]">Vence dia {c.dia_vencimento} · desde {formatData(c.data_inicio)} · {c.ativa ? 'Ativa' : 'Pausada'}</p>
+              </div>
+              <div className="flex gap-1">
+                <button type="button" onClick={() => alternar(c)} className="px-2 py-1 rounded-lg text-[11px] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
+                  {c.ativa ? 'Pausar' : 'Reativar'}
+                </button>
+                <button type="button" onClick={() => excluir(c)} className="px-2 py-1 rounded-lg text-[11px] border border-[var(--border)] text-red-600 hover:bg-red-50">
+                  Excluir
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {form && (
+        <form onSubmit={salvar} className="space-y-3 border border-[var(--border)] rounded-lg p-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Campo label="Valor (R$)">
+              <Input type="number" min="0.01" step="0.01" value={form.valor} onChange={muda('valor')} required />
+            </Campo>
+            <Campo label="Periodicidade">
+              <Select value={form.periodicidade} onChange={muda('periodicidade')}>
+                <option value="mensal">Mensal</option>
+                <option value="trimestral">Trimestral</option>
+                <option value="semestral">Semestral</option>
+                <option value="anual">Anual</option>
+              </Select>
+            </Campo>
+            <Campo label="Dia do vencimento (1 a 28)">
+              <Input type="number" min="1" max="28" value={form.dia_vencimento} onChange={muda('dia_vencimento')} required />
+            </Campo>
+            <Campo label="Início">
+              <CampoData name="data_inicio" value={form.data_inicio} onChange={muda('data_inicio')} required />
+            </Campo>
+          </div>
+          <Campo label="Forma de pagamento">
+            <Select value={form.forma_pagamento} onChange={muda('forma_pagamento')}>
+              {FORMAS_PAGAMENTO.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
+            </Select>
+          </Campo>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setForm(null)} className="px-3 py-1.5 rounded-lg text-xs border border-[var(--border)] text-[var(--text-secondary)]">Cancelar</button>
+            <button type="submit" className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white" style={{ backgroundColor: '#0f4c5c' }}>Salvar contribuição</button>
+          </div>
+        </form>
+      )}
+    </section>
   )
 }
 

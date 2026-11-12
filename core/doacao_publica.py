@@ -71,6 +71,6 @@ def registrar_doacao_publica(dados):
 
 def ativar_membro_interessado(doacao):
     """Na confirmação de uma doação, o membro 'interessado' passa a 'ativo'."""
-    if doacao.status == 'confirmada' and doacao.apoiador.status == 'interessado':
+    if doacao.status == 'confirmada' and doacao.apoiador_id and doacao.apoiador.status == 'interessado':
         doacao.apoiador.status = 'ativo'
         doacao.apoiador.save(update_fields=['status'])

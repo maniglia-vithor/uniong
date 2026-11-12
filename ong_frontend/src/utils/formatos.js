@@ -42,3 +42,8 @@ export function formatarMomento(iso) {
   const d = new Date(iso)
   return `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
 }
+
+export const FORMAS_PAGAMENTO = [
+  ['pix', 'PIX'], ['dinheiro', 'Dinheiro'], ['transferencia', 'Transferência bancária'],
+  ['boleto', 'Boleto'], ['cartao', 'Cartão'], ['outro', 'Outro'],
+]
