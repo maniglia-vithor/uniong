@@ -105,13 +105,8 @@ export const criarComunicado       = (data) => api.post('/comunicados/', data)
 export const atualizarComunicado   = (id, data) => api.put(`/comunicados/${id}/`, data)
 export const excluirComunicado     = (id) => api.delete(`/comunicados/${id}/`)
 
-// Relatórios (download CSV com token no header)
-export function downloadRelatorio(tipo) {
-  const token = localStorage.getItem('ong_access')
-  return fetch(`/api/relatorios/${tipo}/`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-}
+// Relatórios CSV (via axios: usa o token e a renovação automática)
+export const downloadRelatorio = (tipo, params) => api.get(`/relatorios/${tipo}/`, { params, responseType: 'blob' })
 
 // Percorre todas as páginas de um endpoint paginado e devolve a lista completa.
 export async function buscarTodas(url, params = {}) {

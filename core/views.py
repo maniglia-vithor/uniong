@@ -1,4 +1,3 @@
-import csv
 import os
 
 from django.conf import settings
@@ -11,7 +10,7 @@ from decimal import Decimal
 
 from django.db.models import Case, Count, DecimalField, F, ProtectedError, Q, Sum, Value, When
 from django.db.models.functions import Coalesce
-from django.http import FileResponse, HttpResponse
+from django.http import FileResponse
 from rest_framework import viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
@@ -394,71 +393,6 @@ class ComunicadoViewSet(viewsets.ModelViewSet):
     search_fields = ['titulo', 'conteudo']
     ordering_fields = ['titulo', 'data_publicacao', 'publico_alvo']
     ordering = ['-data_publicacao', '-id']
-
-
-def _csv_response(filename):
-    response = HttpResponse(content_type='text/csv; charset=utf-8')
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    response.write('﻿')  # BOM para compatibilidade com Excel
-    return response
-
-
-@api_view(['GET'])
-def relatorio_doacoes(request):
-    response = _csv_response('relatorio_doacoes.csv')
-    writer = csv.writer(response)
-    writer.writerow(['ID', 'Apoiador', 'Campanha', 'Valor (R$)', 'Data', 'Status'])
-    for d in Doacao.objects.select_related('apoiador', 'campanha').order_by('-data'):
-        writer.writerow([
-            d.id,
-            d.apoiador.nome,
-            d.campanha.titulo if d.campanha else '',
-            str(d.valor).replace('.', ','),
-            d.data.strftime('%d/%m/%Y'),
-            d.get_status_display(),
-        ])
-    return response
-
-
-@api_view(['GET'])
-def relatorio_campanhas(request):
-    response = _csv_response('relatorio_campanhas.csv')
-    writer = csv.writer(response)
-    writer.writerow(['ID', 'Título', 'Meta (R$)', 'Arrecadado (R$)', 'Progresso (%)', 'Status', 'Início', 'Fim'])
-    for c in Campanha.objects.com_arrecadado().order_by('-data_inicio'):
-        writer.writerow([
-            c.id,
-            c.titulo,
-            str(c.meta_valor).replace('.', ','),
-            str(c.valor_arrecadado).replace('.', ','),
-            c.percentual_progresso,
-            c.get_status_display(),
-            c.data_inicio.strftime('%d/%m/%Y'),
-            c.data_fim.strftime('%d/%m/%Y') if c.data_fim else '',
-        ])
-    return response
-
-
-@api_view(['GET'])
-def relatorio_apoiadores(request):
-    response = _csv_response('relatorio_apoiadores.csv')
-    writer = csv.writer(response)
-    writer.writerow(['ID', 'Nome', 'E-mail', 'Data de Cadastro', 'Status', 'Total Doado (R$)'])
-    apoiadores = (
-        Apoiador.objects
-        .annotate(total_doado=Sum('doacoes__valor', filter=Q(doacoes__status='confirmada')))
-        .order_by('nome')
-    )
-    for a in apoiadores:
-        writer.writerow([
-            a.id,
-            a.nome,
-            a.email,
-            a.data_cadastro.strftime('%d/%m/%Y'),
-            a.get_status_display(),
-            str(a.total_doado or 0).replace('.', ','),
-        ])
-    return response
 
 
 @api_view(['POST'])
