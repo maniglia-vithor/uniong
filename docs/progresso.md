@@ -247,5 +247,28 @@ Teste manual sugerido:
 5. Rodar `python manage.py backup --destino <pasta>` e abrir o `.tar.gz`.
 6. Acessar `/api/health/`.
 
-## Fase 7 — Alinhar o artigo do TCC com o sistema
-- [ ] `docs/revisao_artigo.md` com a tabela “Trecho do artigo → Situação no sistema → Texto sugerido”
+## Fase 7 — Alinhar o artigo do TCC com o sistema ✅
+Branch `fase-7-artigo` (a partir de `fase-6-implantacao`). Nenhum código alterado.
+- [x] `docs/revisao_artigo.md` com a tabela “Trecho do artigo → Situação no sistema → Texto sugerido”. Cobre os 14 pontos do prompt e tem cinco apêndices:
+  - A: entidades e diagrama ER em Mermaid;
+  - B: módulos ausentes no artigo;
+  - C: seção “Resultados e validação” com roteiro e questionário SUS em português;
+  - D: considerações finais e limitações;
+  - E: requisitos RF11–RF17 e RNF06–RNF10.
+
+Decisões tomadas:
+- O prompt pede o código da `main`, mas as fases ainda não foram mescladas. A revisão usa a `fase-6-implantacao`, que contém todas as fases encadeadas; isso está registrado no topo do documento.
+- O texto do artigo foi lido do `Artigo final.docx` (mesmo conteúdo do PDF).
+- Números usados: 246 testes de backend, 18 de frontend e as notas do Lighthouse da fase 6.
+- Deixados como `[preencher]`:
+  - cobertura de código (não medida; o coverage.py não está instalado);
+  - resultados do SUS, ainda não aplicado;
+  - datas de acesso das referências novas;
+  - eventual publicação em produção.
+- Afirmações do artigo corrigidas:
+  - o login tradicional é por nome de usuário, não por e-mail;
+  - o endpoint do Google valida o *id_token*, não recebe e-mail e nome;
+  - o valor arrecadado é calculado, não um campo atualizado;
+  - não há geração antecipada de ocorrências futuras de despesas;
+  - não existe mais a lista de “doações recentes anonimizadas” no portal;
+  - a prestação de contas é HTML imprimível, não PDF gerado no servidor.
