@@ -120,6 +120,9 @@ CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
 
+# Endereço público do frontend (usado no redirecionamento das prévias /c/<id>/).
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
+
 # Segurança HTTPS: ativa por padrão quando DEBUG=False, cada item ajustável pelo .env.
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'

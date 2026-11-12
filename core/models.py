@@ -1,3 +1,4 @@
+import os
 import uuid
 from decimal import Decimal
 
@@ -48,7 +49,17 @@ def _soma_por_campanha(modelo, **filtros):
     )
 
 
+def caminho_imagem_campanha(instance, filename):
+    extensao = os.path.splitext(filename)[1].lower()
+    return f'campanhas/{uuid.uuid4().hex}{extensao}'
+
+
 class CampanhaQuerySet(models.QuerySet):
+    def em_andamento(self, referencia=None):
+        """Status "ativa" e data de fim ainda não passada."""
+        referencia = referencia or timezone.localdate()
+        return self.filter(status='ativa').filter(Q(data_fim__isnull=True) | Q(data_fim__gte=referencia))
+
     def com_arrecadado(self):
         """Anota `arrecadado` (doações confirmadas) e `gasto` (despesas pagas vinculadas)."""
         return self.annotate(
@@ -70,6 +81,10 @@ class Campanha(models.Model):
     data_inicio = models.DateField()
     data_fim = models.DateField(null=True, blank=True)
     descricao = models.TextField(blank=True)
+    # Imagem pública (cards e prévia nas redes); validada como os anexos.
+    imagem = models.FileField(upload_to=caminho_imagem_campanha, blank=True, default='')
+    # Quando a equipe foi avisada de que a meta foi atingida (avisa uma única vez).
+    meta_notificada_em = models.DateTimeField(null=True, blank=True)
 
     objects = CampanhaQuerySet.as_manager()
 
@@ -108,6 +123,19 @@ class Campanha(models.Model):
     @property
     def saldo(self):
         return self.valor_arrecadado - self.valor_gasto
+
+    @property
+    def vencida(self):
+        return bool(self.data_fim) and self.data_fim < timezone.localdate()
+
+    @property
+    def status_efetivo(self):
+        """Campanha com data de fim já passada conta como encerrada (sem alterar o campo gravado)."""
+        return 'encerrada' if self.vencida else self.status
+
+    @property
+    def aceita_doacoes(self):
+        return self.status_efetivo == 'ativa'
 
     def __str__(self):
         return self.titulo

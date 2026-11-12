@@ -86,13 +86,19 @@ class CampanhaSerializer(serializers.ModelSerializer):
     meta_atingida = serializers.ReadOnlyField()
     valor_gasto = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     saldo = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+    status_efetivo = serializers.ReadOnlyField()
+    imagem_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Campanha
         fields = [
             'id', 'titulo', 'meta_valor', 'valor_arrecadado', 'percentual_progresso',
-            'meta_atingida', 'valor_gasto', 'saldo', 'status', 'data_inicio', 'data_fim', 'descricao',
+            'meta_atingida', 'valor_gasto', 'saldo', 'status', 'status_efetivo', 'data_inicio', 'data_fim',
+            'descricao', 'imagem_url',
         ]
+
+    def get_imagem_url(self, obj):
+        return f'/api/public/campanhas/{obj.pk}/imagem/' if obj.imagem else None
 
     def validate_meta_valor(self, value):
         return _positivo(value, 'A meta deve ser maior que zero.')
@@ -194,6 +200,6 @@ class DoacaoSerializer(serializers.ModelSerializer):
 
     def validate_campanha(self, value):
         mesma_de_antes = self.instance is not None and value is not None and self.instance.campanha_id == value.pk
-        if value is not None and value.status == 'encerrada' and not mesma_de_antes:
-            raise serializers.ValidationError('Não é possível registrar doações em uma campanha encerrada.')
+        if value is not None and not value.aceita_doacoes and not mesma_de_antes:
+            raise serializers.ValidationError('Não é possível registrar doações em uma campanha encerrada ou pausada.')
         return value

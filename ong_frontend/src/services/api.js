@@ -82,6 +82,11 @@ export const getDespesasDaCampanha = (id) => api.get(`/campanhas/${id}/despesas/
 export const criarCampanha         = (data) => api.post('/campanhas/', data)
 export const atualizarCampanha     = (id, data) => api.put(`/campanhas/${id}/`, data)
 export const excluirCampanha       = (id) => api.delete(`/campanhas/${id}/`)
+export const enviarImagemCampanha  = (id, arquivo) => {
+  const fd = new FormData()
+  fd.append('imagem', arquivo)
+  return api.post(`/campanhas/${id}/imagem/`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+}
 export const encerrarCampanha      = (id) => api.patch(`/campanhas/${id}/`, { status: 'encerrada' })
 
 // Doações

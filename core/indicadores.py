@@ -54,7 +54,8 @@ def membros_ativos(ate=None):
 
 
 def campanhas_ativas(ate=None):
-    qs = Campanha.objects.filter(status='ativa')
+    """Campanhas em andamento (status ativa e sem data de fim vencida) na data de referência."""
+    qs = Campanha.objects.em_andamento(referencia=ate)
     if ate is not None:
         qs = qs.filter(data_inicio__lte=ate)
     return qs

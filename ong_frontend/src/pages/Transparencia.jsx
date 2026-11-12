@@ -2,18 +2,18 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   HeartHandshake, DollarSign, Megaphone, Users, TrendingUp,
-  Receipt, ShieldOff, ArrowLeft, X, ExternalLink, Share2,
+  Receipt, ShieldOff, ArrowLeft, X, ExternalLink,
   CheckCircle, Plus,
 } from 'lucide-react'
-import { FaWhatsapp, FaInstagram, FaFacebook, FaLinkedin, FaTiktok } from 'react-icons/fa'
-import { MdEmail } from 'react-icons/md'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
 import axios from 'axios'
 import BarraProgresso from '../components/BarraProgresso'
-import QrCodePix, { qrComoArquivo } from '../components/QrCodePix'
+import QrCodePix from '../components/QrCodePix'
+import CompartilharCampanha from '../components/CompartilharCampanha'
+import ResumoCampanha from '../components/ResumoCampanha'
 import PrestacaoContas from '../components/PrestacaoContas'
 import ListaDespesasPublicas from '../components/ListaDespesasPublicas'
 import { mensagemErro } from '../utils/formatos'
@@ -23,16 +23,8 @@ import logoUniONG from '../assets/Gemini_Generated_Image_g792fng792fng792.jpg'
 // Data de referência fixada ao carregar a página (evita chamar Date durante a renderização).
 const HOJE = new Date()
 
-const BASE_URL = typeof window !== 'undefined' ? window.location.origin : ''
-
 function formatBRL(v) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v ?? 0)
-}
-
-function formatData(iso) {
-  if (!iso) return '—'
-  const [y, m, d] = iso.split('-')
-  return `${d}/${m}/${y}`
 }
 
 const CORES_CAMPANHA = ['#0f4c5c', '#f97316', '#0891b2', '#7c3aed']
@@ -221,78 +213,18 @@ function GastosModal({ lista, total, onFechar }) {
 
 /* ─── Campaign Detail Modal ──────────────────────────────────────────────── */
 function CampanhaModal({ campanha, pix, onFechar }) {
-  const [aviso, setAviso] = useState(null)
   const idQr = `qr-campanha-${campanha.id}`
-
-  const link = `${BASE_URL}/transparencia`
-  const texto = `Apoie a campanha "${campanha.titulo}" da UniONG! Já arrecadamos ${formatBRL(campanha.valor_arrecadado)} de ${formatBRL(campanha.meta_valor)}. Doe via PIX:`
-  const textoCompleto = `${texto} ${link}`
-  const t = encodeURIComponent(texto)
-  const tc = encodeURIComponent(textoCompleto)
-  const u = encodeURIComponent(link)
-
-  function abrirPopup(url) {
-    window.open(url, '_blank', 'noopener,noreferrer,width=640,height=640')
-  }
-
-  // Instagram e TikTok não têm URL de compartilhamento na web: usa o compartilhamento
-  // nativo do aparelho (com o QR Code) e, sem suporte, copia o texto e abre a rede.
-  async function compartilharSemUrl(nome, siteUrl) {
-    try {
-      const arquivo = await qrComoArquivo(idQr, 'pix-campanha.png')
-      if (arquivo && navigator.canShare?.({ files: [arquivo] })) {
-        await navigator.share({ title: campanha.titulo, text: textoCompleto, files: [arquivo] })
-        return
-      }
-    } catch (e) {
-      if (e?.name === 'AbortError') return
-    }
-    try {
-      await navigator.clipboard.writeText(textoCompleto)
-      setAviso(`Texto da campanha copiado! Cole no ${nome} para compartilhar.`)
-    } catch {
-      setAviso(`Abra o ${nome} e compartilhe o link: ${link}`)
-    }
-    window.open(siteUrl, '_blank', 'noopener,noreferrer')
-  }
-
-  const redes = [
-    { label: 'WhatsApp', Icon: FaWhatsapp, onClick: () => abrirPopup(`https://wa.me/?text=${tc}`) },
-    { label: 'Instagram', Icon: FaInstagram, onClick: () => compartilharSemUrl('Instagram', 'https://www.instagram.com/') },
-    { label: 'Facebook', Icon: FaFacebook, onClick: () => abrirPopup(`https://www.facebook.com/sharer/sharer.php?u=${u}&quote=${t}`) },
-    { label: 'LinkedIn', Icon: FaLinkedin, onClick: () => abrirPopup(`https://www.linkedin.com/sharing/share-offsite/?url=${u}`) },
-    { label: 'E-mail', Icon: MdEmail, onClick: () => { window.location.href = `mailto:?subject=${encodeURIComponent(`Apoie a campanha: ${campanha.titulo}`)}&body=${tc}` } },
-    { label: 'TikTok', Icon: FaTiktok, onClick: () => compartilharSemUrl('TikTok', 'https://www.tiktok.com/') },
-  ]
-
   return (
     <Overlay titulo={campanha.titulo} onFechar={onFechar} largura="max-w-lg">
       <div className="space-y-6">
-        {/* Progresso */}
-        <div>
-          <div className="flex justify-between mb-1.5 text-xs">
-            <span className="text-[var(--text-muted)]">Progresso</span>
-            <span className="font-semibold text-[var(--text-primary)]">{campanha.percentual_progresso}%</span>
-          </div>
-          <BarraProgresso percentual={campanha.percentual_progresso} cor="#0f4c5c" />
-        </div>
-
-        {/* Detalhes */}
-        <dl className="grid grid-cols-2 border border-[var(--border)] rounded-lg divide-x divide-y divide-[var(--border)] overflow-hidden">
-          {[
-            { label: 'Arrecadado', valor: formatBRL(campanha.valor_arrecadado) },
-            { label: 'Meta', valor: formatBRL(campanha.meta_valor) },
-            { label: 'Início', valor: formatData(campanha.data_inicio) },
-            { label: 'Encerramento', valor: campanha.data_fim ? formatData(campanha.data_fim) : 'Em aberto' },
-          ].map(item => (
-            <div key={item.label} className="px-4 py-3">
-              <dt className="text-xs text-[var(--text-muted)]">{item.label}</dt>
-              <dd className="text-sm font-semibold text-[var(--text-primary)] mt-0.5">{item.valor}</dd>
-            </div>
-          ))}
-        </dl>
-
-        {/* PIX */}
+        <ResumoCampanha campanha={campanha} />
+        <Link
+          to={`/transparencia/campanha/${campanha.id}`}
+          className="inline-flex text-sm font-semibold underline"
+          style={{ color: '#0f4c5c' }}
+        >
+          Ver página da campanha e prestação de contas
+        </Link>
         <div>
           <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Doar via PIX</h3>
           <QrCodePix
@@ -302,36 +234,11 @@ function CampanhaModal({ campanha, pix, onFechar }) {
             descricao="Escaneie o QR Code com o aplicativo do seu banco ou use o PIX copia e cola para doar para esta campanha."
           />
         </div>
-        {/* Compartilhar */}
-        <div>
-          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-            <Share2 size={14} className="text-[var(--text-muted)]" />
-            Compartilhar campanha
-          </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {redes.map(({ label, Icon, onClick }) => (
-              <button
-                key={label}
-                type="button"
-                onClick={onClick}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
-              >
-                <Icon size={15} className="flex-shrink-0" />
-                {label}
-              </button>
-            ))}
-          </div>
-          {aviso && (
-            <p className="mt-3 text-xs text-[var(--text-secondary)] bg-[var(--bg-card-alt)] border border-[var(--border)] rounded-lg px-3 py-2">
-              {aviso}
-            </p>
-          )}
-        </div>
+        <CompartilharCampanha campanha={campanha} idQr={idQr} />
       </div>
     </Overlay>
   )
 }
-
 /* ─── Comunicados ───────────────────────────────────────────────────────── */
 function formatDataHora(iso) {
   const d = new Date(iso)
@@ -547,11 +454,15 @@ export default function Transparencia() {
                 {dados.campanhas.map((c, i) => {
                   const cor = CORES_CAMPANHA[i % CORES_CAMPANHA.length]
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={c.id}
-                      className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-5 cursor-pointer hover:shadow-md hover:border-[var(--text-muted)] transition-all"
+                      className="text-left w-full bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-5 cursor-pointer hover:shadow-md hover:border-[var(--text-muted)] transition-all"
                       onClick={() => setCampanhaModal(c)}
                     >
+                      {c.imagem_url && (
+                        <img src={c.imagem_url} alt="" className="w-full h-36 object-cover rounded-xl mb-4" />
+                      )}
                       <div className="flex items-start justify-between mb-3">
                         <h3 className="font-semibold text-[var(--text-primary)] leading-snug pr-2">{c.titulo}</h3>
                         <span className="text-lg font-bold flex-shrink-0" style={{ color: cor }}>
@@ -569,7 +480,7 @@ export default function Transparencia() {
                           <p className="font-semibold text-[var(--text-secondary)]">{formatBRL(c.meta_valor)}</p>
                         </div>
                       </div>
-                    </div>
+                    </button>
                   )
                 })}
                 {dados.campanhas.length === 0 && (

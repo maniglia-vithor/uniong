@@ -1,6 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
+from .campanhas_publicas import campanha_publica, imagem_campanha
 from .relatorios import (
     relatorio_apoiadores, relatorio_campanhas, relatorio_despesas, relatorio_doacoes, relatorio_prestacao_contas,
 )
@@ -24,6 +25,8 @@ urlpatterns = router.urls + [
     path('public/transparencia/', painel_transparencia, name='painel_transparencia'),
     path('public/doacoes/', public_doacao, name='public_doacao'),
     path('public/prestacao-contas/', prestacao_contas_publica, name='prestacao_contas_publica'),
+    path('public/campanhas/<int:pk>/', campanha_publica, name='campanha_publica'),
+    path('public/campanhas/<int:pk>/imagem/', imagem_campanha, name='imagem_campanha'),
     path('public/despesas/<int:despesa_id>/comprovantes/<int:anexo_id>/', comprovante_publico, name='comprovante_publico'),
     path('configuracoes/pix/', configuracao_pix, name='configuracao_pix'),
     path('configuracoes/instituicao/', configuracao_instituicao, name='configuracao_instituicao'),

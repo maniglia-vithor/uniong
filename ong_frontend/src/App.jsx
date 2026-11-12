@@ -15,6 +15,7 @@ import Configuracoes from './pages/Configuracoes'
 import Historico from './pages/Historico'
 import Transparencia from './pages/Transparencia'
 import Privacidade from './pages/Privacidade'
+import CampanhaPublica from './pages/CampanhaPublica'
 import PrestacaoContasImpressao from './pages/PrestacaoContasImpressao'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
@@ -36,6 +37,7 @@ export default function App() {
           {/* Rotas públicas */}
           <Route path="/transparencia" element={<Transparencia />} />
           <Route path="/privacidade" element={<Privacidade />} />
+          <Route path="/transparencia/campanha/:id" element={<CampanhaPublica />} />
           <Route path="/login" element={<Login />} />
 
           {/* Rotas administrativas protegidas */}

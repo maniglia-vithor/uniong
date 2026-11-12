@@ -10,7 +10,7 @@ import Paginacao from '../components/Paginacao'
 import { CampoBusca } from '../components/CabecalhoOrdenavel'
 import useListaPaginada from '../hooks/useListaPaginada'
 import { formatData, mensagemErro } from '../utils/formatos'
-import { getCampanhas, criarCampanha, atualizarCampanha, excluirCampanha, encerrarCampanha } from '../services/api'
+import { getCampanhas, criarCampanha, atualizarCampanha, excluirCampanha, encerrarCampanha, enviarImagemCampanha } from '../services/api'
 
 const VAZIO = { titulo: '', meta_valor: '', status: 'ativa', data_inicio: '', data_fim: '', descricao: '' }
 
@@ -25,6 +25,7 @@ export default function Campanhas() {
   const [editando, setEditando] = useState(null)
   const [form, setForm] = useState(VAZIO)
   const [salvando, setSalvando] = useState(false)
+  const [imagem, setImagem] = useState(null)
 
   function abrirNovo() {
     setEditando(null)
@@ -45,7 +46,7 @@ export default function Campanhas() {
     setModal(true)
   }
 
-  function fechar() { setModal(false); setEditando(null) }
+  function fechar() { setModal(false); setEditando(null); setImagem(null) }
 
   function onChange(e) { setForm((f) => ({ ...f, [e.target.name]: e.target.value })) }
 
@@ -54,10 +55,13 @@ export default function Campanhas() {
     setSalvando(true)
     const payload = { ...form, data_fim: form.data_fim || null }
     try {
-      if (editando) {
-        await atualizarCampanha(editando.id, payload)
-      } else {
-        await criarCampanha(payload)
+      const { data } = editando ? await atualizarCampanha(editando.id, payload) : await criarCampanha(payload)
+      if (imagem) {
+        try {
+          await enviarImagemCampanha(data.id, imagem)
+        } catch (err) {
+          alert(`Campanha salva, mas a imagem não foi aceita: ${mensagemErro(err)}`)
+        }
       }
       fechar()
       lista.recarregar()
@@ -144,7 +148,7 @@ export default function Campanhas() {
             >
               <div className="flex items-start justify-between gap-2">
                 <h3 className="font-semibold text-[var(--text-primary)] leading-snug">{c.titulo}</h3>
-                <BadgeStatus status={c.status} />
+                <BadgeStatus status={c.status_efetivo ?? c.status} />
               </div>
 
               <div>
@@ -219,6 +223,18 @@ export default function Campanhas() {
                 placeholder="Descreva o objetivo desta campanha..."
                 className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100 resize-none bg-[var(--bg-input)] text-[var(--text-primary)]"
               />
+            </Campo>
+            <Campo label="Imagem pública (opcional)">
+              {editando?.imagem_url && !imagem && (
+                <img src={editando.imagem_url} alt="Imagem atual da campanha" className="w-full h-28 object-cover rounded-lg mb-2" />
+              )}
+              <input
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp"
+                onChange={(e) => setImagem(e.target.files?.[0] ?? null)}
+                className="block w-full text-xs text-[var(--text-secondary)]"
+              />
+              <p className="text-[11px] text-[var(--text-muted)] mt-1">JPG, PNG ou WEBP até 5 MB. Aparece no portal e na prévia ao compartilhar.</p>
             </Campo>
             <div className="flex gap-3 pt-2">
               <BotaoCancelar onClick={fechar} />

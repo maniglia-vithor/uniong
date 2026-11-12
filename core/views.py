@@ -25,6 +25,7 @@ from .anexos import TIPOS_PERMITIDOS, validar_anexo
 from .doacao_publica import DoacaoPublicaSerializer, ativar_membro_interessado, registrar_doacao_publica
 from . import indicadores
 from .auditoria import AuditoriaMixin, registrar as registrar_auditoria
+from .campanhas_publicas import avisar_meta_atingida, validar_imagem
 from .paginacao import filtrar_periodo
 from .portal import CATEGORIA_AGREGADA, despesas_publicas
 from .pix import mascarar
@@ -128,8 +129,31 @@ class CampanhaViewSet(AuditoriaMixin, ExclusaoProtegidaMixin, viewsets.ModelView
         ?incluir_encerradas=1 traz todas (usado para vincular despesas)."""
         qs = Campanha.objects.all()
         if request.query_params.get('incluir_encerradas') != '1':
-            qs = qs.filter(status='ativa')
+            qs = Campanha.objects.em_andamento()
         return Response(list(qs.order_by('titulo').values('id', 'titulo', 'status')))
+
+    @action(detail=True, methods=['post', 'delete'], url_path='imagem')
+    def imagem(self, request, pk=None):
+        """POST (multipart, campo "imagem") envia a imagem pública da campanha; DELETE remove."""
+        campanha = self.get_object()
+        if request.method == 'DELETE':
+            if campanha.imagem:
+                campanha.imagem.delete(save=False)
+            Campanha.objects.filter(pk=campanha.pk).update(imagem='')
+            return Response(status=204)
+        arquivo = request.FILES.get('imagem')
+        if arquivo is None:
+            return Response({'imagem': 'Envie um arquivo no campo "imagem".'}, status=400)
+        try:
+            validar_imagem(arquivo)
+        except ValueError as e:
+            return Response({'imagem': str(e)}, status=400)
+        if campanha.imagem:
+            campanha.imagem.delete(save=False)
+        campanha.imagem = arquivo
+        campanha.save(update_fields=['imagem'])
+        registrar_auditoria(request.user, campanha, 'edicao', 'imagem', '', campanha.imagem.name)
+        return Response({'imagem_url': f'/api/public/campanhas/{campanha.pk}/imagem/'})
 
     @action(detail=True, methods=['get'], pagination_class=None, filter_backends=[])
     def despesas(self, request, pk=None):
@@ -184,7 +208,10 @@ class DoacaoViewSet(AuditoriaMixin, viewsets.ModelViewSet):
         })
 
     def perform_update(self, serializer):
-        ativar_membro_interessado(serializer.save())
+        doacao = serializer.save()
+        ativar_membro_interessado(doacao)
+        if doacao.status == 'confirmada' and doacao.campanha_id:
+            avisar_meta_atingida(doacao.campanha)
 
     @action(detail=False, methods=['post'], url_path='acao-em-lote')
     def acao_em_lote(self, request):
@@ -201,11 +228,15 @@ class DoacaoViewSet(AuditoriaMixin, viewsets.ModelViewSet):
             doacao.save(update_fields=['status'])
             registrar_auditoria(request.user, doacao, 'edicao', 'status', 'pendente', novo_status)
             ativar_membro_interessado(doacao)
+        for campanha_id in {d.campanha_id for d in doacoes if d.campanha_id and novo_status == 'confirmada'}:
+            avisar_meta_atingida(Campanha(pk=campanha_id))
         return Response({'atualizadas': len(doacoes), 'ignoradas': len(set(ids)) - len(doacoes)})
 
     def perform_create(self, serializer):
         doacao = serializer.save()
         ativar_membro_interessado(doacao)
+        if doacao.status == 'confirmada' and doacao.campanha_id:
+            avisar_meta_atingida(doacao.campanha)
         actor = self.request.user.get_full_name() or self.request.user.username
         valor = f'R$ {doacao.valor:.2f}'.replace('.', ',')
         campanha_txt = f' para a campanha {doacao.campanha.titulo}' if doacao.campanha else ''
@@ -267,7 +298,7 @@ class DashboardViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'], url_path='campanhas-ativas')
     def campanhas_ativas(self, request):
-        campanhas = Campanha.objects.com_arrecadado().filter(status='ativa').order_by('-data_inicio')
+        campanhas = Campanha.objects.em_andamento().com_arrecadado().order_by('-data_inicio')
         return Response(CampanhaSerializer(campanhas, many=True).data)
 
     @staticmethod

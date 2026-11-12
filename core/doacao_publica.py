@@ -38,7 +38,7 @@ class DoacaoPublicaSerializer(serializers.Serializer):
     def validate_campaign_id(self, value):
         if value is None:
             return None
-        campanha = Campanha.objects.filter(pk=value, status='ativa').first()
+        campanha = Campanha.objects.em_andamento().filter(pk=value).first()
         if campanha is None:
             raise serializers.ValidationError('Campanha indisponível para doações.')
         return campanha
