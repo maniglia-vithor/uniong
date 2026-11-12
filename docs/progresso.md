@@ -176,13 +176,76 @@ Não feito / limitações:
 
 Teste manual sugerido: em Equipe, convidar um e-mail e copiar o link do terminal do `runserver` para definir a senha; usar “Esqueci minha senha” no login; cadastrar uma doação anônima, uma em bens e uma com comprovante; gerar e enviar um recibo; preencher a aba Instituição e conferir menu, portal e prestação de contas; criar um comunicado “Somente Membros” com envio por e-mail e abrir o link de descadastro; cadastrar uma contribuição na ficha de um membro e rodar `python manage.py gerar_contribuicoes`; cadastrar voluntários e uma atividade com 1 vaga, inscrever e registrar horas.
 
-## Fase 6 — Implantação, qualidade e acessibilidade
-- [ ] 1. Implantação
-- [ ] 2. Backup
-- [ ] 3. Integração contínua
-- [ ] 4. Testes do frontend
-- [ ] 5. Acessibilidade e responsividade (RNF01 do artigo)
-- [ ] 6. README
+## Fase 6 — Implantação, qualidade e acessibilidade ✅
+Branch `fase-6-implantacao` (a partir de `fase-5-funcionalidades`). Backend: 246 testes passando (MySQL e SQLite). Frontend: 18 testes Vitest; oxlint 0 erros, 12 avisos (os mesmos da fase 4). CI no GitHub Actions passando.
+- [x] 1. Implantação: `Dockerfile` (gunicorn, migrações e `collectstatic` na subida, usuário sem privilégios, healthcheck), `ong_frontend/Dockerfile` + `nginx.conf` (proxy de `/api/`, `/c/`, `/admin-django/`; `/static/` por volume), `docker-compose.yml` (MySQL 8.4 + volumes). Admin do Django movido para `/admin-django/`. `GET /api/health/` anônimo, sem dados (503 se o banco cair). Guia em `docs/implantacao.md`.
+- [x] 2. Backup: `python manage.py backup [--destino] [--manter N]` (mysqldump + `media/` + `privado/` em `.tar.gz` com data; mantém os N mais recentes). Restauração e cron no guia.
+- [x] 3. CI: `.github/workflows/ci.yml` (check, `makemigrations --check`, testes com `ong_backend/settings_test.py` em SQLite; oxlint, Vitest e build). Badge no README.
+- [x] 4. Testes do frontend: Vitest + Testing Library para `utils/pix.js` (CRC 1D3D do exemplo do Banco Central, valor, txid, nome/cidade sem acento e truncados), `formatBRL`/`formatData`, `Paginacao`, `RotaProtegida` e `Modal` (foco e Esc).
+- [x] 5. Acessibilidade e responsividade (detalhes abaixo).
+- [x] 6. README reescrito (visão geral, funcionalidades, arquitetura, execução local, testes, implantação, variáveis e autores).
+
+Lighthouse, categoria Acessibilidade (desktop; build de produção servido por `vite preview` com um backend isolado em SQLite e dados fictícios, sem tocar o banco de desenvolvimento):
+
+| Tela | Antes (claro / escuro) | Depois (claro / escuro) |
+|---|---|---|
+| Login | 90 / 90 | 100 / 100 |
+| Painel | 90 / 90 | 100 / 100 |
+| Doações | 95 / 95 | 100 / 100 |
+| Transparência | 94 / 94 | 100 / 100 |
+
+Falhas encontradas antes:
+- botões sem nome (sino de notificações, mostrar senha);
+- contraste de `--text-muted`, do menu lateral, das cores da marca usadas como texto e das tendências dos cartões;
+- ausência de `<main>`;
+- `lang="en"`;
+- cabeçalho de tabela vazio;
+- área de toque pequena no botão de senha.
+
+Na primeira medição o tema escuro era sobrescrito pelo próprio app antes da auditoria. O script foi corrigido, passou a conferir o tema aplicado e o "antes" escuro foi medido de novo sobre o código anterior (`git stash`).
+
+O que foi feito em acessibilidade:
+- Modais (Modal, painel de detalhes, detalhes dos KPIs, modais do portal), pelo hook `useDialogo`:
+  - `role="dialog"`, `aria-modal` e `aria-labelledby`;
+  - foco inicial dentro do modal e Tab/Shift+Tab presos nele;
+  - Esc fecha e o foco volta ao elemento que abriu.
+- Formulários: `Campo` associa o `<label>` ao campo e liga a mensagem de erro por `aria-describedby`/`aria-invalid`; o mesmo vale no login e na aba Instituição.
+- Botões só com ícone: todos ganharam `aria-label` (varredura automática dos `.jsx`). O botão de remover notificação estava dentro de outro botão; foi separado.
+- Gráficos: o componente `GraficoAcessivel` dá título, descrição textual e "Ver como tabela" aos 5 gráficos que ainda não tinham; o gráfico de fluxo já tinha.
+- Contraste WCAG AA nos dois temas:
+  - novas variáveis `--marca-texto`, `--destaque-texto` e outras de cor de texto, com versão escura;
+  - função `corDeTexto` para as cores dinâmicas;
+  - selos e tendências em tons -700/-800.
+  - Selos de status já trazem o texto, e as tendências trazem ícone e sinal: nada depende só da cor.
+- Responsividade:
+  - menu lateral recolhível abaixo de 768 px (botão "Abrir menu" com `aria-expanded`; fecha ao navegar ou tocar fora);
+  - tabelas com rolagem horizontal própria, conferido em 375 px: a página não rola na horizontal, só a tabela;
+  - painel de notificações limitado à largura da tela.
+- Percentuais com vírgula decimal (antes "0.9%").
+
+Decisões tomadas:
+- Dependências novas:
+  - `gunicorn` 23.0.0: servidor WSGI de produção;
+  - `vitest`, `@testing-library/react`, `@testing-library/jest-dom` e `jsdom`: só desenvolvimento, pedidas pelo item 4.
+  - Lighthouse e puppeteer foram usados só numa pasta temporária, fora do projeto.
+- O HTTPS fica num proxy na frente do nginx (guia com Caddy + Let's Encrypt), em vez de certificados dentro do container. O healthcheck do container usa o primeiro `ALLOWED_HOSTS` e `X-Forwarded-Proto: https`, para não esbarrar no redirecionamento HTTPS de produção.
+- O `.tar.gz` do backup só ganha o nome final quando está completo. A senha do MySQL vai por `MYSQL_PWD`, não pela linha de comando.
+- `settings_test.py` usa SQLite em memória, hash de senha rápido e e-mail em memória. Os 246 testes passam nos dois bancos.
+- `vite.config.js` aceita `VITE_PROXY_API`, usado para medir o Lighthouse contra o backend isolado.
+- Corrigido em seguida: o `popular_dados` falharia com recibos e despesas ligadas a campanhas (PROTECT).
+
+Não feito / limitações:
+- **Docker não foi executado nesta máquina** (não está instalado). Os arquivos foram revisados e o `collectstatic` e o script de healthcheck foram testados fora do container. Na primeira subida, acompanhe `docker compose logs -f`.
+- O backup foi testado de verdade contra o MySQL local (dump de 54 KB). O arquivo, que contém dados reais, foi apagado logo depois.
+- O Lighthouse avalia regras automáticas. Navegação completa por teclado e leitor de tela em todas as telas não foi testada manualmente; o comportamento dos modais está coberto por teste automatizado.
+
+Teste manual sugerido:
+1. Abrir o painel no celular (ou com o DevTools em 375 px) e usar o menu.
+2. Abrir "Registrar Doação" e navegar só com Tab/Shift+Tab e Esc.
+3. Alternar o tema escuro e conferir a leitura.
+4. Clicar em "Ver como tabela" nos gráficos.
+5. Rodar `python manage.py backup --destino <pasta>` e abrir o `.tar.gz`.
+6. Acessar `/api/health/`.
 
 ## Fase 7 — Alinhar o artigo do TCC com o sistema
 - [ ] `docs/revisao_artigo.md` com a tabela “Trecho do artigo → Situação no sistema → Texto sugerido”
