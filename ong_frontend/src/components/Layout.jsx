@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Megaphone, HandCoins, Users,
-  MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X, Settings, History, UserCog, HandHeart,
+  MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X, Settings, History, UserCog, HandHeart, Menu,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -77,6 +77,7 @@ export default function Layout() {
   const [filtroTipo, setFiltroTipo] = useState(null)
   const [aberto, setAberto] = useState(false)
   const [drawerTarget, setDrawerTarget] = useState(null)
+  const [menuAberto, setMenuAberto] = useState(false)
   const dropdownRef = useRef(null)
 
   const naoLidas = notificacoes.filter(n => !n.lida).length
@@ -151,28 +152,37 @@ export default function Layout() {
     <>
       <div className="flex h-screen overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-64 flex-shrink-0 flex flex-col" style={{ backgroundColor: '#0f4c5c' }}>
+        {menuAberto && (
+          <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setMenuAberto(false)} aria-hidden="true" />
+        )}
+        <aside
+          id="menu-lateral"
+          aria-label="Menu principal"
+          className={`fixed inset-y-0 left-0 z-40 w-64 flex-shrink-0 flex flex-col transform transition-transform duration-200 md:static md:translate-x-0 ${menuAberto ? 'translate-x-0' : '-translate-x-full'}`}
+          style={{ backgroundColor: '#0f4c5c' }}
+        >
           {/* Branding */}
           <div className="flex items-center gap-3 px-5 py-4 border-b border-white/10">
             <LogoInstituicao instituicao={instituicao} claro />
             <div className="min-w-0">
               <p className="text-white font-bold text-sm leading-tight truncate" title={instituicao.nome}>{instituicao.nome}</p>
-              <p className="text-white/50 text-xs">Painel Administrativo</p>
+              <p className="text-white/75 text-xs">Painel Administrativo</p>
             </div>
           </div>
 
           {/* Nav */}
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" aria-label="Seções do painel">
             {navItems.filter((item) => !item.soSuperusuario || usuario?.is_superuser).map(({ to, label, icon: Icon, end }) => (
               <NavLink
                 key={to}
                 to={to}
                 end={end}
+                onClick={() => setMenuAberto(false)}
                 className={({ isActive }) =>
                   `relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                     isActive
                       ? 'text-white'
-                      : 'text-white/55 hover:bg-white/10 hover:text-white'
+                      : 'text-white/80 hover:bg-white/10 hover:text-white'
                   }`
                 }
                 style={({ isActive }) =>
@@ -187,7 +197,7 @@ export default function Layout() {
                         style={{ backgroundColor: '#f97316' }}
                       />
                     )}
-                    <Icon size={18} style={isActive ? { color: '#f97316' } : {}} />
+                    <Icon size={18} aria-hidden="true" style={isActive ? { color: 'var(--destaque-texto)' } : {}} />
                     {label}
                     {to === '/admin/doacoes' && pendentes > 0 && (
                       <span
@@ -215,15 +225,15 @@ export default function Layout() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-white text-xs font-medium truncate">{usuario?.nome || usuario?.username}</p>
-                <p className="text-white/40 text-xs">{usuario?.is_superuser ? 'Administrador' : 'Equipe'}</p>
+                <p className="text-white/75 text-xs">{usuario?.is_superuser ? 'Administrador' : 'Equipe'}</p>
               </div>
             </div>
 
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-white/10 transition-colors text-white/60 hover:text-white text-xs font-medium"
+              className="w-full flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-white/10 transition-colors text-white/80 hover:text-white text-xs font-medium"
             >
-              <LogOut size={14} />
+              <LogOut size={14} aria-hidden="true" />
               Sair
             </button>
           </div>
@@ -232,8 +242,18 @@ export default function Layout() {
         {/* Main */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Topbar */}
-          <header className="bg-[var(--bg-card)] border-b border-[var(--border)] px-6 py-3.5 flex items-center justify-between flex-shrink-0">
-            <div>
+          <header className="bg-[var(--bg-card)] border-b border-[var(--border)] px-4 md:px-6 py-3.5 flex items-center justify-between gap-2 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setMenuAberto(true)}
+              className="md:hidden p-2 -ml-2 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
+              aria-label="Abrir menu"
+              aria-controls="menu-lateral"
+              aria-expanded={menuAberto}
+            >
+              <Menu size={20} aria-hidden="true" />
+            </button>
+            <div className="flex-1 min-w-0">
               <h1 className="text-base font-semibold text-[var(--text-primary)]">{paginaAtual.titulo}</h1>
               <p className="text-xs text-[var(--text-muted)]">{paginaAtual.sub}</p>
             </div>
@@ -243,17 +263,21 @@ export default function Layout() {
                 onClick={() => navigate('/admin/configuracoes')}
                 className="p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
                 title="Configurações"
+                aria-label="Configurações"
               >
-                <Settings size={18} className="text-[var(--text-muted)]" />
+                <Settings size={18} aria-hidden="true" className="text-[var(--text-muted)]" />
               </button>
 
             {/* Bell */}
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setAberto(v => !v)}
-                className="relative p-2 rounded-lg hover:bg-slate-100 transition-colors"
+                className="relative p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+                aria-label={naoLidas > 0 ? `Notificações (${naoLidas} não lidas)` : 'Notificações'}
+                aria-expanded={aberto}
+                aria-haspopup="true"
               >
-                <Bell size={18} className="text-[var(--text-muted)]" />
+                <Bell size={18} aria-hidden="true" className="text-[var(--text-muted)]" />
                 {naoLidas > 0 && (
                   <span
                     className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full text-[10px] font-bold text-white flex items-center justify-center px-1"
@@ -267,7 +291,7 @@ export default function Layout() {
               {/* Dropdown */}
               {aberto && (
                 <div
-                  className="absolute right-0 top-11 w-96 bg-[var(--bg-card)] rounded-xl shadow-2xl border border-[var(--border)] z-50 flex flex-col overflow-hidden"
+                  className="absolute right-0 top-11 w-[min(24rem,calc(100vw-2rem))] bg-[var(--bg-card)] rounded-xl shadow-2xl border border-[var(--border)] z-50 flex flex-col overflow-hidden"
                   style={{ maxHeight: '520px' }}
                 >
                   {/* Header */}
@@ -277,7 +301,7 @@ export default function Layout() {
                       <button
                         onClick={marcarTodasLidas}
                         className="flex items-center gap-1 text-xs font-medium transition-colors"
-                        style={{ color: '#0f4c5c' }}
+                        style={{ color: 'var(--marca-texto)' }}
                       >
                         <Check size={13} />
                         Marcar todas como lidas
@@ -297,7 +321,7 @@ export default function Layout() {
                         className="flex-1 py-2 text-xs font-medium transition-colors border-b-2"
                         style={{
                           borderColor: abaAtiva === aba.id ? '#0f4c5c' : 'transparent',
-                          color: abaAtiva === aba.id ? '#0f4c5c' : '#94a3b8',
+                          color: abaAtiva === aba.id ? 'var(--marca-texto)' : 'var(--text-muted)',
                         }}
                       >
                         {aba.label}
@@ -348,11 +372,15 @@ export default function Layout() {
                         const actor = n.actor_name || 'Sistema'
                         const cor = avatarCor(actor)
                         return (
-                          <button
+                          <div
                             key={n.id}
-                            onClick={() => clicarNotificacao(n)}
-                            className="w-full text-left flex items-start gap-3 px-4 py-3.5 hover:bg-[var(--bg-hover)] transition-colors border-b border-[var(--border-subtle)] group relative"
+                            className="relative group border-b border-[var(--border-subtle)]"
                             style={{ backgroundColor: n.lida ? 'var(--bg-card)' : 'var(--bg-card-alt)' }}
+                          >
+                          <button
+                            type="button"
+                            onClick={() => clicarNotificacao(n)}
+                            className="w-full text-left flex items-start gap-3 px-4 py-3.5 hover:bg-[var(--bg-hover)] transition-colors"
                           >
                             {/* Avatar */}
                             <div
@@ -390,17 +418,22 @@ export default function Layout() {
                               <span
                                 className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1.5"
                                 style={{ backgroundColor: '#3b82f6' }}
-                              />
+                                title="Não lida"
+                              >
+                                <span className="sr-only">Não lida</span>
+                              </span>
                             )}
-
+                          </button>
                             {/* Botão remover */}
                             <button
+                              type="button"
                               onClick={e => remover(e, n.id)}
-                              className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-slate-200 transition-all"
+                              aria-label="Remover notificação"
+                              className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 focus:opacity-100 p-0.5 rounded hover:bg-[var(--bg-hover)] transition-all"
                             >
-                              <X size={12} className="text-[var(--text-muted)]" />
+                              <X size={12} aria-hidden="true" className="text-[var(--text-muted)]" />
                             </button>
-                          </button>
+                          </div>
                         )
                       })
                     )}
@@ -412,18 +445,20 @@ export default function Layout() {
           </header>
 
           {/* Content */}
-          <main className="flex-1 overflow-y-auto p-6 bg-[var(--bg-page)]">
+          <main id="conteudo" className="flex-1 overflow-y-auto p-4 md:p-6 bg-[var(--bg-page)]">
             <Outlet context={{ openDrawer: setDrawerTarget }} />
           </main>
         </div>
       </div>
 
       {/* Record Detail Drawer */}
-      <RecordDetailDrawer
-        target={drawerTarget}
-        onClose={() => setDrawerTarget(null)}
-        onRefresh={() => {}}
-      />
+      {drawerTarget && (
+        <RecordDetailDrawer
+          target={drawerTarget}
+          onClose={() => setDrawerTarget(null)}
+          onRefresh={() => {}}
+        />
+      )}
     </>
   )
 }

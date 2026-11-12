@@ -26,7 +26,7 @@ export default function CampanhaPublica() {
   return (
     <div className="min-h-screen bg-[var(--bg-page)]">
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-        <Link to="/transparencia" className="inline-flex items-center gap-2 text-sm font-medium" style={{ color: '#0f4c5c' }}>
+        <Link to="/transparencia" className="inline-flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--marca-texto)' }}>
           <ArrowLeft size={15} aria-hidden="true" /> Portal de transparência
         </Link>
 
@@ -77,7 +77,7 @@ export default function CampanhaPublica() {
 
             <section className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-6 space-y-3">
               <h2 className="text-base font-semibold text-[var(--text-primary)] flex items-center gap-2">
-                <Receipt size={16} style={{ color: '#f97316' }} aria-hidden="true" />
+                <Receipt size={16} style={{ color: 'var(--destaque-texto)' }} aria-hidden="true" />
                 Prestação de contas da campanha
               </h2>
               <p className="text-xs text-[var(--text-muted)]">

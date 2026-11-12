@@ -1,9 +1,26 @@
+import { Children, cloneElement, isValidElement, useId } from 'react'
+
+/**
+ * Rótulo + campo. O <label> é associado ao último elemento filho (o campo) por id, e a mensagem de
+ * erro é ligada a ele por aria-describedby e aria-invalid.
+ */
 export function Campo({ label, erro, children }) {
+  const base = useId()
+  const erroId = erro ? `${base}-erro` : undefined
+  const filhos = Children.toArray(children)
+  const indice = filhos.findLastIndex((f) => isValidElement(f))
+  let campoId
+  if (indice >= 0) {
+    const alvo = filhos[indice]
+    campoId = alvo.props.id ?? `${base}-campo`
+    const descritos = [alvo.props['aria-describedby'], erroId].filter(Boolean).join(' ') || undefined
+    filhos[indice] = cloneElement(alvo, { id: campoId, 'aria-describedby': descritos, 'aria-invalid': erro ? true : alvo.props['aria-invalid'] })
+  }
   return (
     <div>
-      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">{label}</label>
-      {children}
-      {erro && <p className="text-xs text-red-500 mt-1">{erro}</p>}
+      <label htmlFor={campoId} className="block text-xs font-medium text-[var(--text-secondary)] mb-1">{label}</label>
+      {filhos}
+      {erro && <p id={erroId} className="text-xs text-red-600 mt-1">{erro}</p>}
     </div>
   )
 }

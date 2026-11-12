@@ -17,7 +17,7 @@ export default function GraficoFluxo({ dados, titulo, descricao, altura = 260 })
           type="button"
           onClick={() => setTabela((v) => !v)}
           className="text-xs font-medium underline flex-shrink-0"
-          style={{ color: '#0f4c5c' }}
+          style={{ color: 'var(--marca-texto)' }}
           aria-pressed={tabela}
         >
           {tabela ? 'Ver como gráfico' : 'Ver como tabela'}

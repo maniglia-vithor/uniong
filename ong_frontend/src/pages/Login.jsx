@@ -102,10 +102,7 @@ export default function Login() {
       </div>
 
       {/* ── Coluna direita — Formulário ── */}
-      <div
-        className="flex items-center justify-center p-8 relative"
-        style={{ backgroundColor: '#f8fafc' }}
-      >
+      <main className="flex items-center justify-center p-8 relative bg-[var(--bg-page)]">
         {/* Blob sutil no fundo */}
         <div
           className="absolute bottom-0 right-0 w-64 h-64 rounded-full opacity-[0.07] pointer-events-none"
@@ -122,8 +119,8 @@ export default function Login() {
           <div className="flex md:hidden flex-col items-center gap-3 mb-8">
             <img src={logoUniONG} alt="UniONG" className="w-24 h-24 object-contain" />
             <div className="text-center">
-              <p className="font-bold text-slate-800">UniONG</p>
-              <p className="text-xs text-slate-400">Portal Unificado para Pequenas ONG's</p>
+              <p className="font-bold text-[var(--text-primary)]">UniONG</p>
+              <p className="text-xs text-[var(--text-muted)]">Portal Unificado para Pequenas ONG's</p>
             </div>
           </div>
 
@@ -145,10 +142,11 @@ export default function Login() {
 
             <form onSubmit={onSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: '#0f4c5c' }}>
+                <label htmlFor="login-usuario" className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--marca-texto)' }}>
                   Usuário
                 </label>
                 <input
+                  id="login-usuario"
                   name="username"
                   type="text"
                   autoComplete="username"
@@ -164,11 +162,12 @@ export default function Login() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: '#0f4c5c' }}>
+                <label htmlFor="login-senha" className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--marca-texto)' }}>
                   Senha
                 </label>
                 <div className="relative">
                   <input
+                    id="login-senha"
                     name="password"
                     type={mostrarSenha ? 'text' : 'password'}
                     autoComplete="current-password"
@@ -184,9 +183,10 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setMostrarSenha((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
-                    style={{ color: '#94a3b8' }}
-                    tabIndex={-1}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-md transition-colors"
+                    style={{ color: 'var(--text-muted)' }}
+                    aria-label={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}
+                    aria-pressed={mostrarSenha}
                   >
                     {mostrarSenha ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
@@ -194,7 +194,7 @@ export default function Login() {
               </div>
 
               {erro && (
-                <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-xs text-red-600 font-medium">
+                <div role="alert" className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-xs text-red-700 font-medium">
                   {erro}
                 </div>
               )}
@@ -215,7 +215,7 @@ export default function Login() {
               <div className="text-right -mt-1">
                 <Link
                   to="/recuperar-senha"
-                  className="text-xs transition-colors text-slate-500 hover:text-orange-600"
+                  className="text-xs transition-colors text-[var(--text-muted)] hover:text-[var(--destaque-texto)] underline-offset-2 hover:underline"
                 >
                   Esqueci minha senha
                 </Link>
@@ -254,7 +254,7 @@ export default function Login() {
             UniONG · Portal Unificado para Pequenas ONG's
           </p>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

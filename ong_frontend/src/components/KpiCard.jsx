@@ -3,7 +3,7 @@ import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 function rotuloPadrao(pct) {
   if (pct === null || pct === undefined) return null
   if (pct === 0) return '0% em relação ao mês anterior'
-  return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}% em relação ao mês anterior`
+  return `${pct > 0 ? '+' : ''}${pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% em relação ao mês anterior`
 }
 
 export default function KpiCard({ titulo, valor, trend_percentage, trend_direction, rotuloTendencia, icone: Icone, cor, onClick }) {
@@ -11,7 +11,7 @@ export default function KpiCard({ titulo, valor, trend_percentage, trend_directi
   const isNegative = trend_direction === 'negative'
   const semBase = trend_percentage === null || trend_percentage === undefined
 
-  const trendColor = isPositive ? 'text-emerald-600' : isNegative ? 'text-red-500' : 'text-[var(--text-muted)]'
+  const trendColor = isPositive ? 'text-emerald-700 dark:text-emerald-400' : isNegative ? 'text-red-700 dark:text-red-400' : 'text-[var(--text-muted)]'
   const TrendIcon = isPositive ? TrendingUp : isNegative ? TrendingDown : Minus
   const legenda = rotuloTendencia ?? rotuloPadrao(trend_percentage) ?? '— sem base de comparação no mês anterior'
 

@@ -3,7 +3,8 @@ import axios from 'axios'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { Scale } from 'lucide-react'
 import GraficoFluxo from './GraficoFluxo'
-import { formatBRL } from '../utils/formatos'
+import { formatBRL, corDeTexto } from '../utils/formatos'
+import GraficoAcessivel from './GraficoAcessivel'
 
 const CORES = ['#0f4c5c', '#f97316', '#0891b2', '#7c3aed', '#64748b']
 
@@ -33,7 +34,7 @@ export default function PrestacaoContas() {
     <section aria-labelledby="titulo-prestacao" className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="titulo-prestacao" className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-          <Scale size={16} style={{ color: '#0f4c5c' }} aria-hidden="true" />
+          <Scale size={16} style={{ color: 'var(--marca-texto)' }} aria-hidden="true" />
           Prestação de contas
         </h2>
         <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
@@ -55,21 +56,26 @@ export default function PrestacaoContas() {
         {totais.map((t) => (
           <div key={t.rotulo} className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-5">
             <p className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">{t.rotulo}</p>
-            <p className="text-2xl font-bold mt-1" style={{ color: t.cor }}>{formatBRL(t.valor)}</p>
+            <p className="text-2xl font-bold mt-1" style={{ color: corDeTexto(t.cor) }}>{formatBRL(t.valor)}</p>
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <figure className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-5">
-          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">Gasto por categoria</h3>
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-5">
           {dados.gasto_por_categoria.length === 0 ? (
-            <p className="text-sm text-[var(--text-muted)] py-10 text-center">Sem despesas pagas no ano.</p>
-          ) : (
             <>
-              <figcaption className="sr-only">
-                {dados.gasto_por_categoria.map((c) => `${c.label}: ${formatBRL(c.total)}`).join('; ')}
-              </figcaption>
+              <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">Gasto por categoria</h3>
+              <p className="text-sm text-[var(--text-muted)] py-10 text-center">Sem despesas pagas no ano.</p>
+            </>
+          ) : (
+            <GraficoAcessivel
+              titulo="Gasto por categoria"
+              cabecalho={<h3 className="text-sm font-semibold text-[var(--text-primary)]">Gasto por categoria</h3>}
+              descricao={dados.gasto_por_categoria.map((c) => `${c.label}: ${formatBRL(c.total)}`).join('; ')}
+              colunas={[{ chave: 'label', rotulo: 'Categoria' }, { chave: 'total', rotulo: 'Pago', formato: (v) => formatBRL(v) }]}
+              linhas={dados.gasto_por_categoria}
+            >
               <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
                   <Pie data={dados.gasto_por_categoria} dataKey="total" nameKey="label" innerRadius={50} outerRadius={80} paddingAngle={3}>
@@ -79,9 +85,9 @@ export default function PrestacaoContas() {
                   <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
                 </PieChart>
               </ResponsiveContainer>
-            </>
+            </GraficoAcessivel>
           )}
-        </figure>
+        </div>
         <div className="xl:col-span-2">
           <GraficoFluxo
             dados={dados.evolucao_mensal}

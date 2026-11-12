@@ -116,7 +116,7 @@ export default function Apoiadores() {
                 <CabecalhoOrdenavel lista={lista} campo="data_cadastro" rotulo="Cadastro" />
                 <CabecalhoOrdenavel lista={lista} campo="total_doado" rotulo="Total Doado" alinhamento="right" />
                 <CabecalhoOrdenavel lista={lista} campo="status" rotulo="Status" />
-                <th className="px-5 py-3" />
+                <th scope="col" className="px-5 py-3"><span className="sr-only">Ações</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">

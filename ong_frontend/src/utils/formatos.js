@@ -47,3 +47,17 @@ export const FORMAS_PAGAMENTO = [
   ['pix', 'PIX'], ['dinheiro', 'Dinheiro'], ['transferencia', 'Transferência bancária'],
   ['boleto', 'Boleto'], ['cartao', 'Cartão'], ['outro', 'Outro'],
 ]
+
+// Cores da marca usadas em gráficos e ícones; como TEXTO precisam de um tom com contraste AA em cada tema.
+const COR_DE_TEXTO = {
+  '#0f4c5c': 'var(--marca-texto)',
+  '#f97316': 'var(--destaque-texto)',
+  '#0891b2': 'var(--ciano-texto)',
+  '#7c3aed': 'var(--violeta-texto)',
+  '#16a34a': 'var(--verde-texto)',
+  '#dc2626': 'var(--vermelho-texto)',
+}
+
+export function corDeTexto(cor) {
+  return COR_DE_TEXTO[String(cor).toLowerCase()] ?? cor
+}

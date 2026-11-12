@@ -154,7 +154,7 @@ export default function Campanhas() {
               <div>
                 <div className="flex justify-between mb-1.5 text-xs text-[var(--text-secondary)]">
                   <span>{formatBRL(c.valor_arrecadado)} arrecadados</span>
-                  <span className="font-semibold" style={{ color: i % 2 === 0 ? '#0f4c5c' : '#f97316' }}>
+                  <span className="font-semibold" style={{ color: i % 2 === 0 ? 'var(--marca-texto)' : 'var(--destaque-texto)' }}>
                     {c.percentual_progresso}%
                   </span>
                 </div>

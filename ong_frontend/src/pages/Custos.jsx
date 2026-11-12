@@ -15,6 +15,7 @@ import {
   removerAnexoDespesa, baixarAnexoDespesa, getDespesasResumo, getDespesasPorCategoria,
   encerrarSerieDespesa, aplicarValorProximasDespesa, getCampanhasOpcoes, marcarAnexoPublico,
 } from '../services/api'
+import GraficoAcessivel from '../components/GraficoAcessivel'
 
 const VAZIO = {
   descricao: '', descricao_publica: '', campanha: '', valor: '', data_vencimento: '', data_pagamento: '',
@@ -286,10 +287,18 @@ export default function Custos() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Donut */}
         <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border)] p-5 flex flex-col">
-          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Gastos pagos por categoria (mês atual)</h2>
           {grafico.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center text-[var(--text-muted)] text-sm">Sem dados</div>
+            <>
+              <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Gastos pagos por categoria (mês atual)</h2>
+              <div className="flex-1 flex items-center justify-center text-[var(--text-muted)] text-sm">Sem dados</div>
+            </>
           ) : (
+            <GraficoAcessivel
+              titulo="Gastos pagos por categoria (mês atual)"
+              descricao={grafico.map((g) => `${g.label}: ${formatBRL(g.total)}`).join('; ')}
+              colunas={[{ chave: 'label', rotulo: 'Categoria' }, { chave: 'total', rotulo: 'Pago', formato: (v) => formatBRL(v) }]}
+              linhas={grafico}
+            >
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie
@@ -310,6 +319,7 @@ export default function Custos() {
                 <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px' }} />
               </PieChart>
             </ResponsiveContainer>
+            </GraficoAcessivel>
           )}
         </div>
 
@@ -327,7 +337,7 @@ export default function Custos() {
                   <CabecalhoOrdenavel lista={lista} campo="data_vencimento" rotulo="Vencimento" />
                   <CabecalhoOrdenavel lista={lista} campo="valor" rotulo="Valor" alinhamento="right" />
                   <CabecalhoOrdenavel lista={lista} campo="status" rotulo="Status" />
-                  <th className="px-5 py-3" />
+                  <th scope="col" className="px-5 py-3"><span className="sr-only">Ações</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-subtle)]">
@@ -497,7 +507,7 @@ export default function Custos() {
                       <button
                         type="button"
                         onClick={() => onBaixarAnexo(a)}
-                        className="text-xs text-teal-700 hover:underline truncate flex items-center gap-1.5"
+                        className="text-xs text-teal-700 dark:text-teal-300 hover:underline truncate flex items-center gap-1.5"
                       >
                         <Paperclip size={11} className="flex-shrink-0" />
                         {a.nome_original}
@@ -533,8 +543,8 @@ export default function Custos() {
                         <Paperclip size={11} className="flex-shrink-0" />
                         {f.name}
                       </span>
-                      <button type="button" onClick={() => removerNovoAnexo(i)} className="text-blue-300 hover:text-red-500 transition-colors flex-shrink-0">
-                        <X size={13} />
+                      <button type="button" onClick={() => removerNovoAnexo(i)} aria-label={`Remover ${f.name}`} className="text-blue-700 hover:text-red-600 transition-colors flex-shrink-0">
+                        <X size={13} aria-hidden="true" />
                       </button>
                     </div>
                   ))}

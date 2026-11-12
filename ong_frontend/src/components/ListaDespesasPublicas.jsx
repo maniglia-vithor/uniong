@@ -29,7 +29,7 @@ export default function ListaDespesasPublicas({ lista, vazio = 'Nenhum gasto reg
                     key={url}
                     href={url}
                     className="inline-flex items-center gap-1 text-xs font-medium hover:underline ml-2"
-                    style={{ color: '#0f4c5c' }}
+                    style={{ color: 'var(--marca-texto)' }}
                     aria-label={`Baixar comprovante ${j + 1} de ${g.descricao}`}
                   >
                     <FileText size={13} aria-hidden="true" /> Comprovante

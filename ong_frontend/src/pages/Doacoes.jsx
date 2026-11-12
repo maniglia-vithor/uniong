@@ -27,7 +27,7 @@ function iniciais(nome) {
 }
 
 // Select com campo de busca quando a lista passa de ~50 itens.
-function SelecaoComBusca({ name, value, onChange, opcoes, rotulo, vazio, required }) {
+function SelecaoComBusca({ name, value, onChange, opcoes, rotulo, vazio, required, id, 'aria-describedby': descritoPor }) {
   const [filtro, setFiltro] = useState('')
   const visiveis = useMemo(() => {
     const termo = filtro.trim().toLowerCase()
@@ -39,7 +39,7 @@ function SelecaoComBusca({ name, value, onChange, opcoes, rotulo, vazio, require
       {opcoes.length > LIMITE_SEM_BUSCA && (
         <Input value={filtro} onChange={(e) => setFiltro(e.target.value)} placeholder={`Filtrar ${rotulo}...`} aria-label={`Filtrar ${rotulo}`} />
       )}
-      <Select name={name} value={value} onChange={onChange} required={required}>
+      <Select id={id} aria-describedby={descritoPor} name={name} value={value} onChange={onChange} required={required}>
         <option value="">{vazio}</option>
         {visiveis.map((o) => <option key={o.id} value={o.id}>{o.rotulo}</option>)}
       </Select>
@@ -181,7 +181,7 @@ export default function Doacoes() {
           <h1 className="text-lg font-bold text-[var(--text-primary)]">Doações</h1>
           <p className="text-xs text-[var(--text-muted)]">
             {resumo.quantidade} registro{resumo.quantidade !== 1 ? 's' : ''} · Total confirmado:{' '}
-            <span className="font-semibold" style={{ color: '#0f4c5c' }}>{formatBRL(resumo.total_confirmado)}</span>
+            <span className="font-semibold" style={{ color: 'var(--marca-texto)' }}>{formatBRL(resumo.total_confirmado)}</span>
             {resumo.bens_quantidade > 0 && (
               <> · Em bens: {resumo.bens_quantidade} doaç{resumo.bens_quantidade !== 1 ? 'ões' : 'ão'}
                 {resumo.bens_valor_estimado > 0 && <> (estimado {formatBRL(resumo.bens_valor_estimado)}, fora dos totais)</>}
@@ -265,7 +265,7 @@ export default function Doacoes() {
                 <CabecalhoOrdenavel lista={lista} campo="valor" rotulo="Valor" alinhamento="right" />
                 <CabecalhoOrdenavel lista={lista} campo="data" rotulo="Data" />
                 <CabecalhoOrdenavel lista={lista} campo="status" rotulo="Status" />
-                <th className="px-5 py-3" />
+                <th scope="col" className="px-5 py-3"><span className="sr-only">Ações</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">

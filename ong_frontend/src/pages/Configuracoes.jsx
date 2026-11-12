@@ -178,7 +178,7 @@ export default function Configuracoes() {
               onClick={() => setAba(id)}
               aria-current={aba === id ? 'page' : undefined}
               className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left"
-              style={aba === id ? { backgroundColor: 'rgba(15,76,92,0.1)', color: '#0f4c5c' } : { color: 'var(--text-secondary)' }}
+              style={aba === id ? { backgroundColor: 'rgba(15,76,92,0.1)', color: 'var(--marca-texto)' } : { color: 'var(--text-secondary)' }}
             >
               <Icon size={16} aria-hidden="true" />
               {label}
@@ -202,7 +202,7 @@ export default function Configuracoes() {
                       aria-pressed={theme === id}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
                       style={theme === id
-                        ? { borderColor: '#0f4c5c', color: '#0f4c5c', backgroundColor: 'rgba(15,76,92,0.08)' }
+                        ? { borderColor: '#0f4c5c', color: 'var(--marca-texto)', backgroundColor: 'rgba(15,76,92,0.08)' }
                         : { borderColor: 'var(--border)', color: 'var(--text-secondary)', backgroundColor: 'var(--bg-card-alt)' }}
                     >
                       <Icon size={12} aria-hidden="true" /> {label}
@@ -319,7 +319,7 @@ export default function Configuracoes() {
                   onClick={exportarDados}
                   disabled={exportando}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border transition-colors disabled:opacity-50"
-                  style={{ borderColor: '#0f4c5c', color: '#0f4c5c' }}
+                  style={{ borderColor: '#0f4c5c', color: 'var(--marca-texto)' }}
                 >
                   <Download size={14} aria-hidden="true" /> {exportando ? 'Exportando...' : 'Exportar dados (JSON)'}
                 </button>

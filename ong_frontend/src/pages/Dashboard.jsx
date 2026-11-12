@@ -12,6 +12,7 @@ import {
   getDashboardResumo, getGraficoMensal, getDoacoesRecentes,
   getTopApoiadores, getCampanhasAtivas, getFluxoMensal,
 } from '../services/api'
+import GraficoAcessivel from '../components/GraficoAcessivel'
 
 function formatBRL(value) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value ?? 0)
@@ -110,7 +111,7 @@ export default function Dashboard() {
       trend_direction: resumo.total_arrecadado.trend_direction,
       rotuloTendencia: `+${formatBRL(resumo.total_arrecadado.acrescimo_mes ?? 0)} neste mês` +
         (resumo.total_arrecadado.trend_percentage !== null
-          ? ` (+${resumo.total_arrecadado.trend_percentage.toFixed(1)}% sobre o mês anterior)`
+          ? ` (+${resumo.total_arrecadado.trend_percentage.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% sobre o mês anterior)`
           : ''),
       icone: DollarSign,
       cor: '#0f4c5c',
@@ -188,7 +189,7 @@ export default function Dashboard() {
         descricao="Doações confirmadas e despesas pagas por mês; a linha mostra o saldo acumulado desde o início."
       />
 
-      <KpiDetailPanel kpi={painelKpi} onClose={() => setPainelKpi(null)} />
+      {painelKpi && <KpiDetailPanel kpi={painelKpi} onClose={() => setPainelKpi(null)} />}
 
       {/* Campanhas + Gráfico */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -202,7 +203,7 @@ export default function Dashboard() {
                   <span className="text-sm font-medium text-[var(--text-primary)] truncate max-w-[60%]">{c.titulo}</span>
                   <span
                     className="text-sm font-bold"
-                    style={{ color: i % 2 === 0 ? '#0f4c5c' : '#f97316' }}
+                    style={{ color: i % 2 === 0 ? 'var(--marca-texto)' : 'var(--destaque-texto)' }}
                   >
                     {c.percentual_progresso}%
                   </span>
@@ -222,7 +223,12 @@ export default function Dashboard() {
 
         {/* Gráfico mensal */}
         <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border)] p-5">
-          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Arrecadação Mensal (últimos 12 meses)</h2>
+          <GraficoAcessivel
+            titulo="Arrecadação Mensal (últimos 12 meses)"
+            descricao="Total de doações confirmadas em cada mês. Clique em uma barra para ver as doações do mês."
+            colunas={[{ chave: 'mes', rotulo: 'Mês' }, { chave: 'total', rotulo: 'Arrecadado', formato: (v) => formatBRL(v) }]}
+            linhas={grafico}
+          >
           <ResponsiveContainer width="100%" height={220} style={{ outline: 'none' }}>
             <BarChart
               data={grafico}
@@ -231,13 +237,13 @@ export default function Dashboard() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
               <XAxis
                 dataKey="mes"
-                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
                 axisLine={false}
                 tickLine={false}
                 interval={0}
               />
               <YAxis
-                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`}
@@ -260,6 +266,7 @@ export default function Dashboard() {
               />
             </BarChart>
           </ResponsiveContainer>
+          </GraficoAcessivel>
         </div>
       </div>
 
@@ -324,7 +331,7 @@ export default function Dashboard() {
                 </div>
                 <span
                   className="text-xs font-bold px-2 py-0.5 rounded-full"
-                  style={{ backgroundColor: '#f97316' + '20', color: '#f97316' }}
+                  style={{ backgroundColor: '#f97316' + '20', color: 'var(--destaque-texto)' }}
                 >
                   #{i + 1}
                 </span>

@@ -7,6 +7,7 @@ import BarraProgresso from './BarraProgresso'
 import { Campo, Input, Select } from './CampoForm'
 import CampoData from './CampoData'
 import { useAuth } from '../context/AuthContext'
+import useDialogo from '../hooks/useDialogo'
 import { FORMAS_PAGAMENTO, formatarMomento, mensagemErro } from '../utils/formatos'
 
 function formatBRL(v) {
@@ -64,13 +65,13 @@ function DetalheDoacao({ record, onEdit }) {
       {record.tipo === 'bens' && <InfoBox label="Itens doados" value={record.descricao_bens} />}
       {record.observacao && <InfoBox label="Observação" value={record.observacao} />}
       {record.status === 'confirmada' && (
-        <a href={`/admin/doacoes/${record.id}/recibo`} className="block text-xs font-semibold underline" style={{ color: '#0f4c5c' }}>
+        <a href={`/admin/doacoes/${record.id}/recibo`} className="block text-xs font-semibold underline" style={{ color: 'var(--marca-texto)' }}>
           {record.recibo_numero ? `Ver recibo nº ${record.recibo_numero}` : 'Gerar recibo'}
         </a>
       )}
       {record.tem_comprovante && (
         <button type="button" onClick={() => baixarDoComprovante(record)}
-          className="text-xs font-semibold underline" style={{ color: '#0f4c5c' }}>
+          className="text-xs font-semibold underline" style={{ color: 'var(--marca-texto)' }}>
           Baixar comprovante ({record.comprovante_nome})
         </button>
       )}
@@ -192,7 +193,7 @@ function DetalheCampanha({ record, onEdit }) {
       <div>
         <div className="flex justify-between mb-1.5 text-xs text-[var(--text-secondary)]">
           <span>{formatBRL(record.valor_arrecadado)} arrecadados</span>
-          <span className="font-semibold" style={{ color: '#f97316' }}>{record.percentual_progresso}%</span>
+          <span className="font-semibold" style={{ color: 'var(--destaque-texto)' }}>{record.percentual_progresso}%</span>
         </div>
         <BarraProgresso percentual={record.percentual_progresso} cor="#f97316" />
         <p className="text-xs text-[var(--text-muted)] mt-1">Meta: {formatBRL(record.meta_valor)}</p>
@@ -403,7 +404,7 @@ function ContribuicoesDoMembro({ apoiadorId }) {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">Contribuições periódicas</h3>
         {!form && (
-          <button type="button" onClick={() => setForm(CONTRIBUICAO_VAZIA)} className="text-xs font-semibold" style={{ color: '#0f4c5c' }}>
+          <button type="button" onClick={() => setForm(CONTRIBUICAO_VAZIA)} className="text-xs font-semibold" style={{ color: 'var(--marca-texto)' }}>
             + Nova contribuição
           </button>
         )}
@@ -546,7 +547,7 @@ function DetalheDespesa({ record }) {
         <div className="space-y-1.5">
           <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">Anexos</p>
           {record.anexos.map((a) => (
-            <button key={a.id} type="button" onClick={() => baixar(a)} className="block text-sm text-teal-700 hover:underline truncate">
+            <button key={a.id} type="button" onClick={() => baixar(a)} className="block text-sm text-teal-700 dark:text-teal-300 hover:underline truncate">
               {a.nome_original}
             </button>
           ))}
@@ -566,7 +567,7 @@ function InfoBox({ label, value, destaque }) {
   return (
     <div className="bg-[var(--bg-card-alt)] rounded-lg px-3 py-2.5">
       <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-0.5">{label}</p>
-      <div className={`text-sm font-medium ${destaque ? 'text-teal-700' : 'text-[var(--text-primary)]'}`}>{value}</div>
+      <div className={`text-sm font-medium ${destaque ? 'text-teal-700 dark:text-teal-300' : 'text-[var(--text-primary)]'}`}>{value}</div>
     </div>
   )
 }
@@ -608,6 +609,7 @@ export const TIPOS_COM_DETALHE = Object.keys(endpointMap)
 
 // ── Drawer principal ────────────────────────────────────────
 export default function RecordDetailDrawer({ target, onClose, onRefresh }) {
+  const { ref: dialogoRef, tituloId: dialogoTituloId } = useDialogo(onClose)
   const [record, setRecord] = useState(null)
   const [carregando, setCarregando] = useState(true)
   const [editando, setEditando] = useState(false)
@@ -650,11 +652,6 @@ export default function RecordDetailDrawer({ target, onClose, onRefresh }) {
       .finally(() => setCarregando(false))
   }, [target])
 
-  useEffect(() => {
-    function onKey(e) { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -676,12 +673,17 @@ export default function RecordDetailDrawer({ target, onClose, onRefresh }) {
       onClick={onClose}
     >
       <div
-        className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden max-h-[90vh]"
+        ref={dialogoRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={dialogoTituloId}
+        tabIndex={-1}
+        className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden max-h-[90vh] outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] flex-shrink-0">
-          <div className="flex items-center gap-2">
+          <div id={dialogoTituloId} className="flex items-center gap-2">
             <span
               className="text-xs font-semibold px-2 py-0.5 rounded-full text-white"
               style={{ backgroundColor: corMap[target.type] }}
@@ -706,7 +708,7 @@ export default function RecordDetailDrawer({ target, onClose, onRefresh }) {
                 aria-selected={aba === id}
                 onClick={() => setAba(id)}
                 className="px-3 py-2 text-xs font-semibold border-b-2 -mb-px"
-                style={{ borderColor: aba === id ? '#0f4c5c' : 'transparent', color: aba === id ? '#0f4c5c' : 'var(--text-muted)' }}
+                style={{ borderColor: aba === id ? '#0f4c5c' : 'transparent', color: aba === id ? 'var(--marca-texto)' : 'var(--text-muted)' }}
               >
                 {rotulo}
               </button>

@@ -5,13 +5,13 @@ export default function Privacidade() {
   return (
     <div className="min-h-screen bg-[var(--bg-page)]">
       <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-6">
-        <Link to="/transparencia" className="inline-flex items-center gap-2 text-sm font-medium" style={{ color: '#0f4c5c' }}>
+        <Link to="/transparencia" className="inline-flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--marca-texto)' }}>
           <ArrowLeft size={15} aria-hidden="true" /> Voltar ao portal de transparência
         </Link>
 
         <article className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-6 sm:p-8 space-y-5 text-sm text-[var(--text-secondary)] leading-relaxed">
           <header className="flex items-center gap-3">
-            <ShieldCheck size={24} style={{ color: '#0f4c5c' }} aria-hidden="true" />
+            <ShieldCheck size={24} style={{ color: 'var(--marca-texto)' }} aria-hidden="true" />
             <h1 className="text-xl font-bold text-[var(--text-primary)]">Política de privacidade</h1>
           </header>
 

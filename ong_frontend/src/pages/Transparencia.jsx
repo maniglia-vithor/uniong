@@ -16,11 +16,13 @@ import CompartilharCampanha from '../components/CompartilharCampanha'
 import ResumoCampanha from '../components/ResumoCampanha'
 import PrestacaoContas from '../components/PrestacaoContas'
 import ListaDespesasPublicas from '../components/ListaDespesasPublicas'
-import { mensagemErro } from '../utils/formatos'
+import { corDeTexto, mensagemErro } from '../utils/formatos'
 import { useAuth } from '../context/AuthContext'
 import useInstituicao from '../hooks/useInstituicao'
+import useDialogo from '../hooks/useDialogo'
 import LogoInstituicao from '../components/LogoInstituicao'
 import RodapeInstituicao from '../components/RodapeInstituicao'
+import GraficoAcessivel from '../components/GraficoAcessivel'
 
 // Data de referência fixada ao carregar a página (evita chamar Date durante a renderização).
 const HOJE = new Date()
@@ -49,7 +51,7 @@ function KpiCard({ label, valor, desc, icone: Icon, cor, onClick }) {
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs text-[var(--text-muted)]">{desc}</p>
         {onClick && (
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0" style={{ backgroundColor: `${cor}18`, color: cor }}>
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0" style={{ backgroundColor: `${cor}18`, color: corDeTexto(cor) }}>
             Ver detalhes
           </span>
         )}
@@ -60,19 +62,17 @@ function KpiCard({ label, valor, desc, icone: Icon, cor, onClick }) {
 
 /* ─── Overlay Modal ─────────────────────────────────────────────────────── */
 function Overlay({ titulo, onFechar, children, largura = 'max-w-lg' }) {
-  useEffect(() => {
-    const fn = (e) => { if (e.key === 'Escape') onFechar() }
-    document.addEventListener('keydown', fn)
-    return () => document.removeEventListener('keydown', fn)
-  }, [onFechar])
+  const { ref, tituloId } = useDialogo(onFechar)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-      <div className={`bg-[var(--bg-card)] rounded-2xl shadow-2xl border border-[var(--border)] w-full ${largura} max-h-[90vh] flex flex-col`}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+      onClick={(e) => e.target === e.currentTarget && onFechar()}>
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={tituloId} tabIndex={-1}
+        className={`bg-[var(--bg-card)] rounded-2xl shadow-2xl border border-[var(--border)] w-full ${largura} max-h-[90vh] flex flex-col outline-none`}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] flex-shrink-0">
-          <h2 className="font-bold text-[var(--text-primary)] text-base">{titulo}</h2>
-          <button onClick={onFechar} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)]">
-            <X size={16} />
+          <h2 id={tituloId} className="font-bold text-[var(--text-primary)] text-base">{titulo}</h2>
+          <button type="button" onClick={onFechar} aria-label="Fechar" className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)]">
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
         <div className="overflow-y-auto flex-1 px-6 py-5">
@@ -181,7 +181,7 @@ function DonationModal({ campanhas, pix, onFechar }) {
           <input type="checkbox" name="consentimento" checked={form.consentimento} onChange={onChange} required className="mt-0.5" />
           <span>
             Li e concordo com a{' '}
-            <Link to="/privacidade" target="_blank" className="underline" style={{ color: '#0f4c5c' }}>política de privacidade</Link>.
+            <Link to="/privacidade" target="_blank" className="underline" style={{ color: 'var(--marca-texto)' }}>política de privacidade</Link>.
           </span>
         </label>
         {erro && <p className="text-xs text-red-500" role="alert">{erro}</p>}
@@ -223,7 +223,7 @@ function CampanhaModal({ campanha, pix, onFechar }) {
         <Link
           to={`/transparencia/campanha/${campanha.id}`}
           className="inline-flex text-sm font-semibold underline"
-          style={{ color: '#0f4c5c' }}
+          style={{ color: 'var(--marca-texto)' }}
         >
           Ver página da campanha e prestação de contas
         </Link>
@@ -280,7 +280,7 @@ function ComunicadoItem({ comunicado: c }) {
           aria-expanded={aberto}
           aria-controls={`comunicado-${c.id}`}
           className="mt-2 text-xs font-semibold hover:underline"
-          style={{ color: '#0f4c5c' }}
+          style={{ color: 'var(--marca-texto)' }}
         >
           {aberto ? 'Mostrar menos' : 'Ler mais'}
         </button>
@@ -341,7 +341,7 @@ export default function Transparencia() {
             O portal de transparência está temporariamente desativado pela organização.
           </p>
           {autenticado && (
-            <Link to="/admin" className="inline-block text-sm font-medium underline" style={{ color: '#0f4c5c' }}>Voltar ao painel</Link>
+            <Link to="/admin" className="inline-block text-sm font-medium underline" style={{ color: 'var(--marca-texto)' }}>Voltar ao painel</Link>
           )}
         </div>
       </div>
@@ -364,7 +364,7 @@ export default function Transparencia() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-page)]">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
         {autenticado && (
           <Link
             to="/admin"
@@ -382,7 +382,7 @@ export default function Transparencia() {
             <LogoInstituicao instituicao={instituicao} className="h-16 w-16 text-2xl" />
             <div>
               {instituicao.configurada && (
-                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#0f4c5c' }}>{instituicao.nome}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--marca-texto)' }}>{instituicao.nome}</p>
               )}
               <h1 className="text-2xl font-bold text-[var(--text-primary)]">Portal de Transparência</h1>
               <p className="text-sm text-[var(--text-secondary)] mt-1 max-w-xl">
@@ -462,7 +462,7 @@ export default function Transparencia() {
             {/* Campanhas em Andamento */}
             <section>
               <h2 className="text-base font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-                <Megaphone size={16} style={{ color: '#f97316' }} />
+                <Megaphone size={16} style={{ color: 'var(--destaque-texto)' }} />
                 Campanhas em Andamento
                 <span className="text-xs font-normal text-[var(--text-muted)]">— clique para detalhes e PIX</span>
               </h2>
@@ -481,7 +481,7 @@ export default function Transparencia() {
                       )}
                       <div className="flex items-start justify-between mb-3">
                         <h3 className="font-semibold text-[var(--text-primary)] leading-snug pr-2">{c.titulo}</h3>
-                        <span className="text-lg font-bold flex-shrink-0" style={{ color: cor }}>
+                        <span className="text-lg font-bold flex-shrink-0" style={{ color: corDeTexto(cor) }}>
                           {c.percentual_progresso}%
                         </span>
                       </div>
@@ -512,10 +512,22 @@ export default function Transparencia() {
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {/* Bar: Arrecadado vs Meta — altura dinâmica */}
                 <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-5">
-                  <h2 className="text-sm font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-                    <TrendingUp size={15} style={{ color: '#0f4c5c' }} />
-                    Arrecadado vs Meta por Campanha
-                  </h2>
+                  <GraficoAcessivel
+                    titulo="Arrecadado vs Meta por Campanha"
+                    cabecalho={(
+                      <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                        <TrendingUp size={15} aria-hidden="true" style={{ color: 'var(--marca-texto)' }} />
+                        Arrecadado vs Meta por Campanha
+                      </h2>
+                    )}
+                    descricao="Valor arrecadado (doações confirmadas) e meta de cada campanha em andamento."
+                    colunas={[
+                      { chave: 'name', rotulo: 'Campanha' },
+                      { chave: 'arrecadado', rotulo: 'Arrecadado', formato: (v) => formatBRL(v) },
+                      { chave: 'meta', rotulo: 'Meta', formato: (v) => formatBRL(v) },
+                    ]}
+                    linhas={dadosGraficoCampanhas}
+                  >
                   <ResponsiveContainer width="100%" height={chartHeight}>
                     <BarChart data={dadosGraficoCampanhas} barGap={4}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -529,15 +541,24 @@ export default function Transparencia() {
                       <Bar dataKey="meta" name="Meta" fill="#f97316" opacity={0.5} radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
+                  </GraficoAcessivel>
                 </div>
 
                 {/* Pie: Distribuição */}
                 {dadosPie.length > 0 && (
                   <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-5">
-                    <h2 className="text-sm font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-                      <Receipt size={15} style={{ color: '#7c3aed' }} />
-                      Distribuição de Arrecadação
-                    </h2>
+                    <GraficoAcessivel
+                      titulo="Distribuição de Arrecadação"
+                      cabecalho={(
+                        <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                          <Receipt size={15} aria-hidden="true" style={{ color: '#7c3aed' }} />
+                          Distribuição de Arrecadação
+                        </h2>
+                      )}
+                      descricao="Participação de cada campanha no total arrecadado pelas campanhas em andamento."
+                      colunas={[{ chave: 'name', rotulo: 'Campanha' }, { chave: 'value', rotulo: 'Arrecadado', formato: (v) => formatBRL(v) }]}
+                      linhas={dadosPie}
+                    >
                     <ResponsiveContainer width="100%" height={chartHeight}>
                       <PieChart>
                         <Pie data={dadosPie} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
@@ -550,6 +571,7 @@ export default function Transparencia() {
                         <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
                       </PieChart>
                     </ResponsiveContainer>
+                    </GraficoAcessivel>
                   </div>
                 )}
               </div>
@@ -561,7 +583,7 @@ export default function Transparencia() {
 
             {/* Rodapé informativo */}
             <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-5 flex items-start gap-3 text-sm text-[var(--text-muted)]">
-              <HeartHandshake size={18} className="flex-shrink-0 mt-0.5" style={{ color: '#0f4c5c' }} />
+              <HeartHandshake size={18} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--marca-texto)' }} />
               <p>
                 Todos os dados exibidos são públicos e atualizados em tempo real.
                 Esta página reflete o compromisso da organização com a transparência e prestação de contas à comunidade.
@@ -569,7 +591,7 @@ export default function Transparencia() {
             </div>
           </>
         )}
-      </div>
+      </main>
 
       {/* Footer */}
       <footer className="border-t border-[var(--border)] bg-[var(--bg-card)] mt-12">
