@@ -1,18 +1,37 @@
-from django.db import models
+import os
+import uuid
+from decimal import Decimal
+
+from dateutil.relativedelta import relativedelta
+
 from django.contrib.auth import get_user_model
+from django.db import models
+from django.db.models import OuterRef, Q, Subquery, Sum, Value
+from django.db.models.functions import Coalesce
+from django.utils import timezone
+
+from .anexos import armazenamento_privado, caminho_anexo, caminho_comprovante_doacao
 
 
 class Apoiador(models.Model):
     STATUS_CHOICES = [
         ('ativo', 'Ativo'),
         ('inativo', 'Inativo'),
+        # Criado pelo portal público; vira "ativo" quando a primeira doação é confirmada.
+        ('interessado', 'Interessado'),
     ]
 
     nome = models.CharField(max_length=150)
     email = models.EmailField(unique=True)
     celular = models.CharField(max_length=20, null=True, blank=True)
+    # CPF ou CNPJ, só dígitos (opcional; aparece no recibo).
+    documento = models.CharField(max_length=14, blank=True, default='')
+    # Desligado pelo link de descadastro dos e-mails de comunicados.
+    recebe_comunicados = models.BooleanField(default=True)
+    # Preenchido quando os dados pessoais foram anonimizados a pedido do titular (LGPD).
+    anonimizado_em = models.DateTimeField(null=True, blank=True)
     data_cadastro = models.DateField(auto_now_add=True)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='ativo')
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='ativo')
 
     class Meta:
         verbose_name = 'Apoiador'
@@ -21,6 +40,38 @@ class Apoiador(models.Model):
 
     def __str__(self):
         return self.nome
+
+
+def _soma_por_campanha(modelo, **filtros):
+    """Subconsulta: soma de `valor` do modelo vinculado à campanha externa (evita JOIN que duplica somas)."""
+    subconsulta = (
+        modelo.objects.filter(campanha=OuterRef('pk'), **filtros)
+        .order_by().values('campanha').annotate(total=Sum('valor')).values('total')
+    )
+    return Coalesce(
+        Subquery(subconsulta, output_field=models.DecimalField(max_digits=14, decimal_places=2)),
+        Value(Decimal('0')),
+        output_field=models.DecimalField(max_digits=14, decimal_places=2),
+    )
+
+
+def caminho_imagem_campanha(instance, filename):
+    extensao = os.path.splitext(filename)[1].lower()
+    return f'campanhas/{uuid.uuid4().hex}{extensao}'
+
+
+class CampanhaQuerySet(models.QuerySet):
+    def em_andamento(self, referencia=None):
+        """Status "ativa" e data de fim ainda não passada."""
+        referencia = referencia or timezone.localdate()
+        return self.filter(status='ativa').filter(Q(data_fim__isnull=True) | Q(data_fim__gte=referencia))
+
+    def com_arrecadado(self):
+        """Anota `arrecadado` (doações confirmadas) e `gasto` (despesas pagas vinculadas)."""
+        return self.annotate(
+            arrecadado=_soma_por_campanha(Doacao, status='confirmada', tipo='financeira'),
+            gasto=_soma_por_campanha(Despesa, status='pago'),
+        )
 
 
 class Campanha(models.Model):
@@ -32,11 +83,16 @@ class Campanha(models.Model):
 
     titulo = models.CharField(max_length=200)
     meta_valor = models.DecimalField(max_digits=12, decimal_places=2)
-    valor_arrecadado = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='ativa')
     data_inicio = models.DateField()
     data_fim = models.DateField(null=True, blank=True)
     descricao = models.TextField(blank=True)
+    # Imagem pública (cards e prévia nas redes); validada como os anexos.
+    imagem = models.FileField(upload_to=caminho_imagem_campanha, blank=True, default='')
+    # Quando a equipe foi avisada de que a meta foi atingida (avisa uma única vez).
+    meta_notificada_em = models.DateTimeField(null=True, blank=True)
+
+    objects = CampanhaQuerySet.as_manager()
 
     class Meta:
         verbose_name = 'Campanha'
@@ -44,10 +100,48 @@ class Campanha(models.Model):
         ordering = ['-data_inicio']
 
     @property
+    def valor_arrecadado(self):
+        if hasattr(self, 'arrecadado'):
+            return self.arrecadado
+        if self.pk is None:
+            return Decimal('0')
+        total = self.doacoes.filter(status='confirmada', tipo='financeira').aggregate(total=Sum('valor'))['total']
+        return total or Decimal('0')
+
+    @property
     def percentual_progresso(self):
-        if self.meta_valor == 0:
+        if not self.meta_valor:
             return 0
-        return min(round((self.valor_arrecadado / self.meta_valor) * 100, 1), 100)
+        return round((self.valor_arrecadado / self.meta_valor) * 100, 1)
+
+    @property
+    def meta_atingida(self):
+        return bool(self.meta_valor) and self.valor_arrecadado >= self.meta_valor
+
+    @property
+    def valor_gasto(self):
+        if hasattr(self, 'gasto'):
+            return self.gasto
+        if self.pk is None:
+            return Decimal('0')
+        return self.despesas.filter(status='pago').aggregate(total=Sum('valor'))['total'] or Decimal('0')
+
+    @property
+    def saldo(self):
+        return self.valor_arrecadado - self.valor_gasto
+
+    @property
+    def vencida(self):
+        return bool(self.data_fim) and self.data_fim < timezone.localdate()
+
+    @property
+    def status_efetivo(self):
+        """Campanha com data de fim já passada conta como encerrada (sem alterar o campo gravado)."""
+        return 'encerrada' if self.vencida else self.status
+
+    @property
+    def aceita_doacoes(self):
+        return self.status_efetivo == 'ativa'
 
     def __str__(self):
         return self.titulo
@@ -58,13 +152,15 @@ class Notificacao(models.Model):
         ('doacao', 'Doação'),
         ('campanha', 'Campanha'),
         ('apoiador', 'Apoiador'),
+        ('despesa', 'Despesa'),
+        ('configuracao', 'Configuração'),
     ]
 
     usuario = models.ForeignKey(
         get_user_model(), on_delete=models.CASCADE, related_name='notificacoes'
     )
     mensagem = models.CharField(max_length=300)
-    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, default='doacao')
+    tipo = models.CharField(max_length=12, choices=TIPO_CHOICES, default='doacao')
     lida = models.BooleanField(default=False)
     criada_em = models.DateTimeField(auto_now_add=True)
     actor_name = models.CharField(max_length=150, blank=True, default='')
@@ -81,60 +177,138 @@ class Notificacao(models.Model):
         return self.mensagem
 
 
+class Contribuicao(models.Model):
+    """Mensalidade/contribuição periódica de um membro; gera doações pendentes (gerar_contribuicoes)."""
+
+    PERIODICIDADE_CHOICES = [
+        ('mensal', 'Mensal'),
+        ('trimestral', 'Trimestral'),
+        ('semestral', 'Semestral'),
+        ('anual', 'Anual'),
+    ]
+    MESES_POR_PERIODO = {'mensal': 1, 'trimestral': 3, 'semestral': 6, 'anual': 12}
+
+    apoiador = models.ForeignKey(Apoiador, on_delete=models.CASCADE, related_name='contribuicoes')
+    valor = models.DecimalField(max_digits=10, decimal_places=2)
+    periodicidade = models.CharField(max_length=10, choices=PERIODICIDADE_CHOICES, default='mensal')
+    # 1 a 28, para existir em todos os meses.
+    dia_vencimento = models.PositiveSmallIntegerField(default=10)
+    data_inicio = models.DateField()
+    forma_pagamento = models.CharField(max_length=15, default='pix')
+    ativa = models.BooleanField(default=True)
+    criada_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Contribuição periódica'
+        verbose_name_plural = 'Contribuições periódicas'
+        ordering = ['-ativa', 'apoiador__nome']
+
+    def vence_no_mes(self, competencia):
+        """True se a contribuição tem parcela no mês de `competencia` (primeiro dia do mês)."""
+        inicio = self.data_inicio.replace(day=1)
+        meses = (competencia.year - inicio.year) * 12 + (competencia.month - inicio.month)
+        return meses >= 0 and meses % self.MESES_POR_PERIODO[self.periodicidade] == 0
+
+    def __str__(self):
+        return f'{self.apoiador.nome} — R$ {self.valor} ({self.get_periodicidade_display().lower()})'
+
+
 class Doacao(models.Model):
     STATUS_CHOICES = [
         ('confirmada', 'Confirmada'),
         ('pendente', 'Pendente'),
         ('cancelada', 'Cancelada'),
     ]
+    ORIGEM_CHOICES = [
+        ('painel', 'Painel'),
+        ('portal', 'Portal público'),
+        ('contribuicao', 'Contribuição periódica'),
+    ]
+    FORMA_PAGAMENTO_CHOICES = [
+        ('pix', 'PIX'),
+        ('dinheiro', 'Dinheiro'),
+        ('transferencia', 'Transferência bancária'),
+        ('boleto', 'Boleto'),
+        ('cartao', 'Cartão'),
+        ('outro', 'Outro'),
+    ]
+    TIPO_CHOICES = [
+        ('financeira', 'Financeira'),
+        ('bens', 'Bens / em espécie'),
+    ]
 
+    # Vazio = doação anônima.
     apoiador = models.ForeignKey(
-        Apoiador, on_delete=models.PROTECT, related_name='doacoes'
+        Apoiador, on_delete=models.PROTECT, null=True, blank=True, related_name='doacoes'
     )
     campanha = models.ForeignKey(
-        Campanha, on_delete=models.SET_NULL, null=True, blank=True, related_name='doacoes'
+        Campanha, on_delete=models.PROTECT, null=True, blank=True, related_name='doacoes'
     )
+    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, default='financeira')
+    # Doações em bens gravam valor 0: não entram em nenhum total financeiro.
     valor = models.DecimalField(max_digits=10, decimal_places=2)
+    descricao_bens = models.TextField(blank=True, default='')
+    valor_estimado = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     data = models.DateField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='confirmada')
+    origem = models.CharField(max_length=12, choices=ORIGEM_CHOICES, default='painel')
+    forma_pagamento = models.CharField(max_length=15, choices=FORMA_PAGAMENTO_CHOICES, blank=True, default='pix')
+    observacao = models.TextField(blank=True, default='')
+    comprovante = models.FileField(
+        upload_to=caminho_comprovante_doacao, storage=armazenamento_privado, blank=True, default=''
+    )
+    comprovante_nome = models.CharField(max_length=255, blank=True, default='')
+    consentimento_em = models.DateTimeField(null=True, blank=True)
+    # Preenchidos quando a doação foi gerada por uma contribuição periódica (uma por mês de competência).
+    contribuicao = models.ForeignKey(
+        Contribuicao, on_delete=models.SET_NULL, null=True, blank=True, related_name='doacoes'
+    )
+    competencia = models.DateField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'Doação'
         verbose_name_plural = 'Doações'
         ordering = ['-data']
+        constraints = [
+            models.UniqueConstraint(fields=['contribuicao', 'competencia'], name='doacao_unica_por_competencia'),
+        ]
 
-    def save(self, *args, **kwargs):
-        # Atualiza valor_arrecadado da campanha ao confirmar/cancelar doação
-        is_new = self.pk is None
-        old_status = None
-        old_valor = None
-
-        if not is_new:
-            old = Doacao.objects.get(pk=self.pk)
-            old_status = old.status
-            old_valor = old.valor
-
-        super().save(*args, **kwargs)
-
-        if self.campanha:
-            self._atualizar_campanha(is_new, old_status, old_valor)
-
-    def _atualizar_campanha(self, is_new, old_status, old_valor):
-        campanha = self.campanha
-        if is_new:
-            if self.status == 'confirmada':
-                campanha.valor_arrecadado += self.valor
-        else:
-            # Remove contribuição antiga se era confirmada
-            if old_status == 'confirmada':
-                campanha.valor_arrecadado -= old_valor
-            # Adiciona nova contribuição se agora é confirmada
-            if self.status == 'confirmada':
-                campanha.valor_arrecadado += self.valor
-        campanha.save()
+    @property
+    def nome_doador(self):
+        return self.apoiador.nome if self.apoiador_id else 'Anônimo'
 
     def __str__(self):
-        return f'R$ {self.valor} — {self.apoiador.nome} em {self.data}'
+        if self.tipo == 'bens':
+            return f'Bens — {self.nome_doador} em {self.data}'
+        return f'R$ {self.valor} — {self.nome_doador} em {self.data}'
+
+
+class Recibo(models.Model):
+    """Recibo emitido para uma doação confirmada. O número é o id: sequencial e nunca reutilizado."""
+
+    doacao = models.OneToOneField(Doacao, on_delete=models.PROTECT, related_name='recibo')
+    emitido_em = models.DateTimeField(auto_now_add=True)
+    emitido_por = models.ForeignKey(
+        get_user_model(), on_delete=models.SET_NULL, null=True, blank=True, related_name='recibos_emitidos'
+    )
+    enviado_para = models.EmailField(blank=True, default='')
+    enviado_em = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Recibo'
+        verbose_name_plural = 'Recibos'
+        ordering = ['-id']
+
+    @property
+    def numero(self):
+        return self.pk
+
+    @property
+    def numero_formatado(self):
+        return f'{self.emitido_em:%Y}/{self.pk:06d}'
+
+    def __str__(self):
+        return f'Recibo nº {self.numero_formatado}'
 
 
 class Despesa(models.Model):
@@ -145,10 +319,11 @@ class Despesa(models.Model):
         ('captacao', 'Captação de Recursos'),
         ('outros', 'Outros'),
     ]
+    # "Atrasado" não é gravado: é a pendente com vencimento anterior a hoje (status_efetivo).
     STATUS_CHOICES = [
         ('pendente', 'Pendente'),
         ('pago', 'Pago'),
-        ('atrasado', 'Atrasado'),
+        ('cancelado', 'Cancelado'),
     ]
     RECORRENCIA_CHOICES = [
         ('mensal', 'Mensal'),
@@ -157,6 +332,11 @@ class Despesa(models.Model):
     ]
 
     descricao = models.CharField(max_length=200)
+    # Texto exibido no portal; vazio → o portal mostra só a categoria.
+    descricao_publica = models.CharField(max_length=200, blank=True, default='')
+    campanha = models.ForeignKey(
+        'Campanha', on_delete=models.PROTECT, null=True, blank=True, related_name='despesas'
+    )
     valor = models.DecimalField(max_digits=12, decimal_places=2)
     data_vencimento = models.DateField()
     data_pagamento = models.DateField(null=True, blank=True)
@@ -166,52 +346,79 @@ class Despesa(models.Model):
     recurrence_period = models.CharField(
         max_length=10, choices=RECORRENCIA_CHOICES, null=True, blank=True
     )
+    # Série de despesas fixas: cada ocorrência é calculada a partir da data-âncora (não da anterior).
+    serie_id = models.UUIDField(null=True, blank=True, db_index=True)
+    data_ancora = models.DateField(null=True, blank=True)
+    numero_ocorrencia = models.PositiveIntegerField(default=0)
+    recorrencia_fim = models.DateField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'Despesa'
         verbose_name_plural = 'Despesas'
         ordering = ['-data_vencimento']
+        constraints = [
+            # Despesas avulsas têm serie_id nulo; NULL não conflita em restrição única.
+            models.UniqueConstraint(fields=['serie_id', 'numero_ocorrencia'], name='ocorrencia_unica_por_serie'),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.is_fixed and self.recurrence_period and self.serie_id is None:
+            self.serie_id = uuid.uuid4()
+            self.data_ancora = self.data_vencimento
+            self.numero_ocorrencia = 0
+        super().save(*args, **kwargs)
 
     def status_efetivo(self):
         """Retorna 'atrasado' se pendente e vencida, independente do campo salvo."""
-        from datetime import date
-        if self.status == 'pendente' and self.data_vencimento < date.today():
+        if self.status == 'pendente' and self.data_vencimento < timezone.localdate():
             return 'atrasado'
         return self.status
 
-    def _proxima_data_vencimento(self):
-        from dateutil.relativedelta import relativedelta
-        if self.recurrence_period == 'mensal':
-            return self.data_vencimento + relativedelta(months=1)
-        if self.recurrence_period == 'semanal':
-            from datetime import timedelta
-            return self.data_vencimento + timedelta(weeks=1)
-        if self.recurrence_period == 'anual':
-            return self.data_vencimento + relativedelta(years=1)
-        return None
+    PASSOS_RECORRENCIA = {'mensal': 'months', 'semanal': 'weeks', 'anual': 'years'}
+
+    def data_da_ocorrencia(self, numero):
+        """Vencimento da n-ésima ocorrência: âncora + n períodos (31/01 → 28/02 → 31/03)."""
+        passo = self.PASSOS_RECORRENCIA.get(self.recurrence_period)
+        if passo is None or self.data_ancora is None:
+            return None
+        return self.data_ancora + relativedelta(**{passo: numero})
 
     def gerar_proxima_recorrencia(self):
-        """Cria a próxima despesa recorrente se ainda não existir."""
-        if not self.is_fixed or not self.recurrence_period:
-            return
-        proxima = self._proxima_data_vencimento()
-        if proxima is None:
-            return
-        ja_existe = Despesa.objects.filter(
+        """Cria a próxima ocorrência da série (só se ainda não existir e não passar do fim). Devolve a criada ou None."""
+        if not self.is_fixed or not self.recurrence_period or self.serie_id is None:
+            return None
+        numero = self.numero_ocorrencia + 1
+        vencimento = self.data_da_ocorrencia(numero)
+        if vencimento is None or (self.recorrencia_fim and vencimento > self.recorrencia_fim):
+            return None
+        if Despesa.objects.filter(serie_id=self.serie_id, numero_ocorrencia=numero).exists():
+            return None
+        return Despesa.objects.create(
             descricao=self.descricao,
+            valor=self.valor,
+            categoria=self.categoria,
+            data_vencimento=vencimento,
+            status='pendente',
             is_fixed=True,
-            data_vencimento=proxima,
-        ).exists()
-        if not ja_existe:
-            Despesa.objects.create(
-                descricao=self.descricao,
-                valor=self.valor,
-                categoria=self.categoria,
-                data_vencimento=proxima,
-                status='pendente',
-                is_fixed=True,
-                recurrence_period=self.recurrence_period,
-            )
+            recurrence_period=self.recurrence_period,
+            serie_id=self.serie_id,
+            data_ancora=self.data_ancora,
+            numero_ocorrencia=numero,
+            recorrencia_fim=self.recorrencia_fim,
+        )
+
+    def encerrar_serie(self, fim):
+        """Define o fim da série e apaga as ocorrências pendentes que vencem depois dele. Devolve quantas apagou."""
+        serie = Despesa.objects.filter(serie_id=self.serie_id)
+        serie.update(recorrencia_fim=fim)
+        apagadas, _ = serie.filter(status='pendente', data_vencimento__gt=fim).delete()
+        return apagadas
+
+    def aplicar_valor_as_proximas(self):
+        """Copia o valor desta ocorrência para as ocorrências pendentes seguintes da série."""
+        return Despesa.objects.filter(
+            serie_id=self.serie_id, numero_ocorrencia__gt=self.numero_ocorrencia, status='pendente',
+        ).update(valor=self.valor)
 
     def __str__(self):
         return f'{self.descricao} — R$ {self.valor}'
@@ -221,9 +428,11 @@ class DespesaAnexo(models.Model):
     despesa = models.ForeignKey(
         Despesa, on_delete=models.CASCADE, related_name='anexos'
     )
-    arquivo = models.FileField(upload_to='despesas/anexos/')
+    arquivo = models.FileField(upload_to=caminho_anexo, storage=armazenamento_privado)
     nome_original = models.CharField(max_length=255, blank=True)
     enviado_em = models.DateTimeField(auto_now_add=True)
+    # Marcado pelo administrador: o comprovante pode ser baixado no portal de transparência.
+    publico = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = 'Anexo de Despesa'
@@ -238,6 +447,125 @@ class DespesaAnexo(models.Model):
 
     def __str__(self):
         return f'Anexo de {self.despesa}'
+
+
+class Voluntario(models.Model):
+    STATUS_CHOICES = [('ativo', 'Ativo'), ('inativo', 'Inativo')]
+
+    # Opcional: o voluntário pode também ser membro (doador) da organização.
+    apoiador = models.ForeignKey(
+        Apoiador, on_delete=models.SET_NULL, null=True, blank=True, related_name='voluntarios'
+    )
+    nome = models.CharField(max_length=150)
+    email = models.EmailField(blank=True, default='')
+    telefone = models.CharField(max_length=20, blank=True, default='')
+    areas_interesse = models.CharField(max_length=255, blank=True, default='')
+    disponibilidade = models.CharField(max_length=255, blank=True, default='')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='ativo')
+    criado_em = models.DateField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Voluntário'
+        verbose_name_plural = 'Voluntários'
+        ordering = ['nome']
+
+    def __str__(self):
+        return self.nome
+
+
+class Atividade(models.Model):
+    titulo = models.CharField(max_length=200)
+    data = models.DateField()
+    local = models.CharField(max_length=200, blank=True, default='')
+    descricao = models.TextField(blank=True, default='')
+    vagas = models.PositiveIntegerField(default=10)
+    voluntarios = models.ManyToManyField(Voluntario, through='InscricaoAtividade', related_name='atividades')
+
+    class Meta:
+        verbose_name = 'Atividade'
+        verbose_name_plural = 'Atividades'
+        ordering = ['-data', '-id']
+
+    def __str__(self):
+        return f'{self.titulo} ({self.data:%d/%m/%Y})'
+
+
+class InscricaoAtividade(models.Model):
+    atividade = models.ForeignKey(Atividade, on_delete=models.CASCADE, related_name='inscricoes')
+    voluntario = models.ForeignKey(Voluntario, on_delete=models.PROTECT, related_name='inscricoes')
+    # Horas efetivamente trabalhadas, registradas depois da atividade.
+    horas = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    inscrito_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Inscrição em atividade'
+        verbose_name_plural = 'Inscrições em atividades'
+        ordering = ['voluntario__nome']
+        constraints = [
+            models.UniqueConstraint(fields=['atividade', 'voluntario'], name='inscricao_unica_por_atividade'),
+        ]
+
+    def __str__(self):
+        return f'{self.voluntario} em {self.atividade}'
+
+
+class LogAlteracao(models.Model):
+    """Registro de auditoria: quem alterou qual campo de qual registro."""
+
+    ACAO_CHOICES = [
+        ('criacao', 'Criação'),
+        ('edicao', 'Edição'),
+        ('exclusao', 'Exclusão'),
+    ]
+
+    usuario = models.ForeignKey(
+        get_user_model(), on_delete=models.SET_NULL, null=True, blank=True, related_name='alteracoes'
+    )
+    acao = models.CharField(max_length=10, choices=ACAO_CHOICES, default='edicao')
+    data = models.DateTimeField(auto_now_add=True)
+    modelo = models.CharField(max_length=50)
+    objeto_id = models.PositiveIntegerField(null=True, blank=True)
+    campo = models.CharField(max_length=50)
+    antes = models.TextField(blank=True, default='')
+    depois = models.TextField(blank=True, default='')
+
+    class Meta:
+        verbose_name = 'Log de alteração'
+        verbose_name_plural = 'Logs de alteração'
+        ordering = ['-data']
+
+    def __str__(self):
+        return f'{self.modelo}#{self.objeto_id} {self.campo} ({self.data:%d/%m/%Y %H:%M})'
+
+
+class ConfiguracaoInstituicao(models.Model):
+    """Registro único com os dados públicos e as configurações da instituição."""
+
+    portal_ativo = models.BooleanField(default=True)
+    nome = models.CharField(max_length=150, blank=True, default='')
+    cnpj = models.CharField(max_length=14, blank=True, default='')  # só dígitos
+    descricao = models.CharField(max_length=300, blank=True, default='')
+    logo = models.FileField(upload_to='instituicao/', blank=True, default='')
+    email = models.EmailField(blank=True, default='')
+    telefone = models.CharField(max_length=20, blank=True, default='')
+    endereco = models.CharField(max_length=255, blank=True, default='')
+    site = models.URLField(blank=True, default='')
+    instagram = models.URLField(blank=True, default='')
+    facebook = models.URLField(blank=True, default='')
+    linkedin = models.URLField(blank=True, default='')
+    youtube = models.URLField(blank=True, default='')
+
+    class Meta:
+        verbose_name = 'Configuração da instituição'
+        verbose_name_plural = 'Configuração da instituição'
+
+    @classmethod
+    def obter(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return 'Configuração da instituição'
 
 
 class ConfiguracaoPix(models.Model):
@@ -263,13 +591,16 @@ class ConfiguracaoPix(models.Model):
 class Comunicado(models.Model):
     PUBLICO_CHOICES = [
         ('publico', 'Público'),
-        ('apoiadores', 'Somente Apoiadores'),
+        ('apoiadores', 'Somente Membros'),
     ]
 
     titulo = models.CharField(max_length=200)
     conteudo = models.TextField()
     data_publicacao = models.DateTimeField(auto_now_add=True)
     publico_alvo = models.CharField(max_length=12, choices=PUBLICO_CHOICES, default='publico')
+    # Envio por e-mail aos membros ativos (só "Somente Membros"): quantos e quando.
+    emails_enviados = models.PositiveIntegerField(default=0)
+    enviado_em = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'Comunicado'

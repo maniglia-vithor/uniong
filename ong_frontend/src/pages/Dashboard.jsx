@@ -2,15 +2,17 @@ import { useEffect, useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
-import { DollarSign, CalendarDays, Users, Megaphone } from 'lucide-react'
+import { DollarSign, CalendarDays, Users, Megaphone, Scale, HandHeart, Clock } from 'lucide-react'
+import GraficoFluxo from '../components/GraficoFluxo'
 import KpiCard from '../components/KpiCard'
 import KpiDetailPanel from '../components/KpiDetailPanel'
 import BarraProgresso from '../components/BarraProgresso'
 import BadgeStatus from '../components/BadgeStatus'
 import {
   getDashboardResumo, getGraficoMensal, getDoacoesRecentes,
-  getTopApoiadores, getCampanhasAtivas,
+  getTopApoiadores, getCampanhasAtivas, getFluxoMensal,
 } from '../services/api'
+import GraficoAcessivel from '../components/GraficoAcessivel'
 
 function formatBRL(value) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value ?? 0)
@@ -58,6 +60,7 @@ export default function Dashboard() {
   const [doacoes, setDoacoes] = useState([])
   const [topApoiadores, setTopApoiadores] = useState([])
   const [campanhas, setCampanhas] = useState([])
+  const [fluxo, setFluxo] = useState([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
   const [painelKpi, setPainelKpi] = useState(null)
@@ -69,8 +72,10 @@ export default function Dashboard() {
       getDoacoesRecentes(),
       getTopApoiadores(),
       getCampanhasAtivas(),
+      getFluxoMensal(),
     ])
-      .then(([r, g, d, t, c]) => {
+      .then(([r, g, d, t, c, f]) => {
+        setFluxo(f.data)
         setResumo(r.data)
         setGrafico(g.data)
         setDoacoes(d.data)
@@ -104,6 +109,10 @@ export default function Dashboard() {
       valor: formatBRL(resumo.total_arrecadado.value),
       trend_percentage: resumo.total_arrecadado.trend_percentage,
       trend_direction: resumo.total_arrecadado.trend_direction,
+      rotuloTendencia: `+${formatBRL(resumo.total_arrecadado.acrescimo_mes ?? 0)} neste mês` +
+        (resumo.total_arrecadado.trend_percentage !== null
+          ? ` (+${resumo.total_arrecadado.trend_percentage.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% sobre o mês anterior)`
+          : ''),
       icone: DollarSign,
       cor: '#0f4c5c',
     },
@@ -143,9 +152,44 @@ export default function Dashboard() {
         {kpis.map((kpi) => (
           <KpiCard key={kpi.titulo} {...kpi} onClick={() => setPainelKpi(kpi.id)} />
         ))}
+        <KpiCard
+          titulo="Saldo do Mês"
+          valor={formatBRL(resumo.saldo_mes.value)}
+          trend_percentage={null}
+          trend_direction={resumo.saldo_mes.value >= 0 ? 'positive' : 'negative'}
+          rotuloTendencia={`Receitas ${formatBRL(resumo.saldo_mes.receitas_mes)} − despesas pagas ${formatBRL(resumo.saldo_mes.despesas_mes)}`}
+          icone={Scale}
+          cor="#16a34a"
+        />
+        {resumo.voluntarios_ativos && (
+          <>
+            <KpiCard
+              titulo="Voluntários Ativos"
+              valor={resumo.voluntarios_ativos.value}
+              trend_percentage={null}
+              rotuloTendencia="Cadastros com situação Ativo"
+              icone={HandHeart}
+              cor="#db2777"
+            />
+            <KpiCard
+              titulo="Horas de Voluntariado no Mês"
+              valor={`${Number(resumo.horas_voluntariado_mes.value).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} h`}
+              trend_percentage={null}
+              rotuloTendencia="Horas registradas nas atividades do mês"
+              icone={Clock}
+              cor="#0891b2"
+            />
+          </>
+        )}
       </div>
 
-      <KpiDetailPanel kpi={painelKpi} onClose={() => setPainelKpi(null)} />
+      <GraficoFluxo
+        dados={fluxo}
+        titulo="Receitas × despesas (últimos 12 meses)"
+        descricao="Doações confirmadas e despesas pagas por mês; a linha mostra o saldo acumulado desde o início."
+      />
+
+      {painelKpi && <KpiDetailPanel kpi={painelKpi} onClose={() => setPainelKpi(null)} />}
 
       {/* Campanhas + Gráfico */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -159,7 +203,7 @@ export default function Dashboard() {
                   <span className="text-sm font-medium text-[var(--text-primary)] truncate max-w-[60%]">{c.titulo}</span>
                   <span
                     className="text-sm font-bold"
-                    style={{ color: i % 2 === 0 ? '#0f4c5c' : '#f97316' }}
+                    style={{ color: i % 2 === 0 ? 'var(--marca-texto)' : 'var(--destaque-texto)' }}
                   >
                     {c.percentual_progresso}%
                   </span>
@@ -179,7 +223,12 @@ export default function Dashboard() {
 
         {/* Gráfico mensal */}
         <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border)] p-5">
-          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Arrecadação Mensal (últimos 12 meses)</h2>
+          <GraficoAcessivel
+            titulo="Arrecadação Mensal (últimos 12 meses)"
+            descricao="Total de doações confirmadas em cada mês. Clique em uma barra para ver as doações do mês."
+            colunas={[{ chave: 'mes', rotulo: 'Mês' }, { chave: 'total', rotulo: 'Arrecadado', formato: (v) => formatBRL(v) }]}
+            linhas={grafico}
+          >
           <ResponsiveContainer width="100%" height={220} style={{ outline: 'none' }}>
             <BarChart
               data={grafico}
@@ -188,13 +237,13 @@ export default function Dashboard() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
               <XAxis
                 dataKey="mes"
-                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
                 axisLine={false}
                 tickLine={false}
                 interval={0}
               />
               <YAxis
-                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`}
@@ -217,6 +266,7 @@ export default function Dashboard() {
               />
             </BarChart>
           </ResponsiveContainer>
+          </GraficoAcessivel>
         </div>
       </div>
 
@@ -281,7 +331,7 @@ export default function Dashboard() {
                 </div>
                 <span
                   className="text-xs font-bold px-2 py-0.5 rounded-full"
-                  style={{ backgroundColor: '#f97316' + '20', color: '#f97316' }}
+                  style={{ backgroundColor: '#f97316' + '20', color: 'var(--destaque-texto)' }}
                 >
                   #{i + 1}
                 </span>

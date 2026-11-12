@@ -1,279 +1,198 @@
-# UniONG — Portal Unificado para Pequenas ONGs
+# UniONG: gestão para ONGs de pequeno porte
+
+[![CI](https://github.com/maniglia-vithor/uniong/actions/workflows/ci.yml/badge.svg)](https://github.com/maniglia-vithor/uniong/actions/workflows/ci.yml)
+
+O UniONG é uma aplicação web de gestão para Organizações Não Governamentais de pequeno porte. Foi desenvolvido como Trabalho de Conclusão de Curso na Fatec São Bernardo do Campo “Adib Moisés Dib”.
+
+O sistema reúne, num painel administrativo:
+- membros;
+- campanhas;
+- doações;
+- despesas;
+- comunicados;
+- voluntários.
+
+Também oferece um portal público de transparência, com prestação de contas, doação via PIX e páginas de campanha para compartilhar.
 
 ---
 
-## Sobre o Projeto
+## Funcionalidades
 
-O UniONG é um sistema de gestão administrativa desenvolvido para pequenas Organizações Não Governamentais (ONGs). O objetivo é centralizar e facilitar as operações do dia a dia, oferecendo transparência financeira e controle eficiente dos recursos.
+**Painel administrativo** (só para a equipe: usuários `is_staff` ativos)
+- **Painel**: indicadores do mês com tendência, saldo, receitas × despesas dos últimos 12 meses, voluntários ativos e horas de voluntariado.
+- **Campanhas**: meta, valor arrecadado calculado a partir das doações confirmadas, gasto e saldo por campanha, imagem pública, encerramento. Campanhas com doações não podem ser excluídas.
+- **Doações**:
+  - confirmação em lote;
+  - doações anônimas;
+  - forma de pagamento, observação e comprovante privado;
+  - doações em bens, fora dos totais financeiros;
+  - contribuições periódicas (mensalidades);
+  - recibo com número sequencial e valor por extenso, para imprimir ou enviar por e-mail.
+- **Membros**:
+  - cadastro com CPF/CNPJ validado;
+  - contribuições;
+  - preferência de comunicados;
+  - exportação dos dados do titular e anonimização (LGPD).
+- **Custos**:
+  - despesas por categoria e vinculadas a campanhas;
+  - despesas recorrentes em série;
+  - anexos privados;
+  - comprovantes que podem ser publicados no portal.
+- **Comunicação**: comunicados públicos (no portal) ou só para membros, com envio por e-mail e link de descadastro.
+- **Voluntários**: cadastro, atividades com limite de vagas, inscrições e registro de horas.
+- **Relatórios**: CSV (separador `;`, padrão do Excel em português) de doações, campanhas, membros e despesas. Prestação de contas por período em página imprimível.
+- **Equipe**: convite por e-mail, papéis de administrador geral e operador, desativação de acesso.
+- **Histórico**: trilha de auditoria de criação, edição e exclusão, com valores antes e depois.
+- **Configurações**: tema claro/escuro, perfil e senha, dados da instituição (nome, CNPJ, logo, contatos), chave PIX e ligar/desligar o portal.
 
-### Funcionalidades principais
+**Portal público** (`/transparencia`)
+- totais, campanhas em andamento, gastos do mês e prestação de contas anual;
+- doação com QR Code PIX "copia e cola" gerado no navegador;
+- página e link de compartilhamento por campanha (`/c/<id>/`), com prévia nas redes sociais;
+- nenhum dado pessoal de doadores é exibido.
 
-- **Painel Principal (Dashboard)** — KPIs em tempo real com tendências mensais, gráfico de arrecadação dos últimos 12 meses e rankings de apoiadores
-- **Campanhas** — Cadastro e acompanhamento de campanhas de arrecadação com barra de progresso
-- **Doações** — Registro completo de doações com vínculo a apoiadores e campanhas
-- **Apoiadores** — Gestão do cadastro de apoiadores e histórico de contribuições
-- **Comunicação** — Comunicados internos e externos com controle de público-alvo
-- **Custos** — Gestão de despesas por categoria com gráfico de distribuição e alertas de inadimplência
-- **Relatórios** — Exportação de dados em CSV para Doações, Campanhas e Apoiadores
-- **Portal de Transparência** — Página pública com dados anonimizados da organização
-- **Login com Google** — Autenticação via conta Google OAuth 2.0
+**Segurança e qualidade**
+- JWT com renovação, rotação e revogação no logout;
+- login com Google só para usuários já cadastrados;
+- limite de tentativas por IP;
+- recuperação de senha por e-mail;
+- validação dos arquivos enviados;
+- configurações de produção obrigatórias;
+- interface com WCAG AA nos dois temas: nota 100 de acessibilidade no Lighthouse nas telas principais.
 
-### Stack 
+## Arquitetura
 
-| Camada | Tecnologia |
+```
+Navegador ──► nginx (container "web")
+                ├── /            React (build do Vite)
+                ├── /api/  /c/  /admin-django/  ──► Django + DRF (gunicorn) ──► MySQL
+                └── /static/     arquivos do collectstatic
+```
+
+| Camada | Tecnologias |
 |---|---|
-| Backend | Python 3 + Django 5 + Django REST Framework |
-| Banco de dados | MySQL |
-| Frontend | React 18 + Vite + Tailwind CSS |
-| Gráficos | Recharts |
-| Autenticação | JWT (SimpleJWT) + Google OAuth 2.0 |
+| Backend | Python 3.12, Django 5.2, Django REST Framework, SimpleJWT, python-decouple |
+| Banco | MySQL 8 (SQLite nos testes automatizados) |
+| Frontend | React 19, Vite, React Router 7, Tailwind CSS 4, axios, Recharts, qrcode.react |
+| Testes | `django.test` (backend), Vitest + Testing Library (frontend), oxlint |
+| Implantação | Docker, docker-compose, nginx, gunicorn, GitHub Actions |
 
----
+Organização do código:
 
-## Pré-requisitos
+```
+core/                  app Django único: modelos, API, regras de negócio
+  indicadores.py       cálculos do painel, do portal e da prestação de contas
+  relatorios.py        CSV e prestação de contas
+  equipe.py, recibos.py, comunicados.py, voluntarios.py, lgpd.py ...
+  management/commands/ backup, gerar_contribuicoes, enviar_comunicado, popular_dados
+  tests/               testes automatizados do backend
+ong_backend/           settings.py (produção/desenvolvimento) e settings_test.py (CI)
+ong_frontend/src/
+  pages/  components/  hooks/  services/api.js  utils/
+docs/                  progresso por fase, verificação e guia de implantação
+```
 
-Antes de começar, certifique-se de ter instalado em sua máquina:
+Na interface, “Membro” é o termo usado para quem a API chama de `Apoiador` (`/api/apoiadores/`).
 
-| Ferramenta | Versão recomendada | Download |
-|---|---|---|
-| **Python** | 3.11 ou superior | https://www.python.org/downloads/ |
-| **Node.js** | 18 ou superior (inclui npm) | https://nodejs.org/ |
-| **MySQL Server** | 8.0 ou superior | https://dev.mysql.com/downloads/mysql/ |
-| **Git** | qualquer versão recente | https://git-scm.com/downloads |
+## Como rodar localmente
 
-> **Dica:** Para verificar se já estão instalados, abra o terminal e execute:
-> ```
-> python --version
-> node --version
-> npm --version
-> mysql --version
-> git --version
-> ```
-
----
-
-## Passo a Passo
-
-### 1. Clonando o Repositório
-
-Abra o terminal (PowerShell), navegue até a pasta onde deseja salvar o projeto e execute:
+Pré-requisitos: Python 3.12 ou superior, Node.js 22 ou superior e MySQL 8.
 
 ```bash
 git clone https://github.com/maniglia-vithor/uniong.git
 cd uniong
-```
 
----
+# Banco
+mysql -u root -p -e "CREATE DATABASE ong_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
-### 2. Configuração do Banco de Dados
-
-#### Via MySQL Workbench
-
-1. Abra o **MySQL Workbench**
-2. Conecte-se ao seu servidor local
-3. No painel de consultas (Query), execute:
-
-```sql
-CREATE DATABASE ong_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-4. Clique no botão **Execute** ou pressione `Ctrl+Enter`
-
-#### Via linha de comando (CLI)
-
-```bash
-mysql -u root -p
-```
-
-Após digitar sua senha, execute:
-
-```sql
-CREATE DATABASE ong_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-EXIT;
-```
-
----
-
-### 3. Configuração do Backend (Django)
-
-#### 3.1 Criar e ativar o ambiente virtual Python
-
-O ambiente virtual isola as dependências do projeto para não conflitar com outros projetos Python na sua máquina.
-
-**Windows (PowerShell):**
-```powershell
+# Backend
 python -m venv venv
-.\venv\Scripts\Activate.ps1
-```
-
-> Se aparecer um erro de política de execução no PowerShell, execute primeiro:
-> ```powershell
-> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-> ```
-> Depois tente ativar novamente.
-
-Após ativar, o início do terminal deve exibir `(venv)` indicando que o ambiente está ativo.
-
-#### 3.2 Instalar as dependências Python
-
-Com o ambiente virtual ativo, instale todas as bibliotecas necessárias:
-
-```bash
+venv\Scripts\activate            # Windows (PowerShell). No Linux/macOS: source venv/bin/activate
 pip install -r requirements.txt
-```
-
-#### 3.3 Configurar as variáveis de ambiente
-
-Duplique o arquivo de exemplo e renomeie-o:
-
-**Windows (PowerShell):**
-```powershell
-Copy-Item .env.example .env
-```
-
-Abra o arquivo `.env` em qualquer editor de texto e preencha os campos:
-
-```env
-# Chave secreta do Django — gere uma em: https://djecrety.ir/
-SECRET_KEY=coloque-uma-chave-secreta-longa-e-aleatoria-aqui
-
-# Deixe True em desenvolvimento, False em produção
-DEBUG=True
-
-ALLOWED_HOSTS=localhost,127.0.0.1
-
-# Credenciais do seu MySQL local
-DB_NAME=ong_db
-DB_USER=root
-DB_PASSWORD=sua-senha-do-mysql-aqui
-DB_HOST=localhost
-DB_PORT=3306
-
-CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
-
-# Google OAuth (opcional para desenvolvimento inicial)
-# Obtenha em: https://console.cloud.google.com/
-GOOGLE_CLIENT_ID=SEU_CLIENT_ID_AQUI.apps.googleusercontent.com
-```
-
-> **Importante:** O arquivo `.env` **nunca** deve ser enviado ao repositório. Ele já está listado no `.gitignore`.
-
-#### 3.4 Aplicar a estrutura do banco de dados
-
-Este comando cria todas as tabelas necessárias no MySQL automaticamente:
-
-```bash
+copy .env.example .env           # Linux/macOS: cp .env.example .env. Depois preencha DB_PASSWORD e confira DEBUG=True
 python manage.py migrate
-```
-
-A saída esperada é uma lista de operações com `OK` ao lado de cada uma.
-
-#### 3.5 Criar o usuário administrador
-
-Para acessar o painel, você precisa de um usuário. Execute:
-
-```bash
 python manage.py createsuperuser
-```
+python manage.py runserver       # http://localhost:8000
 
-O sistema pedirá:
-- **Username:** escolha um nome de usuário (ex: `admin`)
-- **Email:** seu e-mail (pode deixar em branco)
-- **Password:** uma senha (mínimo 8 caracteres)
-
-#### 3.6 Iniciar o servidor backend
-
-```bash
-python manage.py runserver
-```
-
-O backend estará disponível em: **http://localhost:8000**
-
-Você pode verificar a API em: http://localhost:8000/api/
-
-> Mantenha este terminal aberto enquanto usa o sistema.
-
----
-
-### 4. Configuração do Frontend (React)
-
-Abra um **novo terminal** (mantenha o backend rodando no terminal anterior).
-
-#### 4.1 Navegar para a pasta do frontend
-
-```bash
+# Frontend (outro terminal)
 cd ong_frontend
-```
-
-#### 4.2 Instalar as dependências Node.js
-
-```bash
 npm install
+npm run dev                      # http://localhost:5173
 ```
 
-Este comando pode demorar alguns minutos na primeira execução. Ele baixa todas as bibliotecas listadas no `package.json`.
+> No PowerShell, se a ativação do `venv` for bloqueada, rode uma vez:
+> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 
-#### 4.3 Configurar as variáveis de ambiente do frontend
+| Endereço | O que é |
+|---|---|
+| `http://localhost:5173/transparencia` | Portal público |
+| `http://localhost:5173/login` | Login do painel |
+| `http://localhost:5173/admin` | Painel administrativo |
+| `http://localhost:8000/api/health/` | Healthcheck |
+| `http://localhost:8000/admin-django/` | Admin do Django (suporte técnico) |
 
-**Windows (PowerShell):**
-```powershell
-Copy-Item .env.example .env
-```
+Em desenvolvimento, os e-mails do sistema (convites, recuperação de senha, recibos, comunicados) aparecem no terminal do `runserver`. Para o login com Google, defina `GOOGLE_CLIENT_ID` no `.env` e `VITE_GOOGLE_CLIENT_ID` em `ong_frontend/.env.local`.
 
-O arquivo `.env` do frontend contém o Client ID do Google OAuth. Para desenvolvimento inicial, pode ser deixado em branco — o login com Google simplesmente não funcionará, mas o login tradicional continuará funcionando.
+Dados de exemplo: `python manage.py popular_dados --confirmar`. O comando só roda com `DEBUG=True`, **apaga os dados existentes** e não deve ser usado num banco com dados reais.
 
-#### 4.4 Iniciar o servidor frontend
+## Testes
 
 ```bash
-npm run dev
+# Backend: no MySQL local (cria e apaga o banco test_ong_db)
+python manage.py test core
+
+# Backend: em SQLite, sem MySQL (é o que o CI usa)
+python manage.py test --settings=ong_backend.settings_test
+
+# Frontend
+cd ong_frontend
+npx oxlint
+npm test          # Vitest + Testing Library
+npm run build
 ```
 
-O frontend estará disponível em: **http://localhost:5173**
+O GitHub Actions (`.github/workflows/ci.yml`) roda tudo isso a cada push e pull request.
 
----
+## Implantação
 
-## Acessando o Sistema
+Resumo (o passo a passo completo está em [docs/implantacao.md](docs/implantacao.md)):
 
-Com os dois servidores rodando, acesse **http://localhost:5173** no navegador.
+```bash
+cp .env.example .env    # DEBUG=False, SECRET_KEY, ALLOWED_HOSTS, CORS/CSRF, FRONTEND_URL, DB_*, DB_ROOT_PASSWORD, EMAIL_*
+docker compose up -d --build
+docker compose exec backend python manage.py createsuperuser
+```
 
-| URL | Descrição |
+O guia cobre:
+- HTTPS com Caddy;
+- configuração do Google OAuth e do SMTP;
+- tarefas agendadas no cron: `gerar_contribuicoes` e `backup`;
+- backup e restauração;
+- monitoramento por `GET /api/health/`.
+
+## Variáveis de ambiente
+
+Todas estão documentadas em [.env.example](.env.example). Com `DEBUG=False`, o Django só inicia com as obrigatórias definidas.
+
+| Grupo | Variáveis |
 |---|---|
-| `http://localhost:5173` | Portal de Transparência (público) |
-| `http://localhost:5173/login` | Tela de login |
-| `http://localhost:5173/admin` | Painel Administrativo (requer login) |
-| `http://localhost:8000/api/` | API REST do backend |
-| `http://localhost:8000/admin/` | Admin nativo do Django |
+| Geral | `DEBUG`, `SECRET_KEY`*, `ALLOWED_HOSTS`*, `CORS_ALLOWED_ORIGINS`*, `CSRF_TRUSTED_ORIGINS`, `FRONTEND_URL` |
+| Banco | `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_ROOT_PASSWORD` (Docker) |
+| Login | `GOOGLE_CLIENT_ID`, `JWT_ACCESS_MINUTOS`, `THROTTLE_AUTH`, `THROTTLE_DOACAO_PUBLICA`, `NUM_PROXIES` |
+| E-mail | `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`, `DEFAULT_FROM_EMAIL`, `PASSWORD_RESET_TIMEOUT`, `COMUNICADOS_LOTE`, `COMUNICADOS_LIMITE_SINCRONO` |
+| Arquivos e backup | `PRIVATE_MEDIA_ROOT`, `STATIC_ROOT`, `BACKUP_DIR`, `BACKUP_MANTER` |
+| HTTPS | `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_HSTS_SECONDS`, `SECURE_HSTS_INCLUDE_SUBDOMAINS`, `SECURE_HSTS_PRELOAD`, `USAR_PROXY_HTTPS` |
+| Docker | `PORTA_HTTP` |
 
-Use o usuário criado no passo **3.5** para fazer o primeiro login.
+\* obrigatórias em produção.
 
----
+## Autores
 
-## Estrutura de Pastas
+Trabalho de Conclusão de Curso da Fatec São Bernardo do Campo “Adib Moisés Dib”: *Aplicação voltada à gestão de ONGs de pequeno porte*.
 
-```
-uniong/
-├── core/                   # App principal do Django
-│   ├── migrations/         # Histórico de migrações do banco
-│   ├── models.py           # Modelos (Apoiador, Campanha, Doação, Despesa...)
-│   ├── serializers.py      # Serializers do DRF
-│   ├── views.py            # ViewSets e endpoints da API
-│   └── urls.py             # Rotas da API
-├── ong_backend/            # Configurações globais do Django
-│   └── settings.py
-├── ong_frontend/           # Aplicação React
-│   ├── src/
-│   │   ├── components/     # Componentes reutilizáveis
-│   │   ├── pages/          # Páginas (Dashboard, Campanhas, Doações...)
-│   │   ├── services/       # Funções de chamada à API (api.js)
-│   │   └── context/        # Contexto de autenticação
-│   └── package.json
-├── venv/                   # Ambiente virtual Python (não commitar)
-├── manage.py               # CLI do Django
-├── requirements.txt        # Dependências Python
-├── .env.example            # Modelo de variáveis de ambiente
-└── .gitignore
-```
-→ Backend: `python manage.py runserver 8001` · Frontend: `npm run dev -- --port 5174`
+- Bruno Radiuk Goes
+- Emily Caroline Rodrigues Fonseca
+- Guilherme Silva Rodrigues Lima
+- João Vithor de Oliveira Maniglia
 
-**`Set-ExecutionPolicy` necessário no PowerShell**
-→ Execute o comando de política de execução indicado na seção 3.1 e tente novamente.
+Orientador: Prof. Ms. Claudemir Martins da Silva.

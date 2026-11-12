@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import useDialogo from '../hooks/useDialogo'
 import { X, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import {
   getKpiDoacoes,
@@ -84,6 +85,7 @@ function SortIcon({ dir }) {
 }
 
 export default function KpiDetailPanel({ kpi, onClose }) {
+  const { ref: dialogoRef, tituloId: dialogoTituloId } = useDialogo(onClose)
   const [dados, setDados] = useState([])
   const [carregando, setCarregando] = useState(true)
   const [sortCol, setSortCol] = useState(null)
@@ -102,11 +104,6 @@ export default function KpiDetailPanel({ kpi, onClose }) {
       .finally(() => setCarregando(false))
   }, [kpiKey])
 
-  useEffect(() => {
-    function onKey(e) { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -149,13 +146,20 @@ export default function KpiDetailPanel({ kpi, onClose }) {
       onClick={onClose}
     >
       <div
-        className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-5xl flex flex-col overflow-hidden max-h-[90vh]"
+        ref={dialogoRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={dialogoTituloId}
+        tabIndex={-1}
+        className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-5xl flex flex-col overflow-hidden max-h-[90vh] outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="sticky top-0 bg-[var(--bg-card)] z-10 border-b border-[var(--border)] flex items-center justify-between px-6 py-4 flex-shrink-0">
-          <h2 className="text-sm font-semibold text-[var(--text-primary)]">{cfg.titulo}</h2>
+          <h2 id={dialogoTituloId} className="text-sm font-semibold text-[var(--text-primary)]">{cfg.titulo}</h2>
           <button
+            type="button"
+            aria-label="Fechar"
             onClick={onClose}
             className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)]"
           >

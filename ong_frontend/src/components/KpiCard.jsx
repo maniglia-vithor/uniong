@@ -1,19 +1,26 @@
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 
-export default function KpiCard({ titulo, valor, trend_percentage, trend_direction, icone: Icone, cor, onClick }) {
+function rotuloPadrao(pct) {
+  if (pct === null || pct === undefined) return null
+  if (pct === 0) return '0% em relação ao mês anterior'
+  return `${pct > 0 ? '+' : ''}${pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% em relação ao mês anterior`
+}
+
+export default function KpiCard({ titulo, valor, trend_percentage, trend_direction, rotuloTendencia, icone: Icone, cor, onClick }) {
   const isPositive = trend_direction === 'positive'
   const isNegative = trend_direction === 'negative'
+  const semBase = trend_percentage === null || trend_percentage === undefined
 
-  const trendColor = isPositive ? 'text-emerald-500' : isNegative ? 'text-red-400' : 'text-[var(--text-muted)]'
+  const trendColor = isPositive ? 'text-emerald-700 dark:text-emerald-400' : isNegative ? 'text-red-700 dark:text-red-400' : 'text-[var(--text-muted)]'
   const TrendIcon = isPositive ? TrendingUp : isNegative ? TrendingDown : Minus
+  const legenda = rotuloTendencia ?? rotuloPadrao(trend_percentage) ?? '— sem base de comparação no mês anterior'
 
-  const pct = trend_percentage ?? 0
-  const pctLabel = pct === 0 ? '0%' : `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`
-
+  const Tag = onClick ? 'button' : 'div'
   return (
-    <div
+    <Tag
+      type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={`bg-[var(--bg-card)] rounded-xl p-5 shadow-sm border border-[var(--border)] transition-all duration-150 ${onClick ? 'cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-[1.00]' : ''}`}
+      className={`w-full text-left bg-[var(--bg-card)] rounded-xl p-5 shadow-sm border border-[var(--border)] transition-all duration-150 ${onClick ? 'cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-[1.00]' : ''}`}
     >
       <div className="flex items-start justify-between">
         <div>
@@ -23,14 +30,15 @@ export default function KpiCard({ titulo, valor, trend_percentage, trend_directi
         <div
           className="w-10 h-10 rounded-lg flex items-center justify-center"
           style={{ backgroundColor: `${cor}22` }}
+          aria-hidden="true"
         >
           <Icone size={20} style={{ color: cor }} />
         </div>
       </div>
-      <div className={`flex items-center gap-1 mt-3 text-xs font-medium ${trendColor}`}>
-        <TrendIcon size={13} />
-        <span>{pctLabel} em relação ao mês anterior</span>
+      <div className={`flex items-center gap-1 mt-3 text-xs font-medium ${semBase && !rotuloTendencia ? 'text-[var(--text-muted)]' : trendColor}`}>
+        <TrendIcon size={13} aria-hidden="true" />
+        <span>{legenda}</span>
       </div>
-    </div>
+    </Tag>
   )
 }

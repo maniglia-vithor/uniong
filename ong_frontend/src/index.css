@@ -12,7 +12,13 @@
   --bg-hover:     #f8fafc;
   --text-primary:   #1e293b;
   --text-secondary: #475569;
-  --text-muted:     #94a3b8;
+  --text-muted:     #5b6b7f; /* ≥ 4,9:1 sobre os fundos claros */
+  --marca-texto:    #0f4c5c; /* teal da marca como cor de texto */
+  --destaque-texto: #c2410c; /* laranja da marca escurecido para texto (≥ 4,7:1) */
+  --ciano-texto:    #0e7490;
+  --violeta-texto:  #7c3aed;
+  --verde-texto:    #15803d;
+  --vermelho-texto: #dc2626;
   --border:         #e2e8f0;
   --border-subtle:  #f1f5f9;
   --shadow:         0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
@@ -26,8 +32,14 @@
   --bg-input:     #1e293b;
   --bg-hover:     #263347;
   --text-primary:   #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted:     #64748b;
+  --text-secondary: #cbd5e1;
+  --text-muted:     #94a3b8; /* ≥ 5,7:1 sobre os cartões escuros */
+  --marca-texto:    #67c3d3;
+  --destaque-texto: #fb923c;
+  --ciano-texto:    #22d3ee;
+  --violeta-texto:  #a78bfa;
+  --verde-texto:    #4ade80;
+  --vermelho-texto: #f87171;
   --border:         #334155;
   --border-subtle:  #1e293b;
   --shadow:         0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
@@ -106,4 +118,10 @@
     color: #cbd5e1;
   }
   [data-theme="dark"] .react-datepicker__day:hover { background-color: #1e3a4a; color: #7dd3f0; }
+}
+
+/* Impressão (relatório de prestação de contas) */
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff !important; }
 }

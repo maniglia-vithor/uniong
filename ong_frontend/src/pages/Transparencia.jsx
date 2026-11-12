@@ -1,32 +1,34 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   HeartHandshake, DollarSign, Megaphone, Users, TrendingUp,
-  Receipt, ShieldOff, ArrowLeft, X, ExternalLink, Share2,
-  CheckCircle, Plus, Copy, Check,
+  Receipt, ShieldOff, ArrowLeft, X, ExternalLink,
+  CheckCircle, Plus, HandHeart,
 } from 'lucide-react'
-import { gerarPayloadPix } from '../utils/pix'
-import { FaWhatsapp, FaInstagram, FaFacebook, FaLinkedin, FaTiktok } from 'react-icons/fa'
-import { MdEmail } from 'react-icons/md'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
 import axios from 'axios'
 import BarraProgresso from '../components/BarraProgresso'
-import { useRole } from '../context/RoleContext'
-import logoUniONG from '../assets/Gemini_Generated_Image_g792fng792fng792.jpg'
+import QrCodePix from '../components/QrCodePix'
+import CompartilharCampanha from '../components/CompartilharCampanha'
+import ResumoCampanha from '../components/ResumoCampanha'
+import PrestacaoContas from '../components/PrestacaoContas'
+import ListaDespesasPublicas from '../components/ListaDespesasPublicas'
+import { corDeTexto, mensagemErro } from '../utils/formatos'
+import { useAuth } from '../context/AuthContext'
+import useInstituicao from '../hooks/useInstituicao'
+import useDialogo from '../hooks/useDialogo'
+import LogoInstituicao from '../components/LogoInstituicao'
+import RodapeInstituicao from '../components/RodapeInstituicao'
+import GraficoAcessivel from '../components/GraficoAcessivel'
 
-const BASE_URL = typeof window !== 'undefined' ? window.location.origin : ''
+// Data de referência fixada ao carregar a página (evita chamar Date durante a renderização).
+const HOJE = new Date()
 
 function formatBRL(v) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v ?? 0)
-}
-
-function formatData(iso) {
-  if (!iso) return '—'
-  const [y, m, d] = iso.split('-')
-  return `${d}/${m}/${y}`
 }
 
 const CORES_CAMPANHA = ['#0f4c5c', '#f97316', '#0891b2', '#7c3aed']
@@ -49,7 +51,7 @@ function KpiCard({ label, valor, desc, icone: Icon, cor, onClick }) {
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs text-[var(--text-muted)]">{desc}</p>
         {onClick && (
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0" style={{ backgroundColor: `${cor}18`, color: cor }}>
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0" style={{ backgroundColor: `${cor}18`, color: corDeTexto(cor) }}>
             Ver detalhes
           </span>
         )}
@@ -60,19 +62,17 @@ function KpiCard({ label, valor, desc, icone: Icon, cor, onClick }) {
 
 /* ─── Overlay Modal ─────────────────────────────────────────────────────── */
 function Overlay({ titulo, onFechar, children, largura = 'max-w-lg' }) {
-  useEffect(() => {
-    const fn = (e) => { if (e.key === 'Escape') onFechar() }
-    document.addEventListener('keydown', fn)
-    return () => document.removeEventListener('keydown', fn)
-  }, [onFechar])
+  const { ref, tituloId } = useDialogo(onFechar)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-      <div className={`bg-[var(--bg-card)] rounded-2xl shadow-2xl border border-[var(--border)] w-full ${largura} max-h-[90vh] flex flex-col`}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+      onClick={(e) => e.target === e.currentTarget && onFechar()}>
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={tituloId} tabIndex={-1}
+        className={`bg-[var(--bg-card)] rounded-2xl shadow-2xl border border-[var(--border)] w-full ${largura} max-h-[90vh] flex flex-col outline-none`}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] flex-shrink-0">
-          <h2 className="font-bold text-[var(--text-primary)] text-base">{titulo}</h2>
-          <button onClick={onFechar} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)]">
-            <X size={16} />
+          <h2 id={tituloId} className="font-bold text-[var(--text-primary)] text-base">{titulo}</h2>
+          <button type="button" onClick={onFechar} aria-label="Fechar" className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)]">
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
         <div className="overflow-y-auto flex-1 px-6 py-5">
@@ -84,29 +84,34 @@ function Overlay({ titulo, onFechar, children, largura = 'max-w-lg' }) {
 }
 
 /* ─── Donation Modal ─────────────────────────────────────────────────────── */
-function DonationModal({ campanhas, onFechar }) {
-  const [form, setForm] = useState({ nome: '', email: '', celular: '', campaign_id: '', valor: '' })
+function DonationModal({ campanhas, pix, onFechar }) {
+  const [form, setForm] = useState({ nome: '', email: '', celular: '', campaign_id: '', valor: '', consentimento: false, site: '' })
   const [salvando, setSalvando] = useState(false)
-  const [sucesso, setSucesso] = useState(false)
+  const [registro, setRegistro] = useState(null)
   const [erro, setErro] = useState(null)
 
-  function onChange(e) { setForm(f => ({ ...f, [e.target.name]: e.target.value })) }
+  function onChange(e) {
+    const { name, value, type, checked } = e.target
+    setForm(f => ({ ...f, [name]: type === 'checkbox' ? checked : value }))
+  }
 
   async function onSubmit(e) {
     e.preventDefault()
     setSalvando(true)
     setErro(null)
     try {
-      await axios.post('/api/public/doacoes/', {
+      const { data } = await axios.post('/api/public/doacoes/', {
         nome: form.nome,
         email: form.email,
         celular: form.celular,
         campaign_id: form.campaign_id || null,
-        valor: form.valor || 0,
+        valor: form.valor,
+        consentimento: form.consentimento,
+        site: form.site,
       })
-      setSucesso(true)
+      setRegistro(data)
     } catch (err) {
-      setErro(err?.response?.data?.erro || 'Erro ao registrar doação. Tente novamente.')
+      setErro(mensagemErro(err, 'Erro ao registrar doação. Tente novamente.'))
     } finally {
       setSalvando(false)
     }
@@ -114,15 +119,25 @@ function DonationModal({ campanhas, onFechar }) {
 
   const inputCls = 'w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg bg-[var(--bg-input)] text-[var(--text-primary)] outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100'
 
-  if (sucesso) {
+  if (registro) {
     return (
-      <Overlay titulo="Doação Registrada!" onFechar={onFechar}>
-        <div className="flex flex-col items-center gap-4 py-6 text-center">
-          <CheckCircle size={48} className="text-emerald-500" />
+      <Overlay titulo="Intenção de doação registrada" onFechar={onFechar}>
+        <div className="flex flex-col items-center gap-4 py-2 text-center">
+          <CheckCircle size={44} className="text-emerald-500" aria-hidden="true" />
           <h3 className="text-lg font-bold text-[var(--text-primary)]">Obrigado pela sua contribuição!</h3>
           <p className="text-sm text-[var(--text-secondary)] max-w-sm">
-            Sua intenção de doação foi registrada com sucesso. Nossa equipe entrará em contato para confirmar o pagamento.
+            Para concluir, pague o PIX abaixo. A equipe confirma a doação assim que o valor aparecer no extrato.
           </p>
+          {registro.id && (
+            <div className="w-full text-left">
+              <QrCodePix
+                pix={pix}
+                txid={registro.txid}
+                valor={registro.valor}
+                descricao={`PIX de ${formatBRL(registro.valor)} — identificação ${registro.txid}.`}
+              />
+            </div>
+          )}
           <button onClick={onFechar} className="mt-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ backgroundColor: '#0f4c5c' }}>
             Fechar
           </button>
@@ -154,10 +169,22 @@ function DonationModal({ campanhas, onFechar }) {
           <input name="celular" value={form.celular} onChange={onChange} placeholder="(11) 99999-9999" className={inputCls} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Valor (R$)</label>
-          <input name="valor" type="number" min="1" step="0.01" value={form.valor} onChange={onChange} placeholder="50,00" className={inputCls} />
+          <label htmlFor="doacao-valor" className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Valor (R$) *</label>
+          <input id="doacao-valor" name="valor" type="number" min="1" max="100000" step="0.01" value={form.valor} onChange={onChange} required placeholder="50,00" className={inputCls} />
         </div>
-        {erro && <p className="text-xs text-red-500">{erro}</p>}
+        {/* Campo isca para robôs: oculto para pessoas e leitores de tela. */}
+        <div aria-hidden="true" style={{ position: 'absolute', left: '-10000px', width: 1, height: 1, overflow: 'hidden' }}>
+          <label htmlFor="doacao-site">Site</label>
+          <input id="doacao-site" name="site" value={form.site} onChange={onChange} tabIndex={-1} autoComplete="off" />
+        </div>
+        <label className="flex items-start gap-2 text-xs text-[var(--text-secondary)]">
+          <input type="checkbox" name="consentimento" checked={form.consentimento} onChange={onChange} required className="mt-0.5" />
+          <span>
+            Li e concordo com a{' '}
+            <Link to="/privacidade" target="_blank" className="underline" style={{ color: 'var(--marca-texto)' }}>política de privacidade</Link>.
+          </span>
+        </label>
+        {erro && <p className="text-xs text-red-500" role="alert">{erro}</p>}
         <button
           type="submit"
           disabled={salvando}
@@ -173,35 +200,14 @@ function DonationModal({ campanhas, onFechar }) {
 
 /* ─── Expenses Modal ─────────────────────────────────────────────────────── */
 function GastosModal({ lista, total, onFechar }) {
-  const mesAtual = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
+  const mesAtual = HOJE.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
   return (
     <Overlay titulo={`Gastos do Mês — ${mesAtual}`} onFechar={onFechar} largura="max-w-xl">
-      {lista.length === 0 ? (
-        <p className="text-center py-8 text-[var(--text-muted)] text-sm">Nenhum gasto registrado neste mês.</p>
-      ) : (
-        <>
-          <table className="w-full text-sm mb-4">
-            <thead>
-              <tr className="border-b border-[var(--border)]">
-                <th className="text-left text-xs font-medium text-[var(--text-muted)] py-2">Descrição</th>
-                <th className="text-left text-xs font-medium text-[var(--text-muted)] py-2">Categoria</th>
-                <th className="text-right text-xs font-medium text-[var(--text-muted)] py-2">Valor</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border-subtle)]">
-              {lista.map((g, i) => (
-                <tr key={i} className="hover:bg-[var(--bg-hover)]">
-                  <td className="py-2.5 text-[var(--text-primary)] font-medium pr-4">{g.descricao}</td>
-                  <td className="py-2.5 text-[var(--text-secondary)]">{g.categoria}</td>
-                  <td className="py-2.5 text-right font-semibold text-[var(--text-primary)]">{formatBRL(g.valor)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="flex justify-end pt-2 border-t border-[var(--border)]">
-            <span className="text-sm font-bold text-[var(--text-primary)]">Total: {formatBRL(total)}</span>
-          </div>
-        </>
+      <ListaDespesasPublicas lista={lista} vazio="Nenhum gasto pago neste mês." />
+      {lista.length > 0 && (
+        <div className="flex justify-end pt-3 mt-3 border-t border-[var(--border)]">
+          <span className="text-sm font-bold text-[var(--text-primary)]">Total: {formatBRL(total)}</span>
+        </div>
       )}
     </Overlay>
   )
@@ -209,157 +215,32 @@ function GastosModal({ lista, total, onFechar }) {
 
 /* ─── Campaign Detail Modal ──────────────────────────────────────────────── */
 function CampanhaModal({ campanha, pix, onFechar }) {
-  const temPix = Boolean(pix?.chave)
-  const payloadPix = temPix
-    ? gerarPayloadPix({ chave: pix.chave, nome: pix.nome_recebedor, cidade: pix.cidade, txid: `CAMPANHA${campanha.id}` })
-    : ''
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${encodeURIComponent(payloadPix)}`
-
-  const [aviso, setAviso] = useState(null)
-  const [copiado, setCopiado] = useState(false)
-
-  async function copiarPix() {
-    try {
-      await navigator.clipboard.writeText(payloadPix)
-      setCopiado(true)
-      setTimeout(() => setCopiado(false), 2500)
-    } catch {
-      setAviso(`Código PIX: ${payloadPix}`)
-    }
-  }
-
-  const link = `${BASE_URL}/transparencia`
-  const texto = `Apoie a campanha "${campanha.titulo}" da UniONG! Já arrecadamos ${formatBRL(campanha.valor_arrecadado)} de ${formatBRL(campanha.meta_valor)}. Doe via PIX:`
-  const textoCompleto = `${texto} ${link}`
-  const t = encodeURIComponent(texto)
-  const tc = encodeURIComponent(textoCompleto)
-  const u = encodeURIComponent(link)
-
-  function abrirPopup(url) {
-    window.open(url, '_blank', 'noopener,noreferrer,width=640,height=640')
-  }
-
-  // Instagram e TikTok não têm URL de compartilhamento na web: usa o compartilhamento
-  // nativo do aparelho (com o QR Code) e, sem suporte, copia o texto e abre a rede.
-  async function compartilharSemUrl(nome, siteUrl) {
-    try {
-      const blob = await fetch(qrUrl).then(r => r.blob())
-      const arquivo = new File([blob], 'pix-uniong.png', { type: blob.type || 'image/png' })
-      if (navigator.canShare?.({ files: [arquivo] })) {
-        await navigator.share({ title: campanha.titulo, text: textoCompleto, files: [arquivo] })
-        return
-      }
-    } catch (e) {
-      if (e?.name === 'AbortError') return
-    }
-    try {
-      await navigator.clipboard.writeText(textoCompleto)
-      setAviso(`Texto da campanha copiado! Cole no ${nome} para compartilhar.`)
-    } catch {
-      setAviso(`Abra o ${nome} e compartilhe o link: ${link}`)
-    }
-    window.open(siteUrl, '_blank', 'noopener,noreferrer')
-  }
-
-  const redes = [
-    { label: 'WhatsApp', Icon: FaWhatsapp, onClick: () => abrirPopup(`https://wa.me/?text=${tc}`) },
-    { label: 'Instagram', Icon: FaInstagram, onClick: () => compartilharSemUrl('Instagram', 'https://www.instagram.com/') },
-    { label: 'Facebook', Icon: FaFacebook, onClick: () => abrirPopup(`https://www.facebook.com/sharer/sharer.php?u=${u}&quote=${t}`) },
-    { label: 'LinkedIn', Icon: FaLinkedin, onClick: () => abrirPopup(`https://www.linkedin.com/sharing/share-offsite/?url=${u}`) },
-    { label: 'E-mail', Icon: MdEmail, onClick: () => { window.location.href = `mailto:?subject=${encodeURIComponent(`Apoie a campanha: ${campanha.titulo}`)}&body=${tc}` } },
-    { label: 'TikTok', Icon: FaTiktok, onClick: () => compartilharSemUrl('TikTok', 'https://www.tiktok.com/') },
-  ]
-
+  const idQr = `qr-campanha-${campanha.id}`
   return (
     <Overlay titulo={campanha.titulo} onFechar={onFechar} largura="max-w-lg">
       <div className="space-y-6">
-        {/* Progresso */}
-        <div>
-          <div className="flex justify-between mb-1.5 text-xs">
-            <span className="text-[var(--text-muted)]">Progresso</span>
-            <span className="font-semibold text-[var(--text-primary)]">{campanha.percentual_progresso}%</span>
-          </div>
-          <BarraProgresso percentual={campanha.percentual_progresso} cor="#0f4c5c" />
-        </div>
-
-        {/* Detalhes */}
-        <dl className="grid grid-cols-2 border border-[var(--border)] rounded-lg divide-x divide-y divide-[var(--border)] overflow-hidden">
-          {[
-            { label: 'Arrecadado', valor: formatBRL(campanha.valor_arrecadado) },
-            { label: 'Meta', valor: formatBRL(campanha.meta_valor) },
-            { label: 'Início', valor: formatData(campanha.data_inicio) },
-            { label: 'Encerramento', valor: campanha.data_fim ? formatData(campanha.data_fim) : 'Em aberto' },
-          ].map(item => (
-            <div key={item.label} className="px-4 py-3">
-              <dt className="text-xs text-[var(--text-muted)]">{item.label}</dt>
-              <dd className="text-sm font-semibold text-[var(--text-primary)] mt-0.5">{item.valor}</dd>
-            </div>
-          ))}
-        </dl>
-
-        {/* PIX */}
+        <ResumoCampanha campanha={campanha} />
+        <Link
+          to={`/transparencia/campanha/${campanha.id}`}
+          className="inline-flex text-sm font-semibold underline"
+          style={{ color: 'var(--marca-texto)' }}
+        >
+          Ver página da campanha e prestação de contas
+        </Link>
         <div>
           <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Doar via PIX</h3>
-          {temPix ? (
-            <div className="flex items-center gap-4 border border-[var(--border)] rounded-lg p-4">
-              <img
-                src={qrUrl}
-                alt="QR Code PIX"
-                className="w-[120px] h-[120px] rounded-md border border-[var(--border)] bg-white flex-shrink-0"
-                onError={e => { e.target.style.display = 'none' }}
-              />
-              <div className="space-y-2">
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                  Escaneie o QR Code com o aplicativo do seu banco ou use o PIX copia e cola para doar para esta campanha.
-                </p>
-                <p className="text-[11px] text-[var(--text-muted)] break-all">Chave: {pix.chave}</p>
-                <button
-                  type="button"
-                  onClick={copiarPix}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
-                >
-                  {copiado ? <Check size={13} /> : <Copy size={13} />}
-                  {copiado ? 'Código copiado' : 'Copiar código PIX'}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <p className="text-xs text-[var(--text-muted)] border border-[var(--border)] rounded-lg p-4">
-              A instituição ainda não cadastrou uma chave PIX para receber doações.
-            </p>
-          )}
+          <QrCodePix
+            pix={pix}
+            txid={`CAMPANHA${campanha.id}`}
+            idCanvas={idQr}
+            descricao="Escaneie o QR Code com o aplicativo do seu banco ou use o PIX copia e cola para doar para esta campanha."
+          />
         </div>
-
-        {/* Compartilhar */}
-        <div>
-          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-            <Share2 size={14} className="text-[var(--text-muted)]" />
-            Compartilhar campanha
-          </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {redes.map(({ label, Icon, onClick }) => (
-              <button
-                key={label}
-                type="button"
-                onClick={onClick}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
-              >
-                <Icon size={15} className="flex-shrink-0" />
-                {label}
-              </button>
-            ))}
-          </div>
-          {aviso && (
-            <p className="mt-3 text-xs text-[var(--text-secondary)] bg-[var(--bg-card-alt)] border border-[var(--border)] rounded-lg px-3 py-2">
-              {aviso}
-            </p>
-          )}
-        </div>
+        <CompartilharCampanha campanha={campanha} idQr={idQr} />
       </div>
     </Overlay>
   )
 }
-
 /* ─── Comunicados ───────────────────────────────────────────────────────── */
 function formatDataHora(iso) {
   const d = new Date(iso)
@@ -399,7 +280,7 @@ function ComunicadoItem({ comunicado: c }) {
           aria-expanded={aberto}
           aria-controls={`comunicado-${c.id}`}
           className="mt-2 text-xs font-semibold hover:underline"
-          style={{ color: '#0f4c5c' }}
+          style={{ color: 'var(--marca-texto)' }}
         >
           {aberto ? 'Mostrar menos' : 'Ler mais'}
         </button>
@@ -430,25 +311,41 @@ function Comunicados({ lista }) {
 
 /* ─── Main Page ─────────────────────────────────────────────────────────── */
 export default function Transparencia() {
-  const { role, switchRole } = useRole()
-  const navigate = useNavigate()
+  const instituicao = useInstituicao()
+  const { autenticado } = useAuth()
   const [dados, setDados] = useState(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
   const [donationModal, setDonationModal] = useState(false)
   const [gastosModal, setGastosModal] = useState(false)
   const [campanhaModal, setCampanhaModal] = useState(null)
+  const [indisponivel, setIndisponivel] = useState(false)
 
   useEffect(() => {
     axios.get('/api/public/transparencia/')
       .then(r => setDados(r.data))
-      .catch(() => setErro('Não foi possível carregar os dados. Verifique a conexão com o servidor.'))
+      .catch((err) => {
+        if (err.response?.status === 404) setIndisponivel(true)
+        else setErro('Não foi possível carregar os dados. Verifique a conexão com o servidor.')
+      })
       .finally(() => setCarregando(false))
   }, [])
 
-  function voltarParaAdmin() {
-    switchRole('admin')
-    navigate('/admin')
+  if (indisponivel) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center px-4">
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-8 max-w-md text-center space-y-3">
+          <ShieldOff size={32} className="mx-auto text-[var(--text-muted)]" aria-hidden="true" />
+          <h1 className="text-lg font-bold text-[var(--text-primary)]">Portal indisponível</h1>
+          <p className="text-sm text-[var(--text-secondary)]">
+            O portal de transparência está temporariamente desativado pela organização.
+          </p>
+          {autenticado && (
+            <Link to="/admin" className="inline-block text-sm font-medium underline" style={{ color: 'var(--marca-texto)' }}>Voltar ao painel</Link>
+          )}
+        </div>
+      </div>
+    )
   }
 
   const dadosGraficoCampanhas = dados?.campanhas?.map(c => ({
@@ -467,27 +364,29 @@ export default function Transparencia() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-page)]">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-        {role === 'membro' && (
-          <button
-            onClick={voltarParaAdmin}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90"
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+        {autenticado && (
+          <Link
+            to="/admin"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90"
             style={{ backgroundColor: '#0f4c5c' }}
           >
-            <ArrowLeft size={15} />
-            Voltar ao Painel
-          </button>
+            <ArrowLeft size={15} aria-hidden="true" />
+            Voltar à visão de administrador
+          </Link>
         )}
 
         {/* Hero Banner */}
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-6 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
-            <img src={logoUniONG} alt="UniONG" className="h-16 w-16 object-contain rounded-xl flex-shrink-0" />
+            <LogoInstituicao instituicao={instituicao} className="h-16 w-16 text-2xl" />
             <div>
+              {instituicao.configurada && (
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--marca-texto)' }}>{instituicao.nome}</p>
+              )}
               <h1 className="text-2xl font-bold text-[var(--text-primary)]">Portal de Transparência</h1>
               <p className="text-sm text-[var(--text-secondary)] mt-1 max-w-xl">
-                Acompanhe em tempo real o impacto das nossas campanhas, o total arrecadado
-                e como cada doação está sendo utilizada pela nossa comunidade.
+                {instituicao.descricao || 'Acompanhe em tempo real o impacto das nossas campanhas, o total arrecadado e como cada doação está sendo utilizada pela nossa comunidade.'}
               </p>
             </div>
           </div>
@@ -528,7 +427,7 @@ export default function Transparencia() {
               <KpiCard
                 label="Doações do Mês"
                 valor={formatBRL(dados.kpis.doacoes_mes)}
-                desc={`Desde 01/${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}`}
+                desc={`Desde 01/${String(HOJE.getMonth() + 1).padStart(2, '0')}/${HOJE.getFullYear()}`}
                 icone={TrendingUp}
                 cor="#0891b2"
               />
@@ -542,17 +441,28 @@ export default function Transparencia() {
               <KpiCard
                 label="Gastos do Mês"
                 valor={formatBRL(dados.kpis.gastos_mes)}
-                desc="Despesas do mês atual"
+                desc="Despesas pagas no mês"
                 icone={Receipt}
                 cor="#f97316"
                 onClick={() => setGastosModal(true)}
               />
             </div>
+            {dados.kpis.horas_voluntariado > 0 && (
+              <p className="flex items-center gap-2 text-sm text-[var(--text-secondary)] -mt-4">
+                <HandHeart size={16} aria-hidden="true" style={{ color: '#db2777' }} />
+                <span>
+                  <strong className="text-[var(--text-primary)]">
+                    {Number(dados.kpis.horas_voluntariado).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} horas
+                  </strong>{' '}
+                  de trabalho voluntário registradas pela nossa comunidade.
+                </span>
+              </p>
+            )}
 
             {/* Campanhas em Andamento */}
             <section>
               <h2 className="text-base font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-                <Megaphone size={16} style={{ color: '#f97316' }} />
+                <Megaphone size={16} style={{ color: 'var(--destaque-texto)' }} />
                 Campanhas em Andamento
                 <span className="text-xs font-normal text-[var(--text-muted)]">— clique para detalhes e PIX</span>
               </h2>
@@ -560,14 +470,18 @@ export default function Transparencia() {
                 {dados.campanhas.map((c, i) => {
                   const cor = CORES_CAMPANHA[i % CORES_CAMPANHA.length]
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={c.id}
-                      className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-5 cursor-pointer hover:shadow-md hover:border-[var(--text-muted)] transition-all"
+                      className="text-left w-full bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-5 cursor-pointer hover:shadow-md hover:border-[var(--text-muted)] transition-all"
                       onClick={() => setCampanhaModal(c)}
                     >
+                      {c.imagem_url && (
+                        <img src={c.imagem_url} alt="" className="w-full h-36 object-cover rounded-xl mb-4" />
+                      )}
                       <div className="flex items-start justify-between mb-3">
                         <h3 className="font-semibold text-[var(--text-primary)] leading-snug pr-2">{c.titulo}</h3>
-                        <span className="text-lg font-bold flex-shrink-0" style={{ color: cor }}>
+                        <span className="text-lg font-bold flex-shrink-0" style={{ color: corDeTexto(cor) }}>
                           {c.percentual_progresso}%
                         </span>
                       </div>
@@ -582,7 +496,7 @@ export default function Transparencia() {
                           <p className="font-semibold text-[var(--text-secondary)]">{formatBRL(c.meta_valor)}</p>
                         </div>
                       </div>
-                    </div>
+                    </button>
                   )
                 })}
                 {dados.campanhas.length === 0 && (
@@ -598,10 +512,22 @@ export default function Transparencia() {
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {/* Bar: Arrecadado vs Meta — altura dinâmica */}
                 <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-5">
-                  <h2 className="text-sm font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-                    <TrendingUp size={15} style={{ color: '#0f4c5c' }} />
-                    Arrecadado vs Meta por Campanha
-                  </h2>
+                  <GraficoAcessivel
+                    titulo="Arrecadado vs Meta por Campanha"
+                    cabecalho={(
+                      <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                        <TrendingUp size={15} aria-hidden="true" style={{ color: 'var(--marca-texto)' }} />
+                        Arrecadado vs Meta por Campanha
+                      </h2>
+                    )}
+                    descricao="Valor arrecadado (doações confirmadas) e meta de cada campanha em andamento."
+                    colunas={[
+                      { chave: 'name', rotulo: 'Campanha' },
+                      { chave: 'arrecadado', rotulo: 'Arrecadado', formato: (v) => formatBRL(v) },
+                      { chave: 'meta', rotulo: 'Meta', formato: (v) => formatBRL(v) },
+                    ]}
+                    linhas={dadosGraficoCampanhas}
+                  >
                   <ResponsiveContainer width="100%" height={chartHeight}>
                     <BarChart data={dadosGraficoCampanhas} barGap={4}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -615,15 +541,24 @@ export default function Transparencia() {
                       <Bar dataKey="meta" name="Meta" fill="#f97316" opacity={0.5} radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
+                  </GraficoAcessivel>
                 </div>
 
                 {/* Pie: Distribuição */}
                 {dadosPie.length > 0 && (
                   <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-5">
-                    <h2 className="text-sm font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-                      <Receipt size={15} style={{ color: '#7c3aed' }} />
-                      Distribuição de Arrecadação
-                    </h2>
+                    <GraficoAcessivel
+                      titulo="Distribuição de Arrecadação"
+                      cabecalho={(
+                        <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                          <Receipt size={15} aria-hidden="true" style={{ color: '#7c3aed' }} />
+                          Distribuição de Arrecadação
+                        </h2>
+                      )}
+                      descricao="Participação de cada campanha no total arrecadado pelas campanhas em andamento."
+                      colunas={[{ chave: 'name', rotulo: 'Campanha' }, { chave: 'value', rotulo: 'Arrecadado', formato: (v) => formatBRL(v) }]}
+                      linhas={dadosPie}
+                    >
                     <ResponsiveContainer width="100%" height={chartHeight}>
                       <PieChart>
                         <Pie data={dadosPie} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
@@ -636,16 +571,19 @@ export default function Transparencia() {
                         <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
                       </PieChart>
                     </ResponsiveContainer>
+                    </GraficoAcessivel>
                   </div>
                 )}
               </div>
             )}
 
+            <PrestacaoContas />
+
             <Comunicados lista={dados.comunicados ?? []} />
 
             {/* Rodapé informativo */}
             <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-5 flex items-start gap-3 text-sm text-[var(--text-muted)]">
-              <HeartHandshake size={18} className="flex-shrink-0 mt-0.5" style={{ color: '#0f4c5c' }} />
+              <HeartHandshake size={18} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--marca-texto)' }} />
               <p>
                 Todos os dados exibidos são públicos e atualizados em tempo real.
                 Esta página reflete o compromisso da organização com a transparência e prestação de contas à comunidade.
@@ -653,12 +591,15 @@ export default function Transparencia() {
             </div>
           </>
         )}
-      </div>
+      </main>
 
       {/* Footer */}
       <footer className="border-t border-[var(--border)] bg-[var(--bg-card)] mt-12">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between text-xs text-[var(--text-muted)]">
-          <span>© {new Date().getFullYear()} UniONG · Portal de Transparência</span>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-5">
+          <RodapeInstituicao instituicao={instituicao} />
+        </div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 flex flex-wrap gap-2 items-center justify-between text-xs text-[var(--text-muted)]">
+          <span>© {HOJE.getFullYear()} {instituicao.nome} · Portal de Transparência · desenvolvido com UniONG</span>
           <Link to="/login" className="flex items-center gap-1 hover:text-[var(--text-secondary)] transition-colors">
             <ExternalLink size={11} /> Acesso Administrativo
           </Link>
@@ -667,7 +608,7 @@ export default function Transparencia() {
 
       {/* Modals */}
       {donationModal && (
-        <DonationModal campanhas={dados?.campanhas ?? []} onFechar={() => setDonationModal(false)} />
+        <DonationModal campanhas={dados?.campanhas ?? []} pix={dados?.pix} onFechar={() => setDonationModal(false)} />
       )}
       {gastosModal && dados && (
         <GastosModal

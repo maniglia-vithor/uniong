@@ -2,15 +2,14 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Megaphone, HandCoins, Users,
-  MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X, Settings,
-  ChevronUp, ShieldCheck, Eye,
+  MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X, Settings, History, UserCog, HandHeart, Menu, ShieldCheck, Eye,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { useRole } from '../context/RoleContext'
 
-import api from '../services/api'
-import logoIcon from '../assets/Gemini_Generated_Image_g792fng792fng792.jpg'
-import RecordDetailDrawer from './RecordDetailDrawer'
+import api, { buscarTodas } from '../services/api'
+import useInstituicao from '../hooks/useInstituicao'
+import LogoInstituicao from './LogoInstituicao'
+import RecordDetailDrawer, { TIPOS_COM_DETALHE } from './RecordDetailDrawer'
 
 const navItems = [
   { to: '/admin', label: 'Painel', icon: LayoutDashboard, end: true },
@@ -19,7 +18,10 @@ const navItems = [
   { to: '/admin/apoiadores', label: 'Membros', icon: Users },
   { to: '/admin/comunicacao', label: 'Comunicação', icon: MessageSquare },
   { to: '/admin/custos', label: 'Custos', icon: Receipt },
+  { to: '/admin/voluntarios', label: 'Voluntários', icon: HandHeart },
   { to: '/admin/relatorios', label: 'Relatórios', icon: BarChart3 },
+  { to: '/admin/equipe', label: 'Equipe', icon: UserCog, soSuperusuario: true },
+  { to: '/admin/historico', label: 'Histórico', icon: History, soSuperusuario: true },
 ]
 
 const titulos = {
@@ -31,6 +33,9 @@ const titulos = {
   '/admin/custos': { titulo: 'Custos', sub: 'Gestão de despesas e transparência financeira' },
   '/admin/relatorios': { titulo: 'Relatórios', sub: 'Análises e exportações' },
   '/admin/configuracoes': { titulo: 'Configurações', sub: 'Preferências e gerenciamento do sistema' },
+  '/admin/historico': { titulo: 'Histórico', sub: 'Trilha de auditoria das alterações' },
+  '/admin/equipe': { titulo: 'Equipe', sub: 'Acessos ao painel' },
+  '/admin/voluntarios': { titulo: 'Voluntários', sub: 'Atividades e horas de voluntariado' },
 }
 
 const tipoBadge = {
@@ -38,6 +43,7 @@ const tipoBadge = {
   campanha: { label: 'Campanha', bg: '#dbeafe', color: '#2563eb' },
   apoiador: { label: 'Membro', bg: '#f3e8ff', color: '#7c3aed' },
   despesa:  { label: 'Despesa',  bg: '#fee2e2', color: '#dc2626' },
+  configuracao: { label: 'Configuração', bg: '#e2e8f0', color: '#475569' },
 }
 
 function formatarTempo(isoStr) {
@@ -60,12 +66,10 @@ function avatarCor(nome = '') {
 }
 
 export default function Layout() {
+  const instituicao = useInstituicao()
   const { pathname } = useLocation()
   const { usuario, logout } = useAuth()
-  const { role, isAdmin, switchRole } = useRole()
   const navigate = useNavigate()
-  const [switcherAberto, setSwitcherAberto] = useState(false)
-  const switcherRef = useRef(null)
   const paginaAtual = titulos[pathname] || titulos['/admin']
 
   const [notificacoes, setNotificacoes] = useState([])
@@ -73,30 +77,38 @@ export default function Layout() {
   const [filtroTipo, setFiltroTipo] = useState(null)
   const [aberto, setAberto] = useState(false)
   const [drawerTarget, setDrawerTarget] = useState(null)
+  const [menuAberto, setMenuAberto] = useState(false)
   const dropdownRef = useRef(null)
 
   const naoLidas = notificacoes.filter(n => !n.lida).length
 
+  const [pendentes, setPendentes] = useState(0)
+
   const buscarNotificacoes = useCallback(async () => {
     try {
-      const { data } = await api.get('/notificacoes/?page_size=50')
-      setNotificacoes(data.results ?? data)
+      const [lista, resumo] = await Promise.all([
+        buscarTodas('/notificacoes/'),
+        api.get('/doacoes/resumo/', { params: { status: 'pendente' } }),
+      ])
+      setNotificacoes(lista)
+      setPendentes(resumo.data.quantidade)
     } catch { /* silencia erros de polling */ }
   }, [])
 
   useEffect(() => {
     buscarNotificacoes()
     const intervalo = setInterval(buscarNotificacoes, 20000)
-    return () => clearInterval(intervalo)
+    window.addEventListener('doacoes-pendentes-alteradas', buscarNotificacoes)
+    return () => {
+      clearInterval(intervalo)
+      window.removeEventListener('doacoes-pendentes-alteradas', buscarNotificacoes)
+    }
   }, [buscarNotificacoes])
 
   useEffect(() => {
     function handleClickFora(e) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setAberto(false)
-      }
-      if (switcherRef.current && !switcherRef.current.contains(e.target)) {
-        setSwitcherAberto(false)
       }
     }
     document.addEventListener('mousedown', handleClickFora)
@@ -116,7 +128,7 @@ export default function Layout() {
     }
     setAberto(false)
     // abre drawer se tem target_type e target_id
-    if (n.target_type && n.target_id) {
+    if (n.target_id && TIPOS_COM_DETALHE.includes(n.target_type)) {
       setDrawerTarget({ type: n.target_type, id: n.target_id })
     }
   }
@@ -140,32 +152,37 @@ export default function Layout() {
     <>
       <div className="flex h-screen overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-64 flex-shrink-0 flex flex-col" style={{ backgroundColor: '#0f4c5c' }}>
+        {menuAberto && (
+          <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setMenuAberto(false)} aria-hidden="true" />
+        )}
+        <aside
+          id="menu-lateral"
+          aria-label="Menu principal"
+          className={`fixed inset-y-0 left-0 z-40 w-64 flex-shrink-0 flex flex-col transform transition-transform duration-200 md:static md:translate-x-0 ${menuAberto ? 'translate-x-0' : '-translate-x-full'}`}
+          style={{ backgroundColor: '#0f4c5c' }}
+        >
           {/* Branding */}
           <div className="flex items-center gap-3 px-5 py-4 border-b border-white/10">
-            <img
-              src={logoIcon}
-              alt="UniONG"
-              className="w-9 h-9 rounded-lg object-contain flex-shrink-0"
-            />
-            <div>
-              <p className="text-white font-bold text-sm leading-tight">UniONG</p>
-              <p className="text-white/50 text-xs">Painel Administrativo</p>
+            <LogoInstituicao instituicao={instituicao} claro />
+            <div className="min-w-0">
+              <p className="text-white font-bold text-sm leading-tight truncate" title={instituicao.nome}>{instituicao.nome}</p>
+              <p className="text-white/75 text-xs">Painel Administrativo</p>
             </div>
           </div>
 
           {/* Nav */}
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-            {navItems.map(({ to, label, icon: Icon, end }) => (
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" aria-label="Seções do painel">
+            {navItems.filter((item) => !item.soSuperusuario || usuario?.is_superuser).map(({ to, label, icon: Icon, end }) => (
               <NavLink
                 key={to}
                 to={to}
                 end={end}
+                onClick={() => setMenuAberto(false)}
                 className={({ isActive }) =>
                   `relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                     isActive
                       ? 'text-white'
-                      : 'text-white/55 hover:bg-white/10 hover:text-white'
+                      : 'text-white/80 hover:bg-white/10 hover:text-white'
                   }`
                 }
                 style={({ isActive }) =>
@@ -180,88 +197,43 @@ export default function Layout() {
                         style={{ backgroundColor: '#f97316' }}
                       />
                     )}
-                    <Icon size={18} style={isActive ? { color: '#f97316' } : {}} />
+                    <Icon size={18} aria-hidden="true" style={isActive ? { color: 'var(--destaque-texto)' } : {}} />
                     {label}
+                    {to === '/admin/doacoes' && pendentes > 0 && (
+                      <span
+                        className="ml-auto min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center text-white"
+                        style={{ backgroundColor: '#f97316' }}
+                        aria-label={`${pendentes} doações pendentes`}
+                      >
+                        {pendentes > 99 ? '99+' : pendentes}
+                      </span>
+                    )}
                   </>
                 )}
               </NavLink>
             ))}
           </nav>
 
-          {/* User + Role Switcher */}
-          <div className="px-4 py-4 border-t border-white/10 space-y-1" ref={switcherRef}>
-            {/* Switcher trigger */}
-            <div className="relative">
-              <button
-                onClick={() => setSwitcherAberto(v => !v)}
-                className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/10 transition-colors group"
+          {/* Usuário logado */}
+          <div className="px-4 py-4 border-t border-white/10 space-y-1">
+            <div className="flex items-center gap-3 px-2 py-2">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                style={{ backgroundColor: '#f97316' }}
               >
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 transition-colors"
-                  style={{ backgroundColor: isAdmin ? '#f97316' : '#7c3aed' }}
-                >
-                  {isAdmin
-                    ? (usuario?.username?.[0]?.toUpperCase() ?? 'A')
-                    : <Eye size={14} />}
-                </div>
-                <div className="flex-1 min-w-0 text-left">
-                  <p className="text-white text-xs font-medium truncate">
-                    {isAdmin ? (usuario?.username ?? 'admin') : 'membro'}
-                  </p>
-                  <p className="text-white/40 text-xs">
-                    {isAdmin ? 'Administrador' : 'Membro da ONG'}
-                  </p>
-                </div>
-                <ChevronUp
-                  size={14}
-                  className="text-white/40 transition-transform flex-shrink-0"
-                  style={{ transform: switcherAberto ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                />
-              </button>
-
-              {/* Dropdown de papéis */}
-              {switcherAberto && (
-                <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden z-50">
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-2.5 pb-1">
-                    Visualizar como
-                  </p>
-                  {[
-                    { id: 'admin',  label: usuario?.username ?? 'admin', sub: 'Administrador — acesso total', Icon: ShieldCheck, cor: '#f97316' },
-                    { id: 'membro', label: 'membro',                     sub: 'Membro — somente leitura',    Icon: Eye,          cor: '#7c3aed' },
-                  ].map(({ id, label, sub, Icon, cor }) => (
-                    <button
-                      key={id}
-                      onClick={() => {
-                        switchRole(id)
-                        setSwitcherAberto(false)
-                        navigate(id === 'membro' ? '/transparencia' : '/admin')
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 transition-colors"
-                    >
-                      <div
-                        className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: `${cor}18` }}
-                      >
-                        <Icon size={13} style={{ color: cor }} />
-                      </div>
-                      <div className="flex-1 min-w-0 text-left">
-                        <p className="text-xs font-semibold text-slate-800 truncate">{label}</p>
-                        <p className="text-[10px] text-slate-400">{sub}</p>
-                      </div>
-                      {role === id && (
-                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: cor }} />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
+                {iniciais(usuario?.nome || usuario?.username || '?')}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-xs font-medium truncate">{usuario?.nome || usuario?.username}</p>
+                <p className="text-white/75 text-xs">{usuario?.is_superuser ? 'Administrador' : 'Equipe'}</p>
+              </div>
             </div>
 
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-white/10 transition-colors text-white/60 hover:text-white text-xs font-medium"
+              className="w-full flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-white/10 transition-colors text-white/80 hover:text-white text-xs font-medium"
             >
-              <LogOut size={14} />
+              <LogOut size={14} aria-hidden="true" />
               Sair
             </button>
           </div>
@@ -270,31 +242,63 @@ export default function Layout() {
         {/* Main */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Topbar */}
-          <header className="bg-[var(--bg-card)] border-b border-[var(--border)] px-6 py-3.5 flex items-center justify-between flex-shrink-0">
-            <div>
+          <header className="bg-[var(--bg-card)] border-b border-[var(--border)] px-4 md:px-6 py-3.5 flex items-center justify-between gap-2 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setMenuAberto(true)}
+              className="md:hidden p-2 -ml-2 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
+              aria-label="Abrir menu"
+              aria-controls="menu-lateral"
+              aria-expanded={menuAberto}
+            >
+              <Menu size={20} aria-hidden="true" />
+            </button>
+            <div className="flex-1 min-w-0">
               <h1 className="text-base font-semibold text-[var(--text-primary)]">{paginaAtual.titulo}</h1>
               <p className="text-xs text-[var(--text-muted)]">{paginaAtual.sub}</p>
             </div>
 
-            {/* Settings (admin only) + Bell */}
             <div className="flex items-center gap-1">
-            {isAdmin && (
+              {/* Troca de visão para demonstração: "Membro" abre o portal público (o que um membro vê). */}
+              <div role="group" aria-label="Alternar visão" className="flex items-center rounded-lg border border-[var(--border)] p-0.5 mr-1 text-xs font-semibold">
+                <span
+                  aria-current="true"
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-white"
+                  style={{ backgroundColor: '#0f4c5c' }}
+                >
+                  <ShieldCheck size={13} aria-hidden="true" />
+                  <span className="hidden sm:inline">Administrador</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => navigate('/transparencia')}
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                  aria-label="Ir para a visão de membro (portal de transparência)"
+                  title="Ver o sistema como um membro vê (portal de transparência)"
+                >
+                  <Eye size={13} aria-hidden="true" />
+                  <span className="hidden sm:inline">Membro</span>
+                </button>
+              </div>
               <button
                 onClick={() => navigate('/admin/configuracoes')}
                 className="p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
                 title="Configurações"
+                aria-label="Configurações"
               >
-                <Settings size={18} className="text-[var(--text-muted)]" />
+                <Settings size={18} aria-hidden="true" className="text-[var(--text-muted)]" />
               </button>
-            )}
 
             {/* Bell */}
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setAberto(v => !v)}
-                className="relative p-2 rounded-lg hover:bg-slate-100 transition-colors"
+                className="relative p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+                aria-label={naoLidas > 0 ? `Notificações (${naoLidas} não lidas)` : 'Notificações'}
+                aria-expanded={aberto}
+                aria-haspopup="true"
               >
-                <Bell size={18} className="text-[var(--text-muted)]" />
+                <Bell size={18} aria-hidden="true" className="text-[var(--text-muted)]" />
                 {naoLidas > 0 && (
                   <span
                     className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full text-[10px] font-bold text-white flex items-center justify-center px-1"
@@ -308,7 +312,7 @@ export default function Layout() {
               {/* Dropdown */}
               {aberto && (
                 <div
-                  className="absolute right-0 top-11 w-96 bg-[var(--bg-card)] rounded-xl shadow-2xl border border-[var(--border)] z-50 flex flex-col overflow-hidden"
+                  className="absolute right-0 top-11 w-[min(24rem,calc(100vw-2rem))] bg-[var(--bg-card)] rounded-xl shadow-2xl border border-[var(--border)] z-50 flex flex-col overflow-hidden"
                   style={{ maxHeight: '520px' }}
                 >
                   {/* Header */}
@@ -318,7 +322,7 @@ export default function Layout() {
                       <button
                         onClick={marcarTodasLidas}
                         className="flex items-center gap-1 text-xs font-medium transition-colors"
-                        style={{ color: '#0f4c5c' }}
+                        style={{ color: 'var(--marca-texto)' }}
                       >
                         <Check size={13} />
                         Marcar todas como lidas
@@ -338,7 +342,7 @@ export default function Layout() {
                         className="flex-1 py-2 text-xs font-medium transition-colors border-b-2"
                         style={{
                           borderColor: abaAtiva === aba.id ? '#0f4c5c' : 'transparent',
-                          color: abaAtiva === aba.id ? '#0f4c5c' : '#94a3b8',
+                          color: abaAtiva === aba.id ? 'var(--marca-texto)' : 'var(--text-muted)',
                         }}
                       >
                         {aba.label}
@@ -389,11 +393,15 @@ export default function Layout() {
                         const actor = n.actor_name || 'Sistema'
                         const cor = avatarCor(actor)
                         return (
-                          <button
+                          <div
                             key={n.id}
-                            onClick={() => clicarNotificacao(n)}
-                            className="w-full text-left flex items-start gap-3 px-4 py-3.5 hover:bg-[var(--bg-hover)] transition-colors border-b border-[var(--border-subtle)] group relative"
+                            className="relative group border-b border-[var(--border-subtle)]"
                             style={{ backgroundColor: n.lida ? 'var(--bg-card)' : 'var(--bg-card-alt)' }}
+                          >
+                          <button
+                            type="button"
+                            onClick={() => clicarNotificacao(n)}
+                            className="w-full text-left flex items-start gap-3 px-4 py-3.5 hover:bg-[var(--bg-hover)] transition-colors"
                           >
                             {/* Avatar */}
                             <div
@@ -431,17 +439,22 @@ export default function Layout() {
                               <span
                                 className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1.5"
                                 style={{ backgroundColor: '#3b82f6' }}
-                              />
+                                title="Não lida"
+                              >
+                                <span className="sr-only">Não lida</span>
+                              </span>
                             )}
-
+                          </button>
                             {/* Botão remover */}
                             <button
+                              type="button"
                               onClick={e => remover(e, n.id)}
-                              className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-slate-200 transition-all"
+                              aria-label="Remover notificação"
+                              className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 focus:opacity-100 p-0.5 rounded hover:bg-[var(--bg-hover)] transition-all"
                             >
-                              <X size={12} className="text-[var(--text-muted)]" />
+                              <X size={12} aria-hidden="true" className="text-[var(--text-muted)]" />
                             </button>
-                          </button>
+                          </div>
                         )
                       })
                     )}
@@ -452,27 +465,21 @@ export default function Layout() {
             </div>
           </header>
 
-          {/* Faixa modo membro */}
-          {!isAdmin && (
-            <div className="flex items-center gap-2 px-6 py-2 text-xs font-medium flex-shrink-0" style={{ backgroundColor: '#7c3aed18', color: '#7c3aed', borderBottom: '1px solid #7c3aed30' }}>
-              <Eye size={13} />
-              Visualizando como <strong>Membro</strong> — modo somente leitura. Alterne no canto inferior esquerdo.
-            </div>
-          )}
-
           {/* Content */}
-          <main className="flex-1 overflow-y-auto p-6 bg-[var(--bg-page)]">
-            <Outlet context={{ openDrawer: setDrawerTarget, isAdmin }} />
+          <main id="conteudo" className="flex-1 overflow-y-auto p-4 md:p-6 bg-[var(--bg-page)]">
+            <Outlet context={{ openDrawer: setDrawerTarget }} />
           </main>
         </div>
       </div>
 
       {/* Record Detail Drawer */}
-      <RecordDetailDrawer
-        target={drawerTarget}
-        onClose={() => setDrawerTarget(null)}
-        onRefresh={() => {}}
-      />
+      {drawerTarget && (
+        <RecordDetailDrawer
+          target={drawerTarget}
+          onClose={() => setDrawerTarget(null)}
+          onRefresh={() => {}}
+        />
+      )}
     </>
   )
 }

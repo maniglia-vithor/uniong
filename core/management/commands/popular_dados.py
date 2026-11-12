@@ -1,7 +1,9 @@
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
-from django.core.management.base import BaseCommand
-from core.models import Apoiador, Campanha, Doacao
+from django.conf import settings
+from django.utils import timezone
+from django.core.management.base import BaseCommand, CommandError
+from core.models import Apoiador, Campanha, Despesa, Doacao, Recibo
 
 
 APOIADORES = [
@@ -32,10 +34,26 @@ DOACOES_MENSAIS = [
 
 
 class Command(BaseCommand):
-    help = 'Popula o banco de dados com dados de demonstração'
+    help = 'APAGA doações, campanhas e membros e popula o banco com dados de demonstração (só com DEBUG=True)'
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--confirmar', action='store_true',
+            help='Confirma que todas as doações, campanhas e membros atuais serão apagados.',
+        )
 
     def handle(self, *args, **options):
+        if not settings.DEBUG:
+            raise CommandError('popular_dados só pode ser executado com DEBUG=True (nunca em produção).')
+        if not options['confirmar']:
+            raise CommandError(
+                'Este comando APAGA todas as doações, campanhas e membros. '
+                'Execute novamente com --confirmar para prosseguir.'
+            )
         self.stdout.write('Limpando dados existentes...')
+        # Recibos e despesas vinculadas protegem doações e campanhas (PROTECT): solta os vínculos antes.
+        Recibo.objects.all().delete()
+        Despesa.objects.filter(campanha__isnull=False).update(campanha=None)
         Doacao.objects.all().delete()
         Campanha.objects.all().delete()
         Apoiador.objects.all().delete()
@@ -52,14 +70,13 @@ class Command(BaseCommand):
             c = Campanha.objects.create(
                 titulo=titulo,
                 meta_valor=meta,
-                valor_arrecadado=0,
                 status='ativa',
                 data_inicio=inicio,
             )
             campanhas.append(c)
 
         self.stdout.write('Criando doações (12 meses)...')
-        hoje = date.today()
+        hoje = timezone.localdate()
         apoiador_idx = 0
 
         for i, total_mes in enumerate(DOACOES_MENSAIS):

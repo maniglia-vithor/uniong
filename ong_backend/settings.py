@@ -1,14 +1,26 @@
 from datetime import timedelta
 from pathlib import Path
-from decouple import config
+from decouple import Csv, config
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-chave-de-desenvolvimento-troque-em-producao')
+DEBUG = config('DEBUG', default=False, cast=bool)
 
-DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+def _obrigatoria_em_producao(nome, valor_dev):
+    """Em desenvolvimento usa o valor padrão; com DEBUG=False a variável precisa estar no .env."""
+    valor = config(nome, default='')
+    if valor:
+        return valor
+    if DEBUG:
+        return valor_dev
+    raise ImproperlyConfigured(f'Defina {nome} no .env: obrigatória com DEBUG=False.')
+
+
+SECRET_KEY = _obrigatoria_em_producao('SECRET_KEY', 'django-insecure-chave-somente-para-desenvolvimento')
+
+ALLOWED_HOSTS = Csv()(_obrigatoria_em_producao('ALLOWED_HOSTS', 'localhost,127.0.0.1'))
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -19,6 +31,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'core',
 ]
@@ -61,6 +74,8 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD', default=''),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='3306'),
+        # Cada requisição é uma transação: um erro no meio não deixa registros pela metade.
+        'ATOMIC_REQUESTS': True,
         'OPTIONS': {
             'charset': 'utf8mb4',
         },
@@ -69,30 +84,57 @@ DATABASES = {
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.IsAdminUser',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
+    'DEFAULT_PAGINATION_CLASS': 'core.paginacao.PaginacaoPadrao',
+    'DEFAULT_FILTER_BACKENDS': [
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'auth': config('THROTTLE_AUTH', default='10/min'),
+        'doacao_publica': config('THROTTLE_DOACAO_PUBLICA', default='5/min'),
+    },
+    # Número de proxies reversos à frente do Django; 0 usa o REMOTE_ADDR e ignora X-Forwarded-For.
+    'NUM_PROXIES': config('NUM_PROXIES', default=0, cast=int),
 }
 
 GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=8),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=config('JWT_ACCESS_MINUTOS', default=60, cast=int)),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:5173,http://localhost:3000'
-).split(',')
+CORS_ALLOWED_ORIGINS = Csv()(
+    _obrigatoria_em_producao('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:3000')
+)
 
 CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
+
+# Endereço público do frontend (usado no redirecionamento das prévias /c/<id>/).
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
+
+# Segurança HTTPS: ativa por padrão quando DEBUG=False, cada item ajustável pelo .env.
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+if not DEBUG:
+    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
+    SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=True, cast=bool)
+    CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=True, cast=bool)
+    SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=31536000, cast=int)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = config('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=True, cast=bool)
+    SECURE_HSTS_PRELOAD = config('SECURE_HSTS_PRELOAD', default=False, cast=bool)
+    if config('USAR_PROXY_HTTPS', default=False, cast=bool):
+        SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -110,14 +152,33 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+# Destino do collectstatic (admin do Django e DRF), servido pelo nginx em produção.
+STATIC_ROOT = config('STATIC_ROOT', default=str(BASE_DIR / 'staticfiles'))
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Backups (python manage.py backup): pasta e quantos arquivos manter.
+BACKUP_DIR = config('BACKUP_DIR', default=str(BASE_DIR / 'backups'))
+BACKUP_MANTER = config('BACKUP_MANTER', default=7, cast=int)
+
+# Anexos de despesas: fora de MEDIA_ROOT, servidos só pela API autenticada.
+PRIVATE_MEDIA_ROOT = config('PRIVATE_MEDIA_ROOT', default=str(BASE_DIR / 'privado'))
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
+# E-mail: console em desenvolvimento (mensagens aparecem no terminal do runserver); SMTP em produção.
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = config('EMAIL_HOST', default='')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='UniONG <nao-responda@localhost>')
+
+# Links de convite da equipe valem 72 h; os de recuperação de senha, 2 h.
+CONVITE_VALIDADE_SEGUNDOS = 72 * 3600
+# Comunicados por e-mail: mensagens por conexão SMTP e máximo de destinatários no envio pela tela.
+COMUNICADOS_LOTE = config('COMUNICADOS_LOTE', default=50, cast=int)
+COMUNICADOS_LIMITE_SINCRONO = config('COMUNICADOS_LIMITE_SINCRONO', default=300, cast=int)
+PASSWORD_RESET_TIMEOUT = config('PASSWORD_RESET_TIMEOUT', default=2 * 3600, cast=int)

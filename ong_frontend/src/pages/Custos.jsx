@@ -1,20 +1,25 @@
-import { useEffect, useState, useMemo, useRef } from 'react'
-import { useRole } from '../context/RoleContext'
-import { Plus, Pencil, Trash2, TrendingDown, AlertCircle, Tag, ChevronUp, ChevronDown, ChevronsUpDown, Paperclip, X, RefreshCw, Repeat } from 'lucide-react'
+import { useCallback, useEffect, useState, useRef } from 'react'
+import { Plus, Pencil, Trash2, TrendingDown, AlertCircle, Tag, CalendarClock, Paperclip, X, RefreshCw, Repeat } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import Modal from '../components/Modal'
 import { Campo, Input, Select, BotaoSubmit, BotaoCancelar } from '../components/CampoForm'
 import CampoData from '../components/CampoData'
 import BadgeStatus from '../components/BadgeStatus'
 import TabelaVazia from '../components/TabelaVazia'
+import Paginacao from '../components/Paginacao'
+import { CabecalhoOrdenavel, CampoBusca } from '../components/CabecalhoOrdenavel'
+import useListaPaginada from '../hooks/useListaPaginada'
+import { mensagemErro } from '../utils/formatos'
 import {
   getDespesas, criarDespesa, atualizarDespesa, excluirDespesa,
-  removerAnexoDespesa, getDespesasResumo, getDespesasPorCategoria,
+  removerAnexoDespesa, baixarAnexoDespesa, getDespesasResumo, getDespesasPorCategoria,
+  encerrarSerieDespesa, aplicarValorProximasDespesa, getCampanhasOpcoes, marcarAnexoPublico,
 } from '../services/api'
+import GraficoAcessivel from '../components/GraficoAcessivel'
 
 const VAZIO = {
-  descricao: '', valor: '', data_vencimento: '', data_pagamento: '',
-  categoria: 'outros', status: 'pendente', is_fixed: false, recurrence_period: 'mensal',
+  descricao: '', descricao_publica: '', campanha: '', valor: '', data_vencimento: '', data_pagamento: '',
+  categoria: 'outros', status: 'pendente', is_fixed: false, recurrence_period: 'mensal', recorrencia_fim: '',
 }
 
 const CATEGORIAS = [
@@ -60,42 +65,38 @@ function KpiCusto({ titulo, valor, subtitulo, icone: Icone, cor }) {
   )
 }
 
-function SortIcon({ dir }) {
-  if (dir === 'asc') return <ChevronUp size={12} className="inline-block ml-1" />
-  if (dir === 'desc') return <ChevronDown size={12} className="inline-block ml-1" />
-  return <ChevronsUpDown size={12} className="inline-block ml-1 opacity-30" />
-}
-
 export default function Custos() {
-  const { isAdmin } = useRole()
-  const [lista, setLista] = useState([])
+  const lista = useListaPaginada(getDespesas)
   const [resumo, setResumo] = useState(null)
+  const [campanhasOpcoes, setCampanhasOpcoes] = useState([])
   const [grafico, setGrafico] = useState([])
-  const [carregando, setCarregando] = useState(true)
-  const [erro, setErro] = useState(null)
   const [modal, setModal] = useState(false)
   const [editando, setEditando] = useState(null)
   const [form, setForm] = useState(VAZIO)
   const [novosAnexos, setNovosAnexos] = useState([])
   const [salvando, setSalvando] = useState(false)
-  const [sortCol, setSortCol] = useState(null)
-  const [sortDir, setSortDir] = useState('asc')
+
   const fileInputRef = useRef(null)
 
-  const carregar = () => {
-    setCarregando(true)
-    setErro(null)
-    Promise.all([getDespesas(), getDespesasResumo(), getDespesasPorCategoria()])
-      .then(([d, r, g]) => {
-        setLista(d.data.results ?? d.data)
+  const carregarResumo = useCallback(() => {
+    Promise.all([getDespesasResumo(), getDespesasPorCategoria()])
+      .then(([r, g]) => {
         setResumo(r.data)
         setGrafico(g.data)
       })
-      .catch(() => setErro('Erro ao carregar dados. Verifique se o servidor está rodando.'))
-      .finally(() => setCarregando(false))
-  }
+      .catch(() => {})
+  }, [])
 
-  useEffect(() => { carregar() }, [])
+  useEffect(() => { carregarResumo() }, [carregarResumo])
+
+  useEffect(() => {
+    getCampanhasOpcoes({ incluir_encerradas: 1 }).then(({ data }) => setCampanhasOpcoes(data)).catch(() => {})
+  }, [])
+
+  function carregar() {
+    lista.recarregar()
+    carregarResumo()
+  }
 
   function abrirNovo() {
     setEditando(null)
@@ -108,6 +109,8 @@ export default function Custos() {
     setEditando(item)
     setForm({
       descricao: item.descricao,
+      descricao_publica: item.descricao_publica || '',
+      campanha: item.campanha || '',
       valor: item.valor,
       data_vencimento: item.data_vencimento,
       data_pagamento: item.data_pagamento || '',
@@ -115,9 +118,33 @@ export default function Custos() {
       status: item.status,
       is_fixed: item.is_fixed ?? false,
       recurrence_period: item.recurrence_period || 'mensal',
+      recorrencia_fim: item.recorrencia_fim || '',
     })
     setNovosAnexos([])
     setModal(true)
+  }
+
+  async function onEncerrarSerie() {
+    if (!confirm('Encerrar a série nesta ocorrência? As ocorrências pendentes seguintes serão apagadas.')) return
+    try {
+      const { data } = await encerrarSerieDespesa(editando.id)
+      alert(`Série encerrada. ${data.ocorrencias_apagadas} ocorrência(s) futura(s) apagada(s).`)
+      fechar()
+      carregar()
+    } catch (err) {
+      alert(mensagemErro(err, 'Não foi possível encerrar a série.'))
+    }
+  }
+
+  async function onAplicarValor() {
+    if (!confirm('Aplicar o valor salvo desta despesa às próximas ocorrências pendentes da série?')) return
+    try {
+      const { data } = await aplicarValorProximasDespesa(editando.id)
+      alert(`${data.atualizadas} ocorrência(s) atualizada(s). Salve antes se alterou o valor agora.`)
+      carregar()
+    } catch (err) {
+      alert(mensagemErro(err, 'Não foi possível aplicar o valor.'))
+    }
   }
 
   function fechar() { setModal(false); setEditando(null); setNovosAnexos([]) }
@@ -137,6 +164,16 @@ export default function Custos() {
     setNovosAnexos((prev) => prev.filter((_, i) => i !== idx))
   }
 
+  async function alternarPublico(anexo, publico) {
+    try {
+      const { data } = await marcarAnexoPublico(editando.id, anexo.id, publico)
+      setEditando((prev) => ({ ...prev, anexos: prev.anexos.map((a) => (a.id === anexo.id ? data : a)) }))
+      carregar()
+    } catch (err) {
+      alert(mensagemErro(err, 'Não foi possível alterar o comprovante.'))
+    }
+  }
+
   async function removerAnexoExistente(anexoId) {
     if (!editando) return
     await removerAnexoDespesa(editando.id, anexoId)
@@ -148,6 +185,8 @@ export default function Custos() {
     setSalvando(true)
     const fd = new FormData()
     fd.append('descricao', form.descricao)
+    fd.append('descricao_publica', form.descricao_publica)
+    fd.append('campanha', form.campanha || '')
     fd.append('valor', form.valor)
     fd.append('data_vencimento', form.data_vencimento)
     if (form.data_pagamento) fd.append('data_pagamento', form.data_pagamento)
@@ -155,14 +194,32 @@ export default function Custos() {
     fd.append('status', form.status)
     fd.append('is_fixed', form.is_fixed ? 'true' : 'false')
     if (form.is_fixed) fd.append('recurrence_period', form.recurrence_period)
+    if (form.is_fixed) fd.append('recorrencia_fim', form.recorrencia_fim || '')
     novosAnexos.forEach((f) => fd.append('anexos', f))
     try {
       if (editando) await atualizarDespesa(editando.id, fd)
       else await criarDespesa(fd)
       fechar()
       carregar()
-    } catch { alert('Erro ao salvar. Verifique os dados.') }
+    } catch (err) {
+      const erros = err.response?.data?.anexos
+      alert(Array.isArray(erros) ? erros.join('\n') : mensagemErro(err))
+    }
     finally { setSalvando(false) }
+  }
+
+  async function onBaixarAnexo(anexo) {
+    try {
+      const { data } = await baixarAnexoDespesa(editando.id, anexo.id)
+      const url = URL.createObjectURL(data)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = anexo.nome_original || 'anexo'
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('Não foi possível baixar o anexo.')
+    }
   }
 
   async function onExcluir(id) {
@@ -171,82 +228,55 @@ export default function Custos() {
     carregar()
   }
 
-  function handleSort(col) {
-    if (sortCol === col) {
-      if (sortDir === 'asc') setSortDir('desc')
-      else { setSortCol(null); setSortDir('asc') }
-    } else { setSortCol(col); setSortDir('asc') }
-  }
-
-  const TIPO_COL = {
-    descricao: 'texto', categoria_display: 'texto',
-    data_vencimento: 'data', valor: 'numero', status_efetivo: 'texto',
-  }
-
-  const listaOrdenada = useMemo(() => {
-    if (!sortCol) return lista
-    return [...lista].sort((a, b) => {
-      let va = a[sortCol]; let vb = b[sortCol]
-      if (va == null) va = TIPO_COL[sortCol] === 'numero' ? -Infinity : ''
-      if (vb == null) vb = TIPO_COL[sortCol] === 'numero' ? -Infinity : ''
-      const cmp = TIPO_COL[sortCol] === 'numero'
-        ? va - vb
-        : String(va).localeCompare(String(vb), 'pt-BR')
-      return sortDir === 'asc' ? cmp : -cmp
-    })
-  }, [lista, sortCol, sortDir])
-
-  const colHeader = (key, label, align = 'left') => (
-    <th
-      onClick={() => handleSort(key)}
-      className={`text-${align} text-xs font-medium text-[var(--text-muted)] px-5 py-3 cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors whitespace-nowrap`}
-    >
-      {label}<SortIcon dir={sortCol === key ? sortDir : null} />
-    </th>
-  )
-
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-[var(--text-primary)]">Custos</h1>
-          <p className="text-xs text-[var(--text-muted)]">{lista.length} registro{lista.length !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-[var(--text-muted)]">{lista.total} registro{lista.total !== 1 ? 's' : ''}</p>
         </div>
-        {isAdmin && <button
+        <button
           onClick={abrirNovo}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity"
           style={{ backgroundColor: '#0f4c5c' }}
         >
           <Plus size={15} /> Novo Custo
-        </button>}
+        </button>
       </div>
 
-      {erro && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-center text-red-600 text-sm">{erro}</div>
+      {lista.erro && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-center text-red-600 text-sm">{lista.erro}</div>
       )}
 
       {/* KPI Cards */}
       {resumo && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <KpiCusto
             titulo="Gasto do Mês"
             valor={formatBRL(resumo.gasto_mes)}
-            subtitulo="Despesas com vencimento neste mês"
+            subtitulo="Despesas pagas neste mês (data de pagamento)"
             icone={TrendingDown}
             cor="#dc2626"
           />
           <KpiCusto
+            titulo="A Pagar no Mês"
+            valor={formatBRL(resumo.a_pagar_mes)}
+            subtitulo="Pendentes com vencimento neste mês"
+            icone={CalendarClock}
+            cor="#0891b2"
+          />
+          <KpiCusto
             titulo="Total Pendente"
             valor={formatBRL(resumo.total_pendente)}
-            subtitulo="Inclui pendentes e atrasadas"
+            subtitulo={`Todas as pendentes; ${formatBRL(resumo.total_atrasado)} já vencidas`}
             icone={AlertCircle}
             cor="#f97316"
           />
           <KpiCusto
             titulo="Maior Categoria"
             valor={resumo.maior_categoria_display || '—'}
-            subtitulo="Categoria com mais gastos no mês"
+            subtitulo="Categoria com mais gastos pagos no mês"
             icone={Tag}
             cor="#7c3aed"
           />
@@ -257,10 +287,18 @@ export default function Custos() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Donut */}
         <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border)] p-5 flex flex-col">
-          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Distribuição por Categoria (mês atual)</h2>
           {grafico.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center text-[var(--text-muted)] text-sm">Sem dados</div>
+            <>
+              <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Gastos pagos por categoria (mês atual)</h2>
+              <div className="flex-1 flex items-center justify-center text-[var(--text-muted)] text-sm">Sem dados</div>
+            </>
           ) : (
+            <GraficoAcessivel
+              titulo="Gastos pagos por categoria (mês atual)"
+              descricao={grafico.map((g) => `${g.label}: ${formatBRL(g.total)}`).join('; ')}
+              colunas={[{ chave: 'label', rotulo: 'Categoria' }, { chave: 'total', rotulo: 'Pago', formato: (v) => formatBRL(v) }]}
+              linhas={grafico}
+            >
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie
@@ -281,30 +319,34 @@ export default function Custos() {
                 <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px' }} />
               </PieChart>
             </ResponsiveContainer>
+            </GraficoAcessivel>
           )}
         </div>
 
         {/* Tabela */}
         <div className="lg:col-span-2 bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border)]">
+          <div className="p-3 border-b border-[var(--border)]">
+            <CampoBusca valor={lista.busca} onMudar={lista.setBusca} placeholder="Buscar por descrição" />
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--border)]">
-                  {colHeader('descricao', 'Descrição')}
-                  {colHeader('categoria_display', 'Categoria')}
-                  {colHeader('data_vencimento', 'Vencimento')}
-                  {colHeader('valor', 'Valor', 'right')}
-                  {colHeader('status_efetivo', 'Status')}
-                  <th className="px-5 py-3" />
+                  <CabecalhoOrdenavel lista={lista} campo="descricao" rotulo="Descrição" />
+                  <CabecalhoOrdenavel lista={lista} campo="categoria" rotulo="Categoria" />
+                  <CabecalhoOrdenavel lista={lista} campo="data_vencimento" rotulo="Vencimento" />
+                  <CabecalhoOrdenavel lista={lista} campo="valor" rotulo="Valor" alinhamento="right" />
+                  <CabecalhoOrdenavel lista={lista} campo="status" rotulo="Status" />
+                  <th scope="col" className="px-5 py-3"><span className="sr-only">Ações</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-subtle)]">
-                {carregando ? (
+                {lista.carregando ? (
                   <tr><td colSpan={6} className="text-center py-10 text-[var(--text-muted)] text-sm">Carregando...</td></tr>
-                ) : listaOrdenada.length === 0 ? (
+                ) : lista.itens.length === 0 ? (
                   <TabelaVazia />
                 ) : (
-                  listaOrdenada.map((d) => (
+                  lista.itens.map((d) => (
                     <tr key={d.id} className="hover:bg-[var(--bg-hover)] transition-colors">
                       <td className="px-5 py-3 font-medium text-[var(--text-primary)] max-w-[200px] truncate">{d.descricao}</td>
                       <td className="px-5 py-3">
@@ -323,12 +365,12 @@ export default function Custos() {
                       <td className="px-5 py-3"><BadgeStatus status={d.status_efetivo} /></td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2 justify-end">
-                          {isAdmin && <button onClick={() => abrirEdicao(d)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-700 transition-colors">
+                          <button onClick={() => abrirEdicao(d)} aria-label={`Editar ${d.descricao}`} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-700 transition-colors">
                             <Pencil size={14} />
-                          </button>}
-                          {isAdmin && <button onClick={() => onExcluir(d.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
+                          </button>
+                          <button onClick={() => onExcluir(d.id)} aria-label={`Excluir ${d.descricao}`} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
                             <Trash2 size={14} />
-                          </button>}
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -337,6 +379,7 @@ export default function Custos() {
               </tbody>
             </table>
           </div>
+          <Paginacao pagina={lista.pagina} total={lista.total} tamanhoPagina={lista.tamanhoPagina} onMudar={lista.setPagina} />
         </div>
       </div>
 
@@ -348,6 +391,21 @@ export default function Custos() {
             <Campo label="Descrição">
               <Input name="descricao" value={form.descricao} onChange={onChange} placeholder="Ex: Aluguel do escritório" required />
             </Campo>
+            <Campo label="Descrição pública (opcional)">
+              <Input name="descricao_publica" value={form.descricao_publica} onChange={onChange} maxLength={200}
+                placeholder="O que aparece no portal. Vazio: só a categoria" />
+            </Campo>
+            <Campo label="Campanha (opcional)">
+              <Select name="campanha" value={form.campanha} onChange={onChange}>
+                <option value="">Sem campanha vinculada</option>
+                {campanhasOpcoes.map((c) => (
+                  <option key={c.id} value={c.id}>{c.titulo}{c.status === 'encerrada' ? ' (encerrada)' : ''}</option>
+                ))}
+              </Select>
+            </Campo>
+            {form.categoria === 'recursos_humanos' && (
+              <p className="text-[11px] text-[var(--text-muted)] -mt-2">Despesas de Recursos Humanos aparecem no portal somadas numa única linha.</p>
+            )}
 
             {/* Valor + Vencimento */}
             <div className="grid grid-cols-2 gap-3">
@@ -370,7 +428,7 @@ export default function Custos() {
                 <Select name="status" value={form.status} onChange={onChange}>
                   <option value="pendente">Pendente</option>
                   <option value="pago">Pago</option>
-                  <option value="atrasado">Atrasado</option>
+                  <option value="cancelado">Cancelado (fora dos totais)</option>
                 </Select>
               </Campo>
             </div>
@@ -413,10 +471,26 @@ export default function Custos() {
                       <option value="anual">Anual</option>
                     </Select>
                   </Campo>
+                  <div className="mt-3">
+                    <Campo label="Repetir até (opcional)">
+                      <CampoData name="recorrencia_fim" value={form.recorrencia_fim} onChange={onChange} />
+                    </Campo>
+                  </div>
                   <p className="text-xs text-[var(--text-muted)] mt-2 flex items-center gap-1">
-                    <RefreshCw size={11} />
-                    A próxima despesa será gerada automaticamente ao marcar esta como paga.
+                    <RefreshCw size={11} aria-hidden="true" />
+                    A próxima ocorrência é criada ao marcar esta como paga, sempre a partir da data da primeira
+                    {editando?.numero_ocorrencia ? ` (ocorrência nº ${editando.numero_ocorrencia + 1} da série)` : ''}.
                   </p>
+                  {editando?.serie_id && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <button type="button" onClick={onAplicarValor} className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
+                        Aplicar valor às próximas
+                      </button>
+                      <button type="button" onClick={onEncerrarSerie} className="px-3 py-1.5 rounded-lg text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50">
+                        Encerrar série
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -430,17 +504,26 @@ export default function Custos() {
                 <div className="space-y-1 mb-2">
                   {editando.anexos.map((a) => (
                     <div key={a.id} className="flex items-center justify-between gap-2 px-3 py-1.5 bg-[var(--bg-card-alt)] rounded-lg border border-[var(--border)]">
-                      <a
-                        href={a.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-teal-700 hover:underline truncate flex items-center gap-1.5"
+                      <button
+                        type="button"
+                        onClick={() => onBaixarAnexo(a)}
+                        className="text-xs text-teal-700 dark:text-teal-300 hover:underline truncate flex items-center gap-1.5"
                       >
                         <Paperclip size={11} className="flex-shrink-0" />
                         {a.nome_original}
-                      </a>
+                      </button>
+                      <label className="flex items-center gap-1 text-[11px] text-[var(--text-secondary)] flex-shrink-0" title="Permitir download no portal de transparência">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(a.publico)}
+                          disabled={form.categoria === 'recursos_humanos'}
+                          onChange={(e) => alternarPublico(a, e.target.checked)}
+                        />
+                        Público no portal
+                      </label>
                       <button
                         type="button"
+                        aria-label={`Remover ${a.nome_original}`}
                         onClick={() => removerAnexoExistente(a.id)}
                         className="text-slate-300 hover:text-red-500 transition-colors flex-shrink-0"
                       >
@@ -460,8 +543,8 @@ export default function Custos() {
                         <Paperclip size={11} className="flex-shrink-0" />
                         {f.name}
                       </span>
-                      <button type="button" onClick={() => removerNovoAnexo(i)} className="text-blue-300 hover:text-red-500 transition-colors flex-shrink-0">
-                        <X size={13} />
+                      <button type="button" onClick={() => removerNovoAnexo(i)} aria-label={`Remover ${f.name}`} className="text-blue-700 hover:text-red-600 transition-colors flex-shrink-0">
+                        <X size={13} aria-hidden="true" />
                       </button>
                     </div>
                   ))}
@@ -475,11 +558,12 @@ export default function Custos() {
               >
                 <Paperclip size={18} className="text-[var(--text-muted)]" />
                 <span className="text-xs text-[var(--text-secondary)] font-medium">Adicionar anexo</span>
-                <span className="text-[11px] text-[var(--text-muted)]">Clique para selecionar arquivos</span>
+                <span className="text-[11px] text-[var(--text-muted)]">PDF, JPG, PNG ou WEBP, até 5 MB cada</span>
               </div>
               <input
                 ref={fileInputRef}
                 type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
                 multiple
                 className="hidden"
                 onChange={onAddFiles}

@@ -1,0 +1,59 @@
+# UniONG em produção: MySQL + backend (gunicorn) + web (nginx com o React).
+# Passo a passo em docs/implantacao.md. Uso: cp .env.example .env (e preencher); docker compose up -d --build
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-ong_db}
+      MYSQL_USER: ${DB_USER:?defina DB_USER no .env (não use root)}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?defina DB_ROOT_PASSWORD no .env}
+    volumes:
+      - dados_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      STATIC_ROOT: /app/staticfiles
+      PRIVATE_MEDIA_ROOT: /app/privado
+      BACKUP_DIR: /app/backups
+      # O nginx do serviço "web" é um proxy; some 1 se houver outro na frente (ex.: Caddy com HTTPS).
+      NUM_PROXIES: ${NUM_PROXIES:-1}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - estaticos:/app/staticfiles
+      - midia:/app/media
+      - privado:/app/privado
+      - ./backups:/app/backups
+
+  web:
+    build:
+      context: ./ong_frontend
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${PORTA_HTTP:-80}:80"
+    volumes:
+      - estaticos:/var/www/static:ro
+
+volumes:
+  dados_mysql:
+  estaticos:
+  midia:
+  privado:

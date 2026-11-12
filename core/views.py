@@ -1,28 +1,41 @@
-﻿import csv
+import os
 from datetime import date
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from google.oauth2 import id_token as google_id_token
+from google.auth.exceptions import GoogleAuthError
 from google.auth.transport import requests as google_requests
 from rest_framework_simplejwt.tokens import RefreshToken
-from dateutil.relativedelta import relativedelta
-from django.db.models import Sum, Q
-from django.http import HttpResponse
+from decimal import Decimal
+
+from django.db.models import Case, Count, DecimalField, F, ProtectedError, Q, Sum, Value, When
+from django.db.models.functions import Coalesce
+from django.http import FileResponse
 from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.permissions import AllowAny, BasePermission
+from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoPix
-from .serializers import ApoiadorSerializer, CampanhaSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer
+from django.db import transaction
+
+from .models import Apoiador, Campanha, Contribuicao, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoInstituicao, ConfiguracaoPix, LogAlteracao
+from .anexos import TIPOS_PERMITIDOS, validar_anexo
+from .doacao_publica import DoacaoPublicaSerializer, ativar_membro_interessado, registrar_doacao_publica
+from . import comunicados, indicadores, lgpd, recibos
+from .auditoria import AuditoriaMixin, registrar as registrar_auditoria
+from .campanhas_publicas import avisar_meta_atingida, validar_imagem
+from .paginacao import filtrar_periodo
+from .portal import CATEGORIA_AGREGADA, despesas_publicas
+from .pix import mascarar
+from .throttles import AuthThrottle, DoacaoPublicaThrottle
+from .serializers import ApoiadorSerializer, CampanhaSerializer, ContribuicaoSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer, ConfiguracaoInstituicaoSerializer, LogAlteracaoSerializer, dados_publicos_instituicao
 
 
 def _notificar_admins(mensagem, tipo, actor_name='', action_text='', target_type='', target_id=None):
     User = get_user_model()
-    admins = User.objects.filter(is_staff=True)
-    if not admins.exists():
-        admins = User.objects.all()
+    admins = User.objects.filter(is_staff=True, is_active=True)
     Notificacao.objects.bulk_create([
         Notificacao(
             usuario=u,
@@ -36,17 +49,66 @@ def _notificar_admins(mensagem, tipo, actor_name='', action_text='', target_type
     ])
 
 
-class ApoiadorViewSet(viewsets.ModelViewSet):
-    queryset = Apoiador.objects.all()
+class ExclusaoProtegidaMixin:
+    """Responde 400 com mensagem clara quando o registro tem dependentes protegidos (PROTECT)."""
+
+    mensagem_exclusao_protegida = 'Este registro não pode ser excluído porque possui registros vinculados.'
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            with transaction.atomic():
+                return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            return Response({'erro': self.mensagem_exclusao_protegida}, status=400)
+
+
+class ApoiadorViewSet(AuditoriaMixin, ExclusaoProtegidaMixin, viewsets.ModelViewSet):
     serializer_class = ApoiadorSerializer
-    permission_classes = [IsAuthenticated]
+    mensagem_exclusao_protegida = 'Não é possível excluir: este membro possui doações vinculadas.'
+    search_fields = ['nome', 'email']
+    ordering_fields = ['nome', 'email', 'celular', 'data_cadastro', 'status', 'total_doado']
+    ordering = ['-data_cadastro', '-id']
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = Apoiador.objects.annotate(
+            total_doado=Coalesce(
+                Sum('doacoes__valor', filter=Q(doacoes__status='confirmada', doacoes__tipo='financeira')),
+                Value(Decimal('0')),
+                output_field=DecimalField(max_digits=14, decimal_places=2),
+            )
+        )
         status = self.request.query_params.get('status')
         if status:
             qs = qs.filter(status=status)
         return qs
+
+    @action(detail=True, methods=['post'])
+    def anonimizar(self, request, pk=None):
+        """LGPD: só superusuário e com {"confirmar": true}. Mantém as doações (sem identificação)."""
+        if not request.user.is_superuser:
+            return Response({'erro': 'Apenas superusuários podem anonimizar membros.'}, status=403)
+        if request.data.get('confirmar') is not True:
+            return Response({'erro': 'Confirme a anonimização enviando "confirmar": true.'}, status=400)
+        apoiador = self.get_object()
+        if apoiador.anonimizado_em:
+            return Response({'erro': 'Este membro já foi anonimizado.'}, status=400)
+        lgpd.anonimizar(apoiador, request.user)
+        return Response(self.get_serializer(self.get_queryset().get(pk=apoiador.pk)).data)
+
+    @action(detail=True, methods=['get'])
+    def exportar(self, request, pk=None):
+        """LGPD: todos os dados do membro em JSON, para atender pedido do titular."""
+        apoiador = self.get_object()
+        registrar_auditoria(request.user, apoiador, 'edicao', 'exportação de dados', '', 'dados exportados (LGPD)')
+        resposta = Response(lgpd.exportar(apoiador))
+        resposta['Content-Disposition'] = f'attachment; filename="dados_membro_{apoiador.pk}.json"'
+        return resposta
+
+    @action(detail=False, methods=['get'], pagination_class=None, filter_backends=[])
+    def opcoes(self, request):
+        """Lista leve para seleção: membros ativos (id e nome), sem paginação."""
+        dados = Apoiador.objects.filter(status='ativo').order_by('nome').values('id', 'nome')
+        return Response(list(dados))
 
     def perform_create(self, serializer):
         apoiador = serializer.save()
@@ -61,22 +123,71 @@ class ApoiadorViewSet(viewsets.ModelViewSet):
         )
 
 
-class CampanhaViewSet(viewsets.ModelViewSet):
-    queryset = Campanha.objects.all()
+class CampanhaViewSet(AuditoriaMixin, ExclusaoProtegidaMixin, viewsets.ModelViewSet):
     serializer_class = CampanhaSerializer
-    permission_classes = [IsAuthenticated]
+    mensagem_exclusao_protegida = (
+        'Não é possível excluir: existem doações ou despesas vinculadas a esta campanha. Encerre a campanha em vez de excluí-la.'
+    )
+    search_fields = ['titulo']
+    ordering_fields = ['titulo', 'meta_valor', 'arrecadado', 'progresso', 'data_inicio', 'data_fim', 'status']
+    ordering = ['-data_inicio', '-id']
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = Campanha.objects.com_arrecadado().annotate(
+            progresso=Case(
+                When(meta_valor__gt=0, then=F('arrecadado') * 100 / F('meta_valor')),
+                default=Value(Decimal('0')),
+                output_field=DecimalField(max_digits=14, decimal_places=2),
+            )
+        )
         status = self.request.query_params.get('status')
         if status:
             qs = qs.filter(status=status)
         return qs
 
+    @action(detail=False, methods=['get'], pagination_class=None, filter_backends=[])
+    def opcoes(self, request):
+        """Lista leve para seleção (id, título e status), sem paginação. Padrão: só ativas;
+        ?incluir_encerradas=1 traz todas (usado para vincular despesas)."""
+        qs = Campanha.objects.all()
+        if request.query_params.get('incluir_encerradas') != '1':
+            qs = Campanha.objects.em_andamento()
+        return Response(list(qs.order_by('titulo').values('id', 'titulo', 'status')))
+
+    @action(detail=True, methods=['post', 'delete'], url_path='imagem')
+    def imagem(self, request, pk=None):
+        """POST (multipart, campo "imagem") envia a imagem pública da campanha; DELETE remove."""
+        campanha = self.get_object()
+        if request.method == 'DELETE':
+            if campanha.imagem:
+                campanha.imagem.delete(save=False)
+            Campanha.objects.filter(pk=campanha.pk).update(imagem='')
+            return Response(status=204)
+        arquivo = request.FILES.get('imagem')
+        if arquivo is None:
+            return Response({'imagem': 'Envie um arquivo no campo "imagem".'}, status=400)
+        try:
+            validar_imagem(arquivo)
+        except ValueError as e:
+            return Response({'imagem': str(e)}, status=400)
+        if campanha.imagem:
+            campanha.imagem.delete(save=False)
+        campanha.imagem = arquivo
+        campanha.save(update_fields=['imagem'])
+        registrar_auditoria(request.user, campanha, 'edicao', 'imagem', '', campanha.imagem.name)
+        return Response({'imagem_url': f'/api/public/campanhas/{campanha.pk}/imagem/'})
+
+    @action(detail=True, methods=['get'], pagination_class=None, filter_backends=[])
+    def despesas(self, request, pk=None):
+        """Despesas pagas vinculadas à campanha (prestação de contas da campanha)."""
+        campanha = self.get_object()
+        despesas = campanha.despesas.filter(status='pago').order_by('-data_pagamento', '-id')
+        return Response(DespesaSerializer(despesas, many=True, context={'request': request}).data)
+
     def perform_create(self, serializer):
         campanha = serializer.save()
         actor = self.request.user.get_full_name() or self.request.user.username
-        meta = f'R$ {campanha.meta:.2f}'.replace('.', ',') if campanha.meta else None
+        meta = f'R$ {campanha.meta_valor:.2f}'.replace('.', ',') if campanha.meta_valor else None
         meta_txt = f' (Meta: {meta})' if meta else ''
         _notificar_admins(
             mensagem=f'{actor} criou a campanha: {campanha.titulo}{meta_txt}.',
@@ -88,13 +199,15 @@ class CampanhaViewSet(viewsets.ModelViewSet):
         )
 
 
-class DoacaoViewSet(viewsets.ModelViewSet):
-    queryset = Doacao.objects.select_related('apoiador', 'campanha').all()
+class DoacaoViewSet(AuditoriaMixin, ExclusaoProtegidaMixin, viewsets.ModelViewSet):
     serializer_class = DoacaoSerializer
-    permission_classes = [IsAuthenticated]
+    mensagem_exclusao_protegida = 'Não é possível excluir: já foi emitido recibo para esta doação. Cancele-a, se for o caso.'
+    search_fields = ['apoiador__nome', 'campanha__titulo', 'descricao_bens', 'observacao']
+    ordering_fields = ['apoiador__nome', 'campanha__titulo', 'valor', 'data', 'status', 'forma_pagamento']
+    ordering = ['-data', '-id']
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = Doacao.objects.select_related('apoiador', 'campanha', 'recibo')
         status = self.request.query_params.get('status')
         campanha = self.request.query_params.get('campanha')
         apoiador = self.request.query_params.get('apoiador')
@@ -104,26 +217,135 @@ class DoacaoViewSet(viewsets.ModelViewSet):
             qs = qs.filter(campanha_id=campanha)
         if apoiador:
             qs = qs.filter(apoiador_id=apoiador)
-        return qs
+        for campo in ('tipo', 'forma_pagamento'):
+            valor = self.request.query_params.get(campo)
+            if valor:
+                qs = qs.filter(**{campo: valor})
+        if self.request.query_params.get('anonima') == 'true':
+            qs = qs.filter(apoiador__isnull=True)
+        return filtrar_periodo(qs, self.request, 'data')
+
+    @action(detail=False, methods=['get'], pagination_class=None)
+    def resumo(self, request):
+        """Totais de todos os registros que atendem aos filtros (não só da página)."""
+        qs = self.filter_queryset(self.get_queryset())
+        confirmadas = qs.filter(status='confirmada', tipo='financeira').aggregate(total=Sum('valor'), quantidade=Count('id'))
+        bens = qs.filter(status='confirmada', tipo='bens').aggregate(estimado=Sum('valor_estimado'), quantidade=Count('id'))
+        return Response({
+            'quantidade': qs.count(),
+            'total_confirmado': float(confirmadas['total'] or 0),
+            'quantidade_confirmadas': confirmadas['quantidade'],
+            'bens_quantidade': bens['quantidade'],
+            'bens_valor_estimado': float(bens['estimado'] or 0),
+        })
+
+    @action(detail=True, methods=['post'], url_path='recibo')
+    def recibo(self, request, pk=None):
+        """Emite (ou devolve, com o mesmo número) o recibo da doação confirmada."""
+        try:
+            recibo = recibos.emitir(self.get_object(), request.user)
+        except recibos.ReciboIndisponivel as e:
+            return Response({'erro': str(e)}, status=400)
+        return Response(recibos.dados_recibo(recibo))
+
+    @action(detail=True, methods=['post'], url_path='recibo/enviar')
+    def enviar_recibo(self, request, pk=None):
+        try:
+            recibo = recibos.emitir(self.get_object(), request.user)
+            email = recibos.enviar_por_email(recibo)
+        except recibos.ReciboIndisponivel as e:
+            return Response({'erro': str(e)}, status=400)
+        registrar_auditoria(request.user, recibo.doacao, 'edicao', 'recibo', '', f'enviado para {email}')
+        return Response({'mensagem': f'Recibo enviado para {email}.', **recibos.dados_recibo(recibo)})
+
+    @action(detail=True, methods=['get', 'post', 'delete'], url_path='comprovante')
+    def comprovante(self, request, pk=None):
+        """GET baixa, POST (multipart, campo "comprovante") envia/substitui, DELETE remove o comprovante."""
+        doacao = self.get_object()
+        if request.method == 'GET':
+            if not doacao.comprovante:
+                return Response({'erro': 'Esta doação não tem comprovante.'}, status=404)
+            return _resposta_arquivo(doacao.comprovante, doacao.comprovante_nome)
+        anterior = doacao.comprovante_nome
+        if request.method == 'DELETE':
+            if doacao.comprovante:
+                doacao.comprovante.delete(save=False)
+            Doacao.objects.filter(pk=doacao.pk).update(comprovante='', comprovante_nome='')
+            registrar_auditoria(request.user, doacao, 'edicao', 'comprovante', anterior, '')
+            return Response(status=204)
+        arquivo = request.FILES.get('comprovante')
+        if arquivo is None:
+            return Response({'comprovante': 'Envie um arquivo no campo "comprovante".'}, status=400)
+        try:
+            validar_anexo(arquivo)
+        except ValueError as e:
+            return Response({'comprovante': str(e)}, status=400)
+        if doacao.comprovante:
+            doacao.comprovante.delete(save=False)
+        doacao.comprovante_nome = os.path.basename(arquivo.name)[:255]
+        doacao.comprovante = arquivo
+        doacao.save(update_fields=['comprovante', 'comprovante_nome'])
+        registrar_auditoria(request.user, doacao, 'edicao', 'comprovante', anterior, doacao.comprovante_nome)
+        return Response(DoacaoSerializer(doacao).data)
+
+    def perform_update(self, serializer):
+        doacao = serializer.save()
+        ativar_membro_interessado(doacao)
+        if doacao.status == 'confirmada' and doacao.campanha_id:
+            avisar_meta_atingida(doacao.campanha)
+
+    @action(detail=False, methods=['post'], url_path='acao-em-lote')
+    def acao_em_lote(self, request):
+        """Confirma ou cancela várias doações pendentes de uma vez: {"ids": [...], "acao": "confirmar"|"cancelar"}."""
+        novo_status = {'confirmar': 'confirmada', 'cancelar': 'cancelada'}.get(request.data.get('acao'))
+        ids = request.data.get('ids')
+        if novo_status is None:
+            return Response({'erro': 'Ação inválida. Use "confirmar" ou "cancelar".'}, status=400)
+        if not isinstance(ids, list) or not ids or not all(isinstance(i, int) for i in ids):
+            return Response({'erro': 'Informe a lista de ids das doações.'}, status=400)
+        doacoes = list(Doacao.objects.select_related('apoiador').filter(pk__in=ids, status='pendente'))
+        for doacao in doacoes:
+            doacao.status = novo_status
+            doacao.save(update_fields=['status'])
+            registrar_auditoria(request.user, doacao, 'edicao', 'status', 'pendente', novo_status)
+            ativar_membro_interessado(doacao)
+        for campanha_id in {d.campanha_id for d in doacoes if d.campanha_id and novo_status == 'confirmada'}:
+            avisar_meta_atingida(Campanha(pk=campanha_id))
+        return Response({'atualizadas': len(doacoes), 'ignoradas': len(set(ids)) - len(doacoes)})
 
     def perform_create(self, serializer):
         doacao = serializer.save()
+        ativar_membro_interessado(doacao)
+        if doacao.status == 'confirmada' and doacao.campanha_id:
+            avisar_meta_atingida(doacao.campanha)
         actor = self.request.user.get_full_name() or self.request.user.username
-        valor = f'R$ {doacao.valor:.2f}'.replace('.', ',')
+        valor = 'em bens' if doacao.tipo == 'bens' else f'de R$ {doacao.valor:.2f}'.replace('.', ',')
         campanha_txt = f' para a campanha {doacao.campanha.titulo}' if doacao.campanha else ''
         _notificar_admins(
-            mensagem=f'{actor} registrou uma nova doação de {valor} realizada por {doacao.apoiador.nome}{campanha_txt}.',
+            mensagem=f'{actor} registrou uma nova doação {valor} realizada por {doacao.nome_doador}{campanha_txt}.'[:300],
             tipo='doacao',
             actor_name=actor,
-            action_text=f'registrou uma nova doação de {valor} realizada por {doacao.apoiador.nome}{campanha_txt}',
+            action_text=f'registrou uma nova doação {valor} realizada por {doacao.nome_doador}{campanha_txt}'[:200],
             target_type='doacao',
             target_id=doacao.id,
         )
 
 
+class ContribuicaoViewSet(AuditoriaMixin, viewsets.ModelViewSet):
+    """Contribuições periódicas (mensalidades). ?apoiador=<id> filtra pela ficha do membro."""
+    serializer_class = ContribuicaoSerializer
+    ordering = ['-ativa', 'apoiador__nome', 'id']
+
+    def get_queryset(self):
+        qs = Contribuicao.objects.select_related('apoiador')
+        apoiador = self.request.query_params.get('apoiador')
+        if apoiador:
+            qs = qs.filter(apoiador_id=apoiador)
+        return qs
+
+
 class NotificacaoViewSet(viewsets.ModelViewSet):
     serializer_class = NotificacaoSerializer
-    permission_classes = [IsAuthenticated]
     http_method_names = ['get', 'patch', 'delete', 'head', 'options']
 
     def get_queryset(self):
@@ -136,218 +358,87 @@ class NotificacaoViewSet(viewsets.ModelViewSet):
 
 
 class DashboardViewSet(viewsets.ViewSet):
-    permission_classes = [IsAuthenticated]
 
     @action(detail=False, methods=['get'], url_path='resumo')
     def resumo(self, request):
-        hoje = date.today()
-        inicio_mes_atual = hoje.replace(day=1)
-        inicio_mes_anterior = (inicio_mes_atual - relativedelta(months=1))
-        fim_mes_anterior = inicio_mes_atual
-
-        def calcular_trend(atual, anterior):
-            if anterior == 0:
-                pct = 100.0 if atual > 0 else 0.0
-            else:
-                pct = round(((atual - anterior) / anterior) * 100, 1)
-            if pct > 0:
-                direction = 'positive'
-            elif pct < 0:
-                direction = 'negative'
-            else:
-                direction = 'neutral'
-            return pct, direction
-
-        total_arrecadado = Doacao.objects.filter(status='confirmada').aggregate(
-            total=Sum('valor')
-        )['total'] or 0
-        total_anterior = Doacao.objects.filter(
-            status='confirmada', data__lt=inicio_mes_atual
-        ).aggregate(total=Sum('valor'))['total'] or 0
-        total_trend, total_direction = calcular_trend(float(total_arrecadado), float(total_anterior))
-
-        doacoes_mes = Doacao.objects.filter(
-            status='confirmada', data__gte=inicio_mes_atual
-        ).aggregate(total=Sum('valor'))['total'] or 0
-        doacoes_mes_anterior = Doacao.objects.filter(
-            status='confirmada', data__gte=inicio_mes_anterior, data__lt=fim_mes_anterior
-        ).aggregate(total=Sum('valor'))['total'] or 0
-        doacoes_trend, doacoes_direction = calcular_trend(float(doacoes_mes), float(doacoes_mes_anterior))
-
-        apoiadores_ativos = Apoiador.objects.filter(status='ativo').count()
-        apoiadores_anterior = Apoiador.objects.filter(
-            status='ativo', data_cadastro__lt=inicio_mes_atual
-        ).count()
-        apoiadores_trend, apoiadores_direction = calcular_trend(apoiadores_ativos, apoiadores_anterior)
-
-        campanhas_ativas = Campanha.objects.filter(status='ativa').count()
-        campanhas_anterior = Campanha.objects.filter(
-            status='ativa', data_inicio__lt=inicio_mes_atual
-        ).count()
-        campanhas_trend, campanhas_direction = calcular_trend(campanhas_ativas, campanhas_anterior)
-
-        return Response({
-            'total_arrecadado': {
-                'value': float(total_arrecadado),
-                'trend_percentage': total_trend,
-                'trend_direction': total_direction,
-            },
-            'doacoes_mes': {
-                'value': float(doacoes_mes),
-                'trend_percentage': doacoes_trend,
-                'trend_direction': doacoes_direction,
-            },
-            'apoiadores_ativos': {
-                'value': apoiadores_ativos,
-                'trend_percentage': apoiadores_trend,
-                'trend_direction': apoiadores_direction,
-            },
-            'campanhas_ativas': {
-                'value': campanhas_ativas,
-                'trend_percentage': campanhas_trend,
-                'trend_direction': campanhas_direction,
-            },
-        })
+        return Response(indicadores.resumo_painel())
 
     @action(detail=False, methods=['get'], url_path='grafico-mensal')
     def grafico_mensal(self, request):
-        hoje = date.today()
-        meses = []
+        return Response(indicadores.serie_mensal_doacoes())
 
-        MESES_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
-
-        for i in range(11, -1, -1):
-            inicio = (hoje - relativedelta(months=i)).replace(day=1)
-            fim = (inicio + relativedelta(months=1))
-            total = Doacao.objects.filter(
-                status='confirmada',
-                data__gte=inicio,
-                data__lt=fim,
-            ).aggregate(total=Sum('valor'))['total'] or 0
-
-            meses.append({
-                'mes': f"{MESES_PT[inicio.month - 1]}/{inicio.strftime('%y')}",
-                'isoMes': inicio.strftime('%Y-%m'),
-                'total': float(total),
-            })
-
-        return Response(meses)
+    @action(detail=False, methods=['get'], url_path='fluxo-mensal')
+    def fluxo_mensal(self, request):
+        """Receitas × despesas dos últimos 12 meses, com saldo do mês e saldo acumulado."""
+        return Response(indicadores.fluxo_mensal())
 
     @action(detail=False, methods=['get'], url_path='doacoes-recentes')
     def doacoes_recentes(self, request):
-        doacoes = Doacao.objects.select_related('apoiador', 'campanha').order_by('-data')[:10]
-        serializer = DoacaoSerializer(doacoes, many=True)
-        return Response(serializer.data)
+        doacoes = Doacao.objects.select_related('apoiador', 'campanha').order_by('-data', '-id')[:10]
+        return Response(DoacaoSerializer(doacoes, many=True).data)
 
     @action(detail=False, methods=['get'], url_path='top-apoiadores')
     def top_apoiadores(self, request):
         top = (
             Apoiador.objects
-            .filter(doacoes__status='confirmada')
+            .filter(doacoes__status='confirmada', doacoes__tipo='financeira')
             .annotate(total_doado=Sum('doacoes__valor'))
             .order_by('-total_doado')[:5]
         )
-        data = [
+        return Response([
             {'id': a.id, 'nome': a.nome, 'total_doado': float(a.total_doado or 0)}
             for a in top
-        ]
-        return Response(data)
+        ])
 
     @action(detail=False, methods=['get'], url_path='campanhas-ativas')
     def campanhas_ativas(self, request):
-        campanhas = Campanha.objects.filter(status='ativa').order_by('-data_inicio')
-        serializer = CampanhaSerializer(campanhas, many=True)
-        return Response(serializer.data)
+        campanhas = Campanha.objects.em_andamento().com_arrecadado().order_by('-data_inicio')
+        return Response(CampanhaSerializer(campanhas, many=True).data)
+
+    @staticmethod
+    def _lista_doacoes(qs):
+        return [
+            {
+                'id': d.id,
+                'apoiador_nome': d.nome_doador,
+                'valor': float(d.valor),
+                'data': d.data.isoformat(),
+                'campanha': d.campanha.titulo if d.campanha else None,
+            }
+            for d in qs.select_related('apoiador', 'campanha').order_by('-data', '-id')
+        ]
 
     @action(detail=False, methods=['get'], url_path='kpi-doacoes')
     def kpi_doacoes(self, request):
-        doacoes = (
-            Doacao.objects
-            .select_related('apoiador', 'campanha')
-            .filter(status='confirmada')
-            .order_by('-data')
-        )
-        data = [
-            {
-                'id': d.id,
-                'apoiador_nome': d.apoiador.nome,
-                'valor': float(d.valor),
-                'data': d.data.isoformat(),
-            }
-            for d in doacoes
-        ]
-        return Response(data)
+        return Response(self._lista_doacoes(indicadores.doacoes_confirmadas()))
 
     @action(detail=False, methods=['get'], url_path='doacoes-por-mes')
     def doacoes_por_mes(self, request):
-        """Retorna doações confirmadas de um mês específico (formato: YYYY-MM)."""
+        """Doações confirmadas de um mês específico (?mes=AAAA-MM)."""
         mes_param = request.query_params.get('mes')
         if not mes_param:
             return Response({'erro': 'Parâmetro "mes" obrigatório (ex: 2026-11).'}, status=400)
         try:
-            ano, mes = int(mes_param.split('-')[0]), int(mes_param.split('-')[1])
-        except (ValueError, IndexError):
-            return Response({'erro': 'Formato inválido. Use YYYY-MM.'}, status=400)
-
-        inicio = date(ano, mes, 1)
-        fim = inicio + relativedelta(months=1)
-        doacoes = (
-            Doacao.objects
-            .select_related('apoiador', 'campanha')
-            .filter(status='confirmada', data__gte=inicio, data__lt=fim)
-            .order_by('-data')
-        )
-        data = [
-            {
-                'id': d.id,
-                'apoiador_nome': d.apoiador.nome,
-                'valor': float(d.valor),
-                'data': d.data.isoformat(),
-                'campanha': d.campanha.titulo if d.campanha else None,
-            }
-            for d in doacoes
-        ]
-        return Response(data)
+            mes = indicadores.mes_do_parametro(mes_param)
+        except ValueError:
+            return Response({'erro': 'Formato inválido. Use AAAA-MM.'}, status=400)
+        return Response(self._lista_doacoes(indicadores.doacoes_do_mes(mes)))
 
     @action(detail=False, methods=['get'], url_path='kpi-doacoes-mes')
     def kpi_doacoes_mes(self, request):
-        inicio_mes = date.today().replace(day=1)
-        doacoes = (
-            Doacao.objects
-            .select_related('apoiador', 'campanha')
-            .filter(status='confirmada', data__gte=inicio_mes)
-            .order_by('-data')
-        )
-        data = [
-            {
-                'id': d.id,
-                'apoiador_nome': d.apoiador.nome,
-                'valor': float(d.valor),
-                'data': d.data.isoformat(),
-                'campanha': d.campanha.titulo if d.campanha else None,
-            }
-            for d in doacoes
-        ]
-        return Response(data)
+        return Response(self._lista_doacoes(indicadores.doacoes_do_mes()))
 
     @action(detail=False, methods=['get'], url_path='kpi-apoiadores-ativos')
     def kpi_apoiadores_ativos(self, request):
-        apoiadores = Apoiador.objects.filter(status='ativo').order_by('nome')
-        data = [
-            {
-                'id': a.id,
-                'nome': a.nome,
-                'email': a.email,
-                'data_cadastro': a.data_cadastro.isoformat(),
-            }
-            for a in apoiadores
-        ]
-        return Response(data)
+        return Response([
+            {'id': a.id, 'nome': a.nome, 'email': a.email, 'data_cadastro': a.data_cadastro.isoformat()}
+            for a in indicadores.membros_ativos().order_by('nome')
+        ])
 
     @action(detail=False, methods=['get'], url_path='kpi-campanhas-ativas')
     def kpi_campanhas_ativas(self, request):
-        campanhas = Campanha.objects.filter(status='ativa').order_by('-data_inicio')
-        data = [
+        campanhas = indicadores.campanhas_ativas().com_arrecadado().order_by('-data_inicio')
+        return Response([
             {
                 'id': c.id,
                 'titulo': c.titulo,
@@ -357,45 +448,50 @@ class DashboardViewSet(viewsets.ViewSet):
                 'valor_arrecadado': float(c.valor_arrecadado),
             }
             for c in campanhas
-        ]
-        return Response(data)
+        ])
 
 
-class DespesaViewSet(viewsets.ModelViewSet):
-    queryset = Despesa.objects.prefetch_related('anexos').all()
+class DespesaViewSet(AuditoriaMixin, viewsets.ModelViewSet):
     serializer_class = DespesaSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_serializer_context(self):
-        ctx = super().get_serializer_context()
-        ctx['request'] = self.request
-        return ctx
+    search_fields = ['descricao']
+    ordering_fields = ['descricao', 'categoria', 'data_vencimento', 'data_pagamento', 'valor', 'status']
+    ordering = ['-data_vencimento', '-id']
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = Despesa.objects.select_related('campanha').prefetch_related('anexos')
         status = self.request.query_params.get('status')
         categoria = self.request.query_params.get('categoria')
-        if status:
+        if status == 'atrasado':
+            qs = qs.filter(status='pendente', data_vencimento__lt=indicadores.hoje())
+        elif status:
             qs = qs.filter(status=status)
         if categoria:
             qs = qs.filter(categoria=categoria)
-        return qs
+        return filtrar_periodo(qs, self.request, 'data_vencimento')
+
+    def _anexos_validados(self):
+        arquivos = self.request.FILES.getlist('anexos')
+        erros = []
+        for arq in arquivos:
+            try:
+                validar_anexo(arq)
+            except ValueError as e:
+                erros.append(str(e))
+        if erros:
+            raise ValidationError({'anexos': erros})
+        return arquivos
 
     def _salvar_anexos(self, despesa, arquivos):
         for arq in arquivos:
-            import os
-            anexo = DespesaAnexo(despesa=despesa, nome_original=arq.name)
+            anexo = DespesaAnexo(despesa=despesa, nome_original=os.path.basename(arq.name)[:255])
             anexo.arquivo = arq
             anexo.save()
 
     def perform_create(self, serializer):
+        arquivos = self._anexos_validados()
         despesa = serializer.save()
-        arquivos = self.request.FILES.getlist('anexos')
         if arquivos:
             self._salvar_anexos(despesa, arquivos)
-        # Gera primeira recorrência ao criar despesa fixa
-        if despesa.is_fixed and despesa.recurrence_period:
-            despesa.gerar_proxima_recorrencia()
         actor = self.request.user.get_full_name() or self.request.user.username
         valor = f'R$ {despesa.valor:.2f}'.replace('.', ',')
         tipo_txt = 'fixa' if despesa.is_fixed else 'variável'
@@ -409,240 +505,172 @@ class DespesaViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
+        arquivos = self._anexos_validados()
         status_anterior = serializer.instance.status
         despesa = serializer.save()
-        arquivos = self.request.FILES.getlist('anexos')
         if arquivos:
             self._salvar_anexos(despesa, arquivos)
-        # Gera próxima recorrência quando marcada como paga
-        if (status_anterior != 'pago' and despesa.status == 'pago'
-                and despesa.is_fixed and despesa.recurrence_period):
+        # A próxima ocorrência da série só nasce quando a atual é paga.
+        if status_anterior != 'pago' and despesa.status == 'pago':
             despesa.gerar_proxima_recorrencia()
 
-    @action(detail=True, methods=['delete'], url_path='anexos/(?P<anexo_id>[^/.]+)')
-    def remover_anexo(self, request, pk=None, anexo_id=None):
-        try:
-            anexo = DespesaAnexo.objects.get(pk=anexo_id, despesa_id=pk)
+    @action(detail=True, methods=['post'], url_path='encerrar-serie')
+    def encerrar_serie(self, request, pk=None):
+        """Define o fim da série (padrão: vencimento desta ocorrência) e apaga as pendentes posteriores."""
+        despesa = self.get_object()
+        if despesa.serie_id is None:
+            return Response({'erro': 'Esta despesa não faz parte de uma série recorrente.'}, status=400)
+        fim = despesa.data_vencimento
+        if request.data.get('recorrencia_fim'):
+            try:
+                fim = date.fromisoformat(request.data['recorrencia_fim'])
+            except (TypeError, ValueError):
+                return Response({'recorrencia_fim': 'Data inválida. Use AAAA-MM-DD.'}, status=400)
+        apagadas = despesa.encerrar_serie(fim)
+        return Response({'recorrencia_fim': fim.isoformat(), 'ocorrencias_apagadas': apagadas})
+
+    @action(detail=True, methods=['post'], url_path='aplicar-valor-proximas')
+    def aplicar_valor_proximas(self, request, pk=None):
+        despesa = self.get_object()
+        if despesa.serie_id is None:
+            return Response({'erro': 'Esta despesa não faz parte de uma série recorrente.'}, status=400)
+        return Response({'atualizadas': despesa.aplicar_valor_as_proximas()})
+
+    @action(detail=True, methods=['patch', 'delete'], url_path=r'anexos/(?P<anexo_id>\d+)')
+    def anexo(self, request, pk=None, anexo_id=None):
+        """PATCH {publico: bool} marca o comprovante como público; DELETE remove o anexo e o arquivo."""
+        anexo = DespesaAnexo.objects.filter(pk=anexo_id, despesa_id=pk).first()
+        if anexo is None:
+            return Response({'erro': 'Anexo não encontrado.'}, status=404)
+        if request.method == 'DELETE':
             anexo.arquivo.delete(save=False)
             anexo.delete()
             return Response(status=204)
-        except DespesaAnexo.DoesNotExist:
-            return Response({'erro': 'Anexo não encontrado.'}, status=404)
+        publico = request.data.get('publico')
+        if not isinstance(publico, bool):
+            return Response({'publico': 'Informe true ou false.'}, status=400)
+        anexo.publico = publico
+        anexo.save(update_fields=['publico'])
+        return Response(DespesaAnexoSerializer(anexo).data)
+
+    @action(detail=True, methods=['get'], url_path=r'anexos/(?P<anexo_id>\d+)/download')
+    def baixar_anexo(self, request, pk=None, anexo_id=None):
+        return _resposta_anexo(DespesaAnexo.objects.filter(pk=anexo_id, despesa_id=pk).first())
 
     @action(detail=False, methods=['get'], url_path='resumo')
     def resumo(self, request):
-        hoje = date.today()
-        inicio_mes = hoje.replace(day=1)
-        fim_mes = inicio_mes + relativedelta(months=1)
-
-        todas = Despesa.objects.all()
-
-        gasto_mes = todas.filter(
-            data_vencimento__gte=inicio_mes, data_vencimento__lt=fim_mes
-        ).aggregate(total=Sum('valor'))['total'] or 0
-
-        # Pendentes consideram status_efetivo, então incluímos 'pendente' e 'atrasado'
-        total_pendente = todas.filter(
-            status__in=['pendente', 'atrasado']
-        ).aggregate(total=Sum('valor'))['total'] or 0
-
-        # Maior categoria do mês
-        from django.db.models import Sum as DjSum
-        por_categoria = (
-            todas
-            .filter(data_vencimento__gte=inicio_mes, data_vencimento__lt=fim_mes)
-            .values('categoria')
-            .annotate(total=DjSum('valor'))
-            .order_by('-total')
-        )
-        maior_categoria = por_categoria[0]['categoria'] if por_categoria else None
-        maior_categoria_display = dict(Despesa.CATEGORIA_CHOICES).get(maior_categoria, '—')
-
-        return Response({
-            'gasto_mes': float(gasto_mes),
-            'total_pendente': float(total_pendente),
-            'maior_categoria': maior_categoria,
-            'maior_categoria_display': maior_categoria_display,
-        })
+        return Response(indicadores.resumo_despesas())
 
     @action(detail=False, methods=['get'], url_path='por-categoria')
     def por_categoria(self, request):
-        hoje = date.today()
-        inicio_mes = hoje.replace(day=1)
-        fim_mes = inicio_mes + relativedelta(months=1)
+        return Response(indicadores.gastos_por_categoria())
 
-        dados = (
-            Despesa.objects
-            .filter(data_vencimento__gte=inicio_mes, data_vencimento__lt=fim_mes)
-            .values('categoria')
-            .annotate(total=Sum('valor'))
-            .order_by('-total')
-        )
-        label_map = dict(Despesa.CATEGORIA_CHOICES)
-        return Response([
-            {'categoria': d['categoria'], 'label': label_map.get(d['categoria'], d['categoria']), 'total': float(d['total'])}
-            for d in dados
-        ])
+class SomenteSuperusuario(BasePermission):
+    message = 'Apenas superusuários podem consultar o histórico.'
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_active and request.user.is_superuser)
+
+
+class HistoricoViewSet(viewsets.ReadOnlyModelViewSet):
+    """Trilha de auditoria: ?modelo=&usuario=&objeto_id=&acao=&data_inicio=&data_fim=."""
+
+    serializer_class = LogAlteracaoSerializer
+    permission_classes = [SomenteSuperusuario]
+    search_fields = ['campo', 'antes', 'depois']
+    ordering_fields = ['data', 'modelo', 'acao']
+    ordering = ['-data', '-id']
+
+    def get_queryset(self):
+        qs = LogAlteracao.objects.select_related('usuario')
+        for param, campo in [('modelo', 'modelo'), ('usuario', 'usuario_id'), ('objeto_id', 'objeto_id'), ('acao', 'acao')]:
+            valor = self.request.query_params.get(param)
+            if valor:
+                qs = qs.filter(**{campo: valor})
+        return filtrar_periodo(qs, self.request, 'data__date')
 
 
 class ComunicadoViewSet(viewsets.ModelViewSet):
     queryset = Comunicado.objects.all()
     serializer_class = ComunicadoSerializer
-    permission_classes = [IsAuthenticated]
+    search_fields = ['titulo', 'conteudo']
+    ordering_fields = ['titulo', 'data_publicacao', 'publico_alvo']
+    ordering = ['-data_publicacao', '-id']
 
+    @action(detail=False, methods=['get'], url_path='destinatarios')
+    def destinatarios(self, request):
+        """Quantos membros receberiam o e-mail agora e o limite do envio pela tela."""
+        return Response({
+            'quantidade': comunicados.destinatarios().count(),
+            'limite': settings.COMUNICADOS_LIMITE_SINCRONO,
+        })
 
-def _csv_response(filename):
-    response = HttpResponse(content_type='text/csv; charset=utf-8')
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    response.write('﻿')  # BOM para compatibilidade com Excel
-    return response
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def relatorio_doacoes(request):
-    response = _csv_response('relatorio_doacoes.csv')
-    writer = csv.writer(response)
-    writer.writerow(['ID', 'Apoiador', 'Campanha', 'Valor (R$)', 'Data', 'Status'])
-    for d in Doacao.objects.select_related('apoiador', 'campanha').order_by('-data'):
-        writer.writerow([
-            d.id,
-            d.apoiador.nome,
-            d.campanha.titulo if d.campanha else '',
-            str(d.valor).replace('.', ','),
-            d.data.strftime('%d/%m/%Y'),
-            d.get_status_display(),
-        ])
-    return response
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def relatorio_campanhas(request):
-    response = _csv_response('relatorio_campanhas.csv')
-    writer = csv.writer(response)
-    writer.writerow(['ID', 'Título', 'Meta (R$)', 'Arrecadado (R$)', 'Progresso (%)', 'Status', 'Início', 'Fim'])
-    for c in Campanha.objects.order_by('-data_inicio'):
-        writer.writerow([
-            c.id,
-            c.titulo,
-            str(c.meta_valor).replace('.', ','),
-            str(c.valor_arrecadado).replace('.', ','),
-            c.percentual_progresso,
-            c.get_status_display(),
-            c.data_inicio.strftime('%d/%m/%Y'),
-            c.data_fim.strftime('%d/%m/%Y') if c.data_fim else '',
-        ])
-    return response
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def relatorio_apoiadores(request):
-    response = _csv_response('relatorio_apoiadores.csv')
-    writer = csv.writer(response)
-    writer.writerow(['ID', 'Nome', 'E-mail', 'Data de Cadastro', 'Status', 'Total Doado (R$)'])
-    apoiadores = (
-        Apoiador.objects
-        .annotate(total_doado=Sum('doacoes__valor', filter=Q(doacoes__status='confirmada')))
-        .order_by('nome')
-    )
-    for a in apoiadores:
-        writer.writerow([
-            a.id,
-            a.nome,
-            a.email,
-            a.data_cadastro.strftime('%d/%m/%Y'),
-            a.get_status_display(),
-            str(a.total_doado or 0).replace('.', ','),
-        ])
-    return response
+    @action(detail=True, methods=['post'], url_path='enviar-email')
+    def enviar_email(self, request, pk=None):
+        comunicado = self.get_object()
+        try:
+            enviados = comunicados.enviar(comunicado, limite=settings.COMUNICADOS_LIMITE_SINCRONO)
+        except comunicados.EnvioIndisponivel as e:
+            return Response({'erro': str(e)}, status=400)
+        registrar_auditoria(request.user, comunicado, 'edicao', 'envio por e-mail', '', f'{enviados} e-mail(s)')
+        return Response(ComunicadoSerializer(comunicado).data)
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([AuthThrottle])
 def google_login(request):
-    """
-    Aceita o access_token do Google (fluxo implícito) + email/nome
-    já validados pelo frontend via googleapis.com/oauth2/v3/userinfo.
-    Para produção com id_token, configure GOOGLE_CLIENT_ID e use verify_oauth2_token.
-    """
-    email = request.data.get('email')
-    nome = request.data.get('nome', email)
+    """Troca o id_token (credential) do Google por JWT, apenas para staff já cadastrado."""
+    if not settings.GOOGLE_CLIENT_ID:
+        return Response({'erro': 'Login com Google não está configurado.'}, status=503)
 
-    if not email:
-        return Response({'erro': 'E-mail não fornecido.'}, status=400)
+    credential = request.data.get('credential')
+    if not credential or not isinstance(credential, str):
+        return Response({'erro': 'Token do Google ausente.'}, status=400)
 
-    User = get_user_model()
-    usuario, _ = User.objects.get_or_create(
-        username=email,
-        defaults={'email': email, 'first_name': nome or ''},
-    )
+    try:
+        info = google_id_token.verify_oauth2_token(
+            credential, google_requests.Request(), settings.GOOGLE_CLIENT_ID
+        )
+    except ValueError:
+        return Response({'erro': 'Token do Google inválido.'}, status=401)
+    except GoogleAuthError:
+        return Response({'erro': 'Não foi possível validar o login com o Google.'}, status=503)
+
+    if not info.get('email_verified'):
+        return Response({'erro': 'E-mail do Google não verificado.'}, status=401)
+
+    email = (info.get('email') or '').strip()
+    usuario = (
+        get_user_model().objects
+        .filter(email__iexact=email, is_active=True, is_staff=True)
+        .order_by('id')
+        .first()
+    ) if email else None
+    if usuario is None:
+        return Response({'erro': 'Conta não autorizada. Peça acesso a um administrador.'}, status=403)
 
     refresh = RefreshToken.for_user(usuario)
-    return Response({
-        'access': str(refresh.access_token),
-        'refresh': str(refresh),
-        'username': usuario.username,
-    })
-
-
-def _anonimizar(nome):
-    partes = nome.strip().split()
-    if len(partes) == 1:
-        return partes[0][0] + '.'
-    return f"{partes[0]} {partes[-1][0]}."
+    return Response({'access': str(refresh.access_token), 'refresh': str(refresh)})
 
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def painel_transparencia(request):
     """Endpoint público — sem dados sensíveis."""
-    hoje = date.today()
-    inicio_mes = hoje.replace(day=1)
+    if _portal_desligado():
+        return Response(RESPOSTA_PORTAL_DESLIGADO, status=404)
+    total_arrecadado = indicadores.total_arrecadado()
+    doacoes_mes = indicadores.doacoes_do_mes().aggregate(total=Sum('valor'))['total'] or 0
+    apoiadores_ativos = indicadores.membros_ativos().count()
 
-    total_arrecadado = Doacao.objects.filter(status='confirmada').aggregate(
-        total=Sum('valor')
-    )['total'] or 0
-
-    doacoes_mes = Doacao.objects.filter(
-        status='confirmada', data__gte=inicio_mes
-    ).aggregate(total=Sum('valor'))['total'] or 0
-
-    apoiadores_ativos = Apoiador.objects.filter(status='ativo').count()
-
-    campanhas = Campanha.objects.filter(status='ativa').order_by('-data_inicio')
+    campanhas = indicadores.campanhas_ativas().com_arrecadado().order_by('-data_inicio')
     campanhas_data = CampanhaSerializer(campanhas, many=True).data
 
-    doacoes_recentes = (
-        Doacao.objects
-        .select_related('apoiador', 'campanha')
-        .filter(status='confirmada')
-        .order_by('-data')[:10]
-    )
-    doacoes_data = [
-        {
-            'doador': _anonimizar(d.apoiador.nome),
-            'campanha': d.campanha.titulo if d.campanha else None,
-            'valor': float(d.valor),
-            'data': d.data.isoformat(),
-        }
-        for d in doacoes_recentes
-    ]
-
-    gastos_mes_qs = Despesa.objects.filter(
-        data_vencimento__gte=inicio_mes,
-        data_vencimento__lt=inicio_mes + relativedelta(months=1),
-    )
+    gastos_mes_qs = indicadores.despesas_pagas_no_mes()
+    a_pagar_mes = indicadores.despesas_a_pagar_no_mes().aggregate(total=Sum('valor'))['total'] or 0
     gastos_mes_total = gastos_mes_qs.aggregate(total=Sum('valor'))['total'] or 0
-    gastos_mes_lista = [
-        {
-            'descricao': d.descricao,
-            'categoria': d.get_categoria_display(),
-            'valor': float(d.valor),
-        }
-        for d in gastos_mes_qs.order_by('-valor')
-    ]
+    gastos_mes_lista = despesas_publicas(gastos_mes_qs.prefetch_related('anexos'))
 
     return Response({
         'kpis': {
@@ -651,9 +679,11 @@ def painel_transparencia(request):
             'apoiadores_ativos': apoiadores_ativos,
             'campanhas_ativas': campanhas.count(),
             'gastos_mes': float(gastos_mes_total),
+            'a_pagar_mes': float(a_pagar_mes),
+            # Agregado, sem identificar voluntários.
+            'horas_voluntariado': float(indicadores.horas_voluntariado()),
         },
         'campanhas': campanhas_data,
-        'doacoes_recentes': doacoes_data,
         'gastos_mes_lista': gastos_mes_lista,
         'pix': ConfiguracaoPixSerializer(ConfiguracaoPix.obter()).data,
         'comunicados': [
@@ -668,57 +698,195 @@ def painel_transparencia(request):
     })
 
 
+def _portal_desligado():
+    return not ConfiguracaoInstituicao.obter().portal_ativo
+
+
+RESPOSTA_PORTAL_DESLIGADO = {'erro': 'Portal indisponível.'}
+
+
+def _resposta_anexo(anexo):
+    if anexo is None:
+        return Response({'erro': 'Anexo não encontrado.'}, status=404)
+    return _resposta_arquivo(anexo.arquivo, anexo.nome_original)
+
+
+def _resposta_arquivo(arquivo, nome=''):
+    """Download seguro: sempre como anexo, com tipo fixo pela extensão e nosniff."""
+    if not arquivo or not arquivo.storage.exists(arquivo.name):
+        return Response({'erro': 'Anexo não encontrado.'}, status=404)
+    extensao = os.path.splitext(arquivo.name)[1].lower()
+    resposta = FileResponse(
+        arquivo.open('rb'),
+        as_attachment=True,
+        filename=nome or os.path.basename(arquivo.name),
+        content_type=TIPOS_PERMITIDOS.get(extensao, 'application/octet-stream'),
+    )
+    resposta['X-Content-Type-Options'] = 'nosniff'
+    return resposta
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def comprovante_publico(request, despesa_id, anexo_id):
+    """Comprovante marcado como público de uma despesa paga (fora de Recursos Humanos)."""
+    if _portal_desligado():
+        return Response(RESPOSTA_PORTAL_DESLIGADO, status=404)
+    anexo = (
+        DespesaAnexo.objects
+        .filter(pk=anexo_id, despesa_id=despesa_id, publico=True, despesa__status='pago')
+        .exclude(despesa__categoria=CATEGORIA_AGREGADA)
+        .first()
+    )
+    return _resposta_anexo(anexo)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def prestacao_contas_publica(request):
+    """Prestação de contas agregada de um ano (?ano=AAAA; padrão: ano atual)."""
+    if _portal_desligado():
+        return Response(RESPOSTA_PORTAL_DESLIGADO, status=404)
+    try:
+        ano = int(request.query_params.get('ano') or indicadores.hoje().year)
+    except ValueError:
+        return Response({'ano': 'Ano inválido.'}, status=400)
+    if not 2000 <= ano <= 2100:
+        return Response({'ano': 'Ano inválido.'}, status=400)
+    return Response(indicadores.prestacao_de_contas(ano))
+
+
+@api_view(['GET', 'PATCH'])
+def configuracao_instituicao(request):
+    config = ConfiguracaoInstituicao.obter()
+    if request.method == 'GET':
+        return Response(ConfiguracaoInstituicaoSerializer(config).data)
+    if not request.user.is_superuser:
+        return Response({'erro': 'Apenas superusuários podem alterar a configuração da instituição.'}, status=403)
+    antes = ConfiguracaoInstituicaoSerializer(config).data
+    serializer = ConfiguracaoInstituicaoSerializer(config, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    for campo, novo in serializer.data.items():
+        if campo not in ('cnpj_formatado', 'logo_url') and antes.get(campo) != novo:
+            LogAlteracao.objects.create(
+                usuario=request.user, modelo='ConfiguracaoInstituicao', objeto_id=config.pk,
+                campo=campo, antes=str(antes.get(campo)), depois=str(novo),
+            )
+    return Response(serializer.data)
+
+
+@api_view(['POST', 'DELETE'])
+def logo_instituicao(request):
+    """POST (multipart, campo "logo") envia o logo; DELETE remove. Só superusuário."""
+    if not request.user.is_superuser:
+        return Response({'erro': 'Apenas superusuários podem alterar o logo da instituição.'}, status=403)
+    config = ConfiguracaoInstituicao.obter()
+    anterior = config.logo.name if config.logo else ''
+    if request.method == 'POST':
+        arquivo = request.FILES.get('logo')
+        if arquivo is None:
+            return Response({'logo': 'Envie um arquivo no campo "logo".'}, status=400)
+        try:
+            validar_imagem(arquivo)
+        except ValueError as e:
+            return Response({'logo': str(e)}, status=400)
+    if config.logo:
+        config.logo.delete(save=False)
+    config.logo = arquivo if request.method == 'POST' else ''
+    config.save(update_fields=['logo'])
+    registrar_auditoria(request.user, config, 'edicao', 'logo', anterior, config.logo.name if config.logo else '')
+    return Response(ConfiguracaoInstituicaoSerializer(config).data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def instituicao_publica(request):
+    """Nome, contatos e logo da instituição (usados no portal, no login e no painel)."""
+    return Response(dados_publicos_instituicao(ConfiguracaoInstituicao.obter()))
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def logo_publico(request):
+    config = ConfiguracaoInstituicao.obter()
+    if not config.logo or not config.logo.storage.exists(config.logo.name):
+        return Response({'erro': 'Logo não cadastrado.'}, status=404)
+    extensao = os.path.splitext(config.logo.name)[1].lower()
+    resposta = FileResponse(config.logo.open('rb'), content_type=TIPOS_PERMITIDOS.get(extensao, 'application/octet-stream'))
+    resposta['X-Content-Type-Options'] = 'nosniff'
+    resposta['Cache-Control'] = 'public, max-age=86400'
+    return resposta
+
+
+CAMPOS_PIX = {'chave': 'chave', 'nome_recebedor': 'nome do recebedor', 'cidade': 'cidade'}
+
+
 @api_view(['GET', 'PUT'])
-@permission_classes([IsAuthenticated])
 def configuracao_pix(request):
     config = ConfiguracaoPix.obter()
-    if request.method == 'PUT':
-        serializer = ConfiguracaoPixSerializer(config, data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
-    return Response(ConfiguracaoPixSerializer(config).data)
+    if request.method == 'GET':
+        return Response(ConfiguracaoPixSerializer(config).data)
+
+    if not request.user.is_superuser:
+        return Response({'erro': 'Apenas superusuários podem alterar a chave PIX.'}, status=403)
+
+    antes = {campo: getattr(config, campo) for campo in CAMPOS_PIX}
+    serializer = ConfiguracaoPixSerializer(config, data=request.data)
+    serializer.is_valid(raise_exception=True)
+    with transaction.atomic():
+        config = serializer.save()
+        mudancas = []
+        for campo, rotulo in CAMPOS_PIX.items():
+            novo = getattr(config, campo)
+            if novo == antes[campo]:
+                continue
+            LogAlteracao.objects.create(
+                usuario=request.user, modelo='ConfiguracaoPix', objeto_id=config.pk,
+                campo=campo, antes=antes[campo], depois=novo,
+            )
+            mudancas.append(f'{rotulo} de {mascarar(antes[campo])} para {mascarar(novo)}')
+        if mudancas:
+            actor = request.user.get_full_name() or request.user.username
+            acao = ('alterou a configuração PIX: ' + '; '.join(mudancas))[:200]
+            _notificar_admins(
+                mensagem=f'{actor} {acao}'[:300],
+                tipo='configuracao',
+                actor_name=actor,
+                action_text=acao,
+            )
+    return Response(serializer.data)
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([DoacaoPublicaThrottle])
 def public_doacao(request):
-    """Endpoint público para registrar intenção de doação."""
-    nome = request.data.get('nome', '').strip()
-    email = request.data.get('email', '').strip()
-    celular = request.data.get('celular', '').strip()
-    campaign_id = request.data.get('campaign_id')
-    valor = request.data.get('valor', 0)
+    """Registra uma intenção de doação feita pelo portal público."""
+    if _portal_desligado():
+        return Response(RESPOSTA_PORTAL_DESLIGADO, status=404)
+    mensagem = 'Intenção de doação registrada! Faça o PIX e aguarde a confirmação da equipe.'
+    if (request.data.get('site') or '').strip():
+        return Response({'mensagem': mensagem, 'id': None}, status=201)
 
-    if not nome or not email:
-        return Response({'erro': 'Nome e e-mail são obrigatórios.'}, status=400)
+    serializer = DoacaoPublicaSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    doacao = registrar_doacao_publica(serializer.validated_data)
 
-    apoiador, _ = Apoiador.objects.get_or_create(
-        email=email,
-        defaults={'nome': nome, 'celular': celular or None, 'status': 'ativo'},
+    valor_txt = f'R$ {doacao.valor:.2f}'.replace('.', ',')
+    campanha_txt = f' para a campanha {doacao.campanha.titulo}' if doacao.campanha else ''
+    nome = doacao.apoiador.nome
+    _notificar_admins(
+        mensagem=f'Nova intenção de doação de {nome} — {valor_txt}{campanha_txt}.'[:300],
+        tipo='doacao',
+        actor_name=nome[:150],
+        action_text=f'registrou pelo portal uma intenção de doação de {valor_txt}{campanha_txt}'[:200],
+        target_type='doacao',
+        target_id=doacao.id,
     )
-    if celular and not apoiador.celular:
-        apoiador.celular = celular
-        apoiador.save(update_fields=['celular'])
-
-    campanha = None
-    if campaign_id:
-        try:
-            campanha = Campanha.objects.get(pk=campaign_id)
-        except Campanha.DoesNotExist:
-            pass
-
-    try:
-        valor_decimal = float(valor) if valor else 0
-    except (ValueError, TypeError):
-        valor_decimal = 0
-
-    Doacao.objects.create(
-        apoiador=apoiador,
-        campanha=campanha,
-        valor=max(valor_decimal, 0.01),
-        data=date.today(),
-        status='pendente',
-    )
-
-    return Response({'mensagem': 'Doação registrada com sucesso! Aguarde confirmação.'}, status=201)
+    return Response({
+        'mensagem': mensagem,
+        'id': doacao.id,
+        'valor': f'{doacao.valor:.2f}',
+        'txid': f'DOA{doacao.id}',
+    }, status=201)

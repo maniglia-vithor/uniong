@@ -28,7 +28,7 @@ function dateParaIso(d) {
  * Uso:
  *   <CampoData name="data_inicio" value={form.data_inicio} onChange={onChange} required />
  */
-export default function CampoData({ name, value, onChange, required, placeholder, disabled }) {
+export default function CampoData({ name, value, onChange, required, placeholder, disabled, id, 'aria-describedby': descritoPor, 'aria-invalid': invalido }) {
   function handleChange(date) {
     // Emula o evento sintético esperado pelos handlers existentes
     onChange({ target: { name, value: dateParaIso(date) } })
@@ -44,6 +44,10 @@ export default function CampoData({ name, value, onChange, required, placeholder
       required={required}
       disabled={disabled}
       autoComplete="off"
+      id={id}
+      name={name}
+      ariaDescribedBy={descritoPor}
+      ariaInvalid={invalido ? 'true' : undefined}
       showMonthDropdown
       showYearDropdown
       dropdownMode="select"
