@@ -85,6 +85,7 @@ export const encerrarCampanha      = (id) => api.patch(`/campanhas/${id}/`, { st
 // Doações
 export const getDoacoes            = (params) => api.get('/doacoes/', { params })
 export const getDoacoesResumo      = (params) => api.get('/doacoes/resumo/', { params })
+export const acaoEmLoteDoacoes     = (ids, acao) => api.post('/doacoes/acao-em-lote/', { ids, acao })
 export const criarDoacao           = (data) => api.post('/doacoes/', data)
 export const atualizarDoacao       = (id, data) => api.put(`/doacoes/${id}/`, data)
 export const excluirDoacao         = (id) => api.delete(`/doacoes/${id}/`)

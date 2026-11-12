@@ -73,16 +73,27 @@ export default function Layout() {
 
   const naoLidas = notificacoes.filter(n => !n.lida).length
 
+  const [pendentes, setPendentes] = useState(0)
+
   const buscarNotificacoes = useCallback(async () => {
     try {
-      setNotificacoes(await buscarTodas('/notificacoes/'))
+      const [lista, resumo] = await Promise.all([
+        buscarTodas('/notificacoes/'),
+        api.get('/doacoes/resumo/', { params: { status: 'pendente' } }),
+      ])
+      setNotificacoes(lista)
+      setPendentes(resumo.data.quantidade)
     } catch { /* silencia erros de polling */ }
   }, [])
 
   useEffect(() => {
     buscarNotificacoes()
     const intervalo = setInterval(buscarNotificacoes, 20000)
-    return () => clearInterval(intervalo)
+    window.addEventListener('doacoes-pendentes-alteradas', buscarNotificacoes)
+    return () => {
+      clearInterval(intervalo)
+      window.removeEventListener('doacoes-pendentes-alteradas', buscarNotificacoes)
+    }
   }, [buscarNotificacoes])
 
   useEffect(() => {
@@ -174,6 +185,15 @@ export default function Layout() {
                     )}
                     <Icon size={18} style={isActive ? { color: '#f97316' } : {}} />
                     {label}
+                    {to === '/admin/doacoes' && pendentes > 0 && (
+                      <span
+                        className="ml-auto min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center text-white"
+                        style={{ backgroundColor: '#f97316' }}
+                        aria-label={`${pendentes} doações pendentes`}
+                      >
+                        {pendentes > 99 ? '99+' : pendentes}
+                      </span>
+                    )}
                   </>
                 )}
               </NavLink>

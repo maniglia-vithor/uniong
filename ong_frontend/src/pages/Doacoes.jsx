@@ -12,11 +12,12 @@ import useListaPaginada from '../hooks/useListaPaginada'
 import { formatBRL, formatData, mensagemErro } from '../utils/formatos'
 import {
   getDoacoes, getDoacoesResumo, criarDoacao, atualizarDoacao, excluirDoacao,
-  getApoiadoresOpcoes, getCampanhasOpcoes,
+  getApoiadoresOpcoes, getCampanhasOpcoes, acaoEmLoteDoacoes,
 } from '../services/api'
 
 const VAZIO = { apoiador: '', campanha: '', valor: '', data: '', status: 'confirmada' }
 const LIMITE_SEM_BUSCA = 50
+const ABAS_STATUS = [['', 'Todas'], ['pendente', 'Pendentes'], ['confirmada', 'Confirmadas'], ['cancelada', 'Canceladas']]
 
 function iniciais(nome) {
   return nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
@@ -49,6 +50,8 @@ export default function Doacoes() {
   const filtros = useMemo(() => (filtroStatus ? { status: filtroStatus } : {}), [filtroStatus])
   const lista = useListaPaginada(getDoacoes, { filtros })
   const [resumo, setResumo] = useState({ quantidade: 0, total_confirmado: 0 })
+  const [pendentes, setPendentes] = useState(0)
+  const [selecionadas, setSelecionadas] = useState([])
   const [apoiadores, setApoiadores] = useState([])
   const [campanhas, setCampanhas] = useState([])
   const [modal, setModal] = useState(false)
@@ -62,6 +65,7 @@ export default function Doacoes() {
     if (busca.trim()) params.search = busca.trim()
     const t = setTimeout(() => {
       getDoacoesResumo(params).then(({ data }) => setResumo(data)).catch(() => {})
+      getDoacoesResumo({ status: 'pendente' }).then(({ data }) => setPendentes(data.quantidade)).catch(() => {})
     }, 300)
     return () => clearTimeout(t)
   }, [filtros, busca, itens])
@@ -121,6 +125,19 @@ export default function Doacoes() {
     }
   }
 
+  async function agirEmLote(acao, ids) {
+    const texto = acao === 'confirmar' ? 'Confirmar' : 'Cancelar'
+    if (ids.length > 1 && !confirm(`${texto} ${ids.length} doações pendentes?`)) return
+    try {
+      await acaoEmLoteDoacoes(ids, acao)
+      setSelecionadas([])
+      lista.recarregar()
+      window.dispatchEvent(new Event('doacoes-pendentes-alteradas'))
+    } catch (err) {
+      alert(mensagemErro(err, 'Não foi possível atualizar as doações.'))
+    }
+  }
+
   async function onExcluir(id) {
     if (!confirm('Excluir esta doação?')) return
     try {
@@ -150,20 +167,48 @@ export default function Doacoes() {
         </button>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-2">
+      <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+        <div role="tablist" aria-label="Filtrar por status" className="flex flex-wrap gap-1.5">
+          {ABAS_STATUS.map(([valor, rotulo]) => {
+            const ativa = filtroStatus === valor
+            const destaque = valor === 'pendente' && pendentes > 0
+            return (
+              <button
+                key={valor || 'todas'}
+                role="tab"
+                aria-selected={ativa}
+                onClick={() => { setFiltroStatus(valor); setSelecionadas([]) }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                  ativa
+                    ? 'text-white border-transparent'
+                    : destaque
+                      ? 'border-amber-400 text-amber-700 bg-amber-50 dark:bg-amber-500/10 dark:text-amber-300'
+                      : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                }`}
+                style={ativa ? { backgroundColor: '#0f4c5c' } : undefined}
+              >
+                {rotulo}
+                {valor === 'pendente' && pendentes > 0 && (
+                  <span className={`min-w-[18px] px-1 rounded-full text-[10px] ${ativa ? 'bg-white/25' : 'bg-amber-500 text-white'}`}>{pendentes}</span>
+                )}
+              </button>
+            )
+          })}
+        </div>
         <CampoBusca valor={lista.busca} onMudar={lista.setBusca} placeholder="Buscar por doador ou campanha" />
-        <select
-          value={filtroStatus}
-          onChange={(e) => setFiltroStatus(e.target.value)}
-          aria-label="Filtrar por status"
-          className="text-sm border border-[var(--border)] rounded-lg px-3 py-2 bg-[var(--bg-card)] text-[var(--text-secondary)] outline-none focus:border-teal-500"
-        >
-          <option value="">Todos os status</option>
-          <option value="confirmada">Confirmadas</option>
-          <option value="pendente">Pendentes</option>
-          <option value="cancelada">Canceladas</option>
-        </select>
       </div>
+
+      {filtroStatus === 'pendente' && selecionadas.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm">
+          <span className="text-[var(--text-secondary)]">{selecionadas.length} selecionada{selecionadas.length !== 1 ? 's' : ''}</span>
+          <button onClick={() => agirEmLote('confirmar', selecionadas)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700">
+            Confirmar selecionadas
+          </button>
+          <button onClick={() => agirEmLote('cancelar', selecionadas)} className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
+            Cancelar selecionadas
+          </button>
+        </div>
+      )}
 
       {lista.erro && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-center text-red-600 text-sm">{lista.erro}</div>
@@ -174,6 +219,16 @@ export default function Doacoes() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--border)]">
+                {filtroStatus === 'pendente' && (
+                  <th className="pl-5 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      aria-label="Selecionar todas as pendentes da página"
+                      checked={lista.itens.length > 0 && lista.itens.every((d) => selecionadas.includes(d.id))}
+                      onChange={(e) => setSelecionadas(e.target.checked ? lista.itens.map((d) => d.id) : [])}
+                    />
+                  </th>
+                )}
                 <CabecalhoOrdenavel lista={lista} campo="apoiador__nome" rotulo="Doador" />
                 <CabecalhoOrdenavel lista={lista} campo="campanha__titulo" rotulo="Campanha" />
                 <CabecalhoOrdenavel lista={lista} campo="valor" rotulo="Valor" alinhamento="right" />
@@ -184,7 +239,7 @@ export default function Doacoes() {
             </thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">
               {lista.carregando ? (
-                <tr><td colSpan={6} className="text-center py-10 text-[var(--text-muted)] text-sm">Carregando...</td></tr>
+                <tr><td colSpan={filtroStatus === 'pendente' ? 7 : 6} className="text-center py-10 text-[var(--text-muted)] text-sm">Carregando...</td></tr>
               ) : lista.itens.length === 0 ? (
                 <TabelaVazia />
               ) : (
@@ -194,6 +249,16 @@ export default function Doacoes() {
                     className="hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
                     onClick={() => openDrawer?.({ type: 'doacao', id: d.id })}
                   >
+                    {filtroStatus === 'pendente' && (
+                      <td className="pl-5 py-3" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          aria-label={`Selecionar doação de ${d.apoiador_nome}`}
+                          checked={selecionadas.includes(d.id)}
+                          onChange={(e) => setSelecionadas((s) => (e.target.checked ? [...s, d.id] : s.filter((x) => x !== d.id)))}
+                        />
+                      </td>
+                    )}
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ backgroundColor: '#0f4c5c' }}>
@@ -208,6 +273,16 @@ export default function Doacoes() {
                     <td className="px-5 py-3"><BadgeStatus status={d.status} /></td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2 justify-end" onClick={e => e.stopPropagation()}>
+                        {d.status === 'pendente' && (
+                          <>
+                            <button onClick={() => agirEmLote('confirmar', [d.id])} className="px-2 py-1 rounded-lg text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700">
+                              Confirmar
+                            </button>
+                            <button onClick={() => agirEmLote('cancelar', [d.id])} className="px-2 py-1 rounded-lg text-[11px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
+                              Cancelar
+                            </button>
+                          </>
+                        )}
                         <button onClick={() => abrirEdicao(d)} aria-label="Editar doação" className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-600 transition-colors">
                           <Pencil size={14} />
                         </button>

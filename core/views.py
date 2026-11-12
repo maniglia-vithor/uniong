@@ -173,6 +173,22 @@ class DoacaoViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         ativar_membro_interessado(serializer.save())
 
+    @action(detail=False, methods=['post'], url_path='acao-em-lote')
+    def acao_em_lote(self, request):
+        """Confirma ou cancela várias doações pendentes de uma vez: {"ids": [...], "acao": "confirmar"|"cancelar"}."""
+        novo_status = {'confirmar': 'confirmada', 'cancelar': 'cancelada'}.get(request.data.get('acao'))
+        ids = request.data.get('ids')
+        if novo_status is None:
+            return Response({'erro': 'Ação inválida. Use "confirmar" ou "cancelar".'}, status=400)
+        if not isinstance(ids, list) or not ids or not all(isinstance(i, int) for i in ids):
+            return Response({'erro': 'Informe a lista de ids das doações.'}, status=400)
+        doacoes = list(Doacao.objects.select_related('apoiador').filter(pk__in=ids, status='pendente'))
+        for doacao in doacoes:
+            doacao.status = novo_status
+            doacao.save(update_fields=['status'])
+            ativar_membro_interessado(doacao)
+        return Response({'atualizadas': len(doacoes), 'ignoradas': len(set(ids)) - len(doacoes)})
+
     def perform_create(self, serializer):
         doacao = serializer.save()
         ativar_membro_interessado(doacao)
