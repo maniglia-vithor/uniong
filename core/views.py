@@ -25,6 +25,7 @@ from .anexos import TIPOS_PERMITIDOS, validar_anexo
 from .doacao_publica import DoacaoPublicaSerializer, ativar_membro_interessado, registrar_doacao_publica
 from . import indicadores
 from .paginacao import filtrar_periodo
+from .portal import despesas_publicas
 from .pix import mascarar
 from .throttles import AuthThrottle, DoacaoPublicaThrottle
 from .serializers import ApoiadorSerializer, CampanhaSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer, ConfiguracaoInstituicaoSerializer
@@ -472,13 +473,6 @@ def google_login(request):
     return Response({'access': str(refresh.access_token), 'refresh': str(refresh)})
 
 
-def _anonimizar(nome):
-    partes = nome.strip().split()
-    if len(partes) == 1:
-        return partes[0][0] + '.'
-    return f"{partes[0]} {partes[-1][0]}."
-
-
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def painel_transparencia(request):
@@ -492,33 +486,10 @@ def painel_transparencia(request):
     campanhas = indicadores.campanhas_ativas().com_arrecadado().order_by('-data_inicio')
     campanhas_data = CampanhaSerializer(campanhas, many=True).data
 
-    doacoes_recentes = (
-        Doacao.objects
-        .select_related('apoiador', 'campanha')
-        .filter(status='confirmada')
-        .order_by('-data')[:10]
-    )
-    doacoes_data = [
-        {
-            'doador': _anonimizar(d.apoiador.nome),
-            'campanha': d.campanha.titulo if d.campanha else None,
-            'valor': float(d.valor),
-            'data': d.data.isoformat(),
-        }
-        for d in doacoes_recentes
-    ]
-
     gastos_mes_qs = indicadores.despesas_pagas_no_mes()
     a_pagar_mes = indicadores.despesas_a_pagar_no_mes().aggregate(total=Sum('valor'))['total'] or 0
     gastos_mes_total = gastos_mes_qs.aggregate(total=Sum('valor'))['total'] or 0
-    gastos_mes_lista = [
-        {
-            'descricao': d.descricao,
-            'categoria': d.get_categoria_display(),
-            'valor': float(d.valor),
-        }
-        for d in gastos_mes_qs.order_by('-valor')
-    ]
+    gastos_mes_lista = despesas_publicas(gastos_mes_qs)
 
     return Response({
         'kpis': {
@@ -530,7 +501,6 @@ def painel_transparencia(request):
             'a_pagar_mes': float(a_pagar_mes),
         },
         'campanhas': campanhas_data,
-        'doacoes_recentes': doacoes_data,
         'gastos_mes_lista': gastos_mes_lista,
         'pix': ConfiguracaoPixSerializer(ConfiguracaoPix.obter()).data,
         'comunicados': [

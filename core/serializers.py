@@ -127,7 +127,7 @@ class DespesaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Despesa
         fields = [
-            'id', 'descricao', 'valor', 'data_vencimento', 'data_pagamento',
+            'id', 'descricao', 'descricao_publica', 'valor', 'data_vencimento', 'data_pagamento',
             'categoria', 'categoria_display', 'status', 'status_efetivo',
             'is_fixed', 'recurrence_period', 'recurrence_period_display', 'anexos',
             'serie_id', 'data_ancora', 'numero_ocorrencia', 'recorrencia_fim',

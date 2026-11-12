@@ -17,7 +17,7 @@ import {
 } from '../services/api'
 
 const VAZIO = {
-  descricao: '', valor: '', data_vencimento: '', data_pagamento: '',
+  descricao: '', descricao_publica: '', valor: '', data_vencimento: '', data_pagamento: '',
   categoria: 'outros', status: 'pendente', is_fixed: false, recurrence_period: 'mensal', recorrencia_fim: '',
 }
 
@@ -103,6 +103,7 @@ export default function Custos() {
     setEditando(item)
     setForm({
       descricao: item.descricao,
+      descricao_publica: item.descricao_publica || '',
       valor: item.valor,
       data_vencimento: item.data_vencimento,
       data_pagamento: item.data_pagamento || '',
@@ -167,6 +168,7 @@ export default function Custos() {
     setSalvando(true)
     const fd = new FormData()
     fd.append('descricao', form.descricao)
+    fd.append('descricao_publica', form.descricao_publica)
     fd.append('valor', form.valor)
     fd.append('data_vencimento', form.data_vencimento)
     if (form.data_pagamento) fd.append('data_pagamento', form.data_pagamento)
@@ -362,6 +364,13 @@ export default function Custos() {
             <Campo label="Descrição">
               <Input name="descricao" value={form.descricao} onChange={onChange} placeholder="Ex: Aluguel do escritório" required />
             </Campo>
+            <Campo label="Descrição pública (opcional)">
+              <Input name="descricao_publica" value={form.descricao_publica} onChange={onChange} maxLength={200}
+                placeholder="O que aparece no portal. Vazio: só a categoria" />
+            </Campo>
+            {form.categoria === 'recursos_humanos' && (
+              <p className="text-[11px] text-[var(--text-muted)] -mt-2">Despesas de Recursos Humanos aparecem no portal somadas numa única linha.</p>
+            )}
 
             {/* Valor + Vencimento */}
             <div className="grid grid-cols-2 gap-3">

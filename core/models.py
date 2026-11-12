@@ -175,6 +175,8 @@ class Despesa(models.Model):
     ]
 
     descricao = models.CharField(max_length=200)
+    # Texto exibido no portal; vazio → o portal mostra só a categoria.
+    descricao_publica = models.CharField(max_length=200, blank=True, default='')
     valor = models.DecimalField(max_digits=12, decimal_places=2)
     data_vencimento = models.DateField()
     data_pagamento = models.DateField(null=True, blank=True)
