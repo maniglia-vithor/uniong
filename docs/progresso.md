@@ -55,13 +55,33 @@ Atenção:
 - O usuário `joaovithoroliveira6@gmail.com` (criado pelo login Google antigo) não é staff, então não entra mais. Para liberar, marque-o como staff (ver resumo da fase).
 - Os 30 avisos restantes do oxlint são anteriores; 7 vêm de `pages/CommunityPanel.jsx`, sem uso (limpeza prevista na fase 3, item 7).
 
-## Fase 2 — Integridade dos dados financeiros e indicadores
-- [ ] 1. Criação de campanha (erro 500)
-- [ ] 2. Valor arrecadado calculado
-- [ ] 3. Validações de cadastro
-- [ ] 4. Paginação e listas completas
-- [ ] 5. Datas, fuso e indicadores
-- [ ] 6. Relatórios CSV
+## Fase 2 — Integridade dos dados financeiros e indicadores ✅
+Branch `fase-2-dados-financeiros` (a partir de `fase-1-seguranca`). 105 testes passando; oxlint 0 erros, 24 avisos.
+- [x] 1. Criação de campanha: `meta` → `meta_valor`; `ATOMIC_REQUESTS=True`.
+- [x] 2. Valor arrecadado calculado: campo removido (migração 0013); `Campanha.objects.com_arrecadado()`; `percentual_progresso` real + `meta_atingida`.
+- [x] 3. Validações: meta/valor > 0, `data_fim >= data_inicio`, doação em campanha encerrada, e-mail normalizado, celular com 10/11 dígitos, `Doacao.campanha` PROTECT (migração 0014), botão “Encerrar campanha”.
+- [x] 4. Paginação: `PaginacaoPadrao` (20, até 500), busca e ordenação no servidor, filtros de período, `opcoes/`, `doacoes/resumo/`, componente de paginação nas 5 telas.
+- [x] 5. Datas e indicadores: `core/indicadores.py`, `timezone.localdate()`, gastos do mês por `data_pagamento`, “A pagar no mês”, sem status `atrasado` gravado (migração 0015), tendências com `null` sem base.
+- [x] 6. CSV: `;`, BOM, decimal com vírgula, neutralização de fórmulas, celular, filtros de período e status.
+
+Relatório “valor gravado × valor real” antes da migração 0013 (banco de desenvolvimento):
+
+| Campanha | Gravado | Soma real | Diferença |
+|---|---|---|---|
+| Alimentação Solidária | 18150.00 | 18150.00 | 0.00 |
+| Escola para Todos | 30973.77 | 30973.77 | 0.00 |
+| Saúde na Comunidade | 18500.00 | 18500.00 | 0.00 |
+| Natal das Crianças | 17700.00 | 17700.00 | 0.00 |
+
+Decisões tomadas:
+- Migração 0014 normaliza e-mail/celular dos membros existentes (nenhum precisou de ajuste; nenhuma duplicata).
+- Migração 0015: as 2 despesas pagas sem `data_pagamento` receberam a data de vencimento (melhor estimativa), para continuarem aparecendo nos gastos.
+- Doação existente de campanha já encerrada pode ser editada (ex.: confirmar uma pendente); só é proibido criar/mover para campanha encerrada.
+- Exclusão de membro com doações também responde 400 com mensagem (antes dava erro 500 por `ProtectedError`).
+- Tendência de membros/campanhas: sem histórico de status, compara a mesma regra (status atual e data de cadastro/início até cada data). Limitação documentada em `core/indicadores.py`.
+- Total arrecadado: tendência = acréscimo do mês sobre o total até o fim do mês anterior.
+- Filtro de status na tela de Membros (RF05) já foi feito neste item 4 (ativo/inativo); a opção “interessado” entra na fase 3.
+- Relatórios passaram a usar axios (com renovação de token) em vez de `fetch`.
 
 ## Fase 3 — Doação pública, despesas recorrentes, configurações e limpeza
 - [ ] 1. Doação pelo portal público
