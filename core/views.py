@@ -12,13 +12,14 @@ from django.db.models import Sum, Q
 from django.http import HttpResponse
 from rest_framework import viewsets
 from rest_framework.permissions import AllowAny
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 
 from django.db import transaction
 
 from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoPix, LogAlteracao
 from .pix import mascarar
+from .throttles import AuthThrottle, DoacaoPublicaThrottle
 from .serializers import ApoiadorSerializer, CampanhaSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer
 
 
@@ -553,6 +554,7 @@ def relatorio_apoiadores(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([AuthThrottle])
 def google_login(request):
     """Troca o id_token (credential) do Google por JWT, apenas para staff já cadastrado."""
     if not settings.GOOGLE_CLIENT_ID:
@@ -710,6 +712,7 @@ def configuracao_pix(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([DoacaoPublicaThrottle])
 def public_doacao(request):
     """Endpoint público para registrar intenção de doação."""
     nome = request.data.get('nome', '').strip()

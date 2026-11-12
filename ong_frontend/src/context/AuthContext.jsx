@@ -47,9 +47,13 @@ export function AuthProvider({ children }) {
     return entrarComTokens(data.access, data.refresh)
   }, [entrarComTokens])
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    const refresh = localStorage.getItem('ong_refresh')
     limparSessao()
     setUsuario(null)
+    if (refresh) {
+      try { await api.post('/auth/logout/', { refresh }) } catch { /* sessão já encerrada no servidor */ }
+    }
   }, [])
 
   return (

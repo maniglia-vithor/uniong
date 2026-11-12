@@ -11,25 +11,43 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+const ROTAS_SEM_RENOVACAO = ['/auth/token/', '/auth/token/refresh/', '/auth/google/', '/auth/logout/']
+
+// Uma única renovação por vez: o refresh é rotacionado e o anterior é revogado,
+// então requisições simultâneas precisam esperar a mesma renovação.
+let renovacaoEmAndamento = null
+
+function renovarAccess() {
+  if (!renovacaoEmAndamento) {
+    const refresh = localStorage.getItem('ong_refresh')
+    renovacaoEmAndamento = (refresh
+      ? axios.post('/api/auth/token/refresh/', { refresh }).then(({ data }) => {
+          localStorage.setItem('ong_access', data.access)
+          if (data.refresh) localStorage.setItem('ong_refresh', data.refresh)
+          return data.access
+        })
+      : Promise.reject(new Error('sem refresh token'))
+    ).finally(() => { renovacaoEmAndamento = null })
+  }
+  return renovacaoEmAndamento
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config
-    const rotaDeAuth = original?.url?.startsWith('/auth/')
-    if (error.response?.status === 401 && !original._retry && !rotaDeAuth) {
+    const semRenovacao = ROTAS_SEM_RENOVACAO.includes(original?.url)
+    if (error.response?.status === 401 && original && !original._retry && !semRenovacao) {
       original._retry = true
-      const refresh = localStorage.getItem('ong_refresh')
-      if (refresh) {
-        try {
-          const { data } = await axios.post('/api/auth/token/refresh/', { refresh })
-          localStorage.setItem('ong_access', data.access)
-          original.headers.Authorization = `Bearer ${data.access}`
-          return api(original)
-        } catch { /* refresh expirado */ }
+      try {
+        const access = await renovarAccess()
+        original.headers.Authorization = `Bearer ${access}`
+        return api(original)
+      } catch {
+        localStorage.removeItem('ong_access')
+        localStorage.removeItem('ong_refresh')
+        if (window.location.pathname.startsWith('/admin')) window.location.href = '/login'
       }
-      localStorage.removeItem('ong_access')
-      localStorage.removeItem('ong_refresh')
-      if (window.location.pathname.startsWith('/admin')) window.location.href = '/login'
     }
     return Promise.reject(error)
   }
