@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.urls import path, include
-from core.auth_views import TokenView, RenovarTokenView, eu, logout
+from core.auth_views import TokenView, RenovarTokenView, alterar_senha, eu, logout
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -8,5 +8,6 @@ urlpatterns = [
     path('api/auth/token/refresh/', RenovarTokenView.as_view(), name='token_refresh'),
     path('api/auth/me/', eu, name='auth_me'),
     path('api/auth/logout/', logout, name='auth_logout'),
+    path('api/auth/alterar-senha/', alterar_senha, name='auth_alterar_senha'),
     path('api/', include('core.urls')),
 ]

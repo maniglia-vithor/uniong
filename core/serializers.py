@@ -1,9 +1,15 @@
 from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import serializers
-from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoPix
+from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoInstituicao, ConfiguracaoPix
 from .normalizacao import normalizar_celular, normalizar_email
 from .pix import normalizar_chave_pix
+
+
+class ConfiguracaoInstituicaoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConfiguracaoInstituicao
+        fields = ['portal_ativo']
 
 
 class ConfiguracaoPixSerializer(serializers.ModelSerializer):

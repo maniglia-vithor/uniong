@@ -466,13 +466,34 @@ export default function Transparencia() {
   const [donationModal, setDonationModal] = useState(false)
   const [gastosModal, setGastosModal] = useState(false)
   const [campanhaModal, setCampanhaModal] = useState(null)
+  const [indisponivel, setIndisponivel] = useState(false)
 
   useEffect(() => {
     axios.get('/api/public/transparencia/')
       .then(r => setDados(r.data))
-      .catch(() => setErro('Não foi possível carregar os dados. Verifique a conexão com o servidor.'))
+      .catch((err) => {
+        if (err.response?.status === 404) setIndisponivel(true)
+        else setErro('Não foi possível carregar os dados. Verifique a conexão com o servidor.')
+      })
       .finally(() => setCarregando(false))
   }, [])
+
+  if (indisponivel) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center px-4">
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-8 max-w-md text-center space-y-3">
+          <ShieldOff size={32} className="mx-auto text-[var(--text-muted)]" aria-hidden="true" />
+          <h1 className="text-lg font-bold text-[var(--text-primary)]">Portal indisponível</h1>
+          <p className="text-sm text-[var(--text-secondary)]">
+            O portal de transparência está temporariamente desativado pela organização.
+          </p>
+          {autenticado && (
+            <Link to="/admin" className="inline-block text-sm font-medium underline" style={{ color: '#0f4c5c' }}>Voltar ao painel</Link>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   const dadosGraficoCampanhas = dados?.campanhas?.map(c => ({
     name: c.titulo.length > 22 ? c.titulo.slice(0, 20) + '…' : c.titulo,

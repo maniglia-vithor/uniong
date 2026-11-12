@@ -20,14 +20,14 @@ from rest_framework.response import Response
 
 from django.db import transaction
 
-from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoPix, LogAlteracao
+from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoInstituicao, ConfiguracaoPix, LogAlteracao
 from .anexos import TIPOS_PERMITIDOS, validar_anexo
 from .doacao_publica import DoacaoPublicaSerializer, ativar_membro_interessado, registrar_doacao_publica
 from . import indicadores
 from .paginacao import filtrar_periodo
 from .pix import mascarar
 from .throttles import AuthThrottle, DoacaoPublicaThrottle
-from .serializers import ApoiadorSerializer, CampanhaSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer
+from .serializers import ApoiadorSerializer, CampanhaSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer, ConfiguracaoInstituicaoSerializer
 
 
 def _notificar_admins(mensagem, tipo, actor_name='', action_text='', target_type='', target_id=None):
@@ -483,6 +483,8 @@ def _anonimizar(nome):
 @permission_classes([AllowAny])
 def painel_transparencia(request):
     """Endpoint público — sem dados sensíveis."""
+    if _portal_desligado():
+        return Response(RESPOSTA_PORTAL_DESLIGADO, status=404)
     total_arrecadado = indicadores.total_arrecadado()
     doacoes_mes = indicadores.doacoes_do_mes().aggregate(total=Sum('valor'))['total'] or 0
     apoiadores_ativos = indicadores.membros_ativos().count()
@@ -543,6 +545,33 @@ def painel_transparencia(request):
     })
 
 
+def _portal_desligado():
+    return not ConfiguracaoInstituicao.obter().portal_ativo
+
+
+RESPOSTA_PORTAL_DESLIGADO = {'erro': 'Portal indisponível.'}
+
+
+@api_view(['GET', 'PATCH'])
+def configuracao_instituicao(request):
+    config = ConfiguracaoInstituicao.obter()
+    if request.method == 'GET':
+        return Response(ConfiguracaoInstituicaoSerializer(config).data)
+    if not request.user.is_superuser:
+        return Response({'erro': 'Apenas superusuários podem alterar a configuração da instituição.'}, status=403)
+    antes = ConfiguracaoInstituicaoSerializer(config).data
+    serializer = ConfiguracaoInstituicaoSerializer(config, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    for campo, novo in serializer.data.items():
+        if antes.get(campo) != novo:
+            LogAlteracao.objects.create(
+                usuario=request.user, modelo='ConfiguracaoInstituicao', objeto_id=config.pk,
+                campo=campo, antes=str(antes.get(campo)), depois=str(novo),
+            )
+    return Response(serializer.data)
+
+
 CAMPOS_PIX = {'chave': 'chave', 'nome_recebedor': 'nome do recebedor', 'cidade': 'cidade'}
 
 
@@ -587,6 +616,8 @@ def configuracao_pix(request):
 @throttle_classes([DoacaoPublicaThrottle])
 def public_doacao(request):
     """Registra uma intenção de doação feita pelo portal público."""
+    if _portal_desligado():
+        return Response(RESPOSTA_PORTAL_DESLIGADO, status=404)
     mensagem = 'Intenção de doação registrada! Faça o PIX e aguarde a confirmação da equipe.'
     if (request.data.get('site') or '').strip():
         return Response({'mensagem': mensagem, 'id': None}, status=201)

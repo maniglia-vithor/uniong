@@ -307,6 +307,24 @@ class LogAlteracao(models.Model):
         return f'{self.modelo}#{self.objeto_id} {self.campo} ({self.data:%d/%m/%Y %H:%M})'
 
 
+class ConfiguracaoInstituicao(models.Model):
+    """Registro único com as configurações da instituição (ampliado na fase 5)."""
+
+    portal_ativo = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Configuração da instituição'
+        verbose_name_plural = 'Configuração da instituição'
+
+    @classmethod
+    def obter(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return 'Configuração da instituição'
+
+
 class ConfiguracaoPix(models.Model):
     """Registro único com a chave PIX da instituição."""
 
