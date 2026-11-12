@@ -3,8 +3,9 @@ import { Link, useNavigate } from 'react-router-dom'
 import {
   HeartHandshake, DollarSign, Megaphone, Users, TrendingUp,
   Receipt, ShieldOff, ArrowLeft, X, ExternalLink, Share2,
-  CheckCircle, Plus,
+  CheckCircle, Plus, Copy, Check,
 } from 'lucide-react'
+import { gerarPayloadPix } from '../utils/pix'
 import { FaWhatsapp, FaInstagram, FaFacebook, FaLinkedin, FaTiktok } from 'react-icons/fa'
 import { MdEmail } from 'react-icons/md'
 import {
@@ -207,11 +208,25 @@ function GastosModal({ lista, total, onFechar }) {
 }
 
 /* ─── Campaign Detail Modal ──────────────────────────────────────────────── */
-function CampanhaModal({ campanha, onFechar }) {
-  const qrData = encodeURIComponent(`PIX:UniONG:${campanha.titulo}:${campanha.id}`)
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${qrData}&color=0f4c5c`
+function CampanhaModal({ campanha, pix, onFechar }) {
+  const temPix = Boolean(pix?.chave)
+  const payloadPix = temPix
+    ? gerarPayloadPix({ chave: pix.chave, nome: pix.nome_recebedor, cidade: pix.cidade, txid: `CAMPANHA${campanha.id}` })
+    : ''
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${encodeURIComponent(payloadPix)}`
 
   const [aviso, setAviso] = useState(null)
+  const [copiado, setCopiado] = useState(false)
+
+  async function copiarPix() {
+    try {
+      await navigator.clipboard.writeText(payloadPix)
+      setCopiado(true)
+      setTimeout(() => setCopiado(false), 2500)
+    } catch {
+      setAviso(`Código PIX: ${payloadPix}`)
+    }
+  }
 
   const link = `${BASE_URL}/transparencia`
   const texto = `Apoie a campanha "${campanha.titulo}" da UniONG! Já arrecadamos ${formatBRL(campanha.valor_arrecadado)} de ${formatBRL(campanha.meta_valor)}. Doe via PIX:`
@@ -285,17 +300,34 @@ function CampanhaModal({ campanha, onFechar }) {
         {/* PIX */}
         <div>
           <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Doar via PIX</h3>
-          <div className="flex items-center gap-4 border border-[var(--border)] rounded-lg p-4">
-            <img
-              src={qrUrl}
-              alt="QR Code PIX"
-              className="w-[120px] h-[120px] rounded-md border border-[var(--border)] bg-white flex-shrink-0"
-              onError={e => { e.target.style.display = 'none' }}
-            />
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-              Escaneie o QR Code com o aplicativo do seu banco para realizar uma doação via PIX para esta campanha.
+          {temPix ? (
+            <div className="flex items-center gap-4 border border-[var(--border)] rounded-lg p-4">
+              <img
+                src={qrUrl}
+                alt="QR Code PIX"
+                className="w-[120px] h-[120px] rounded-md border border-[var(--border)] bg-white flex-shrink-0"
+                onError={e => { e.target.style.display = 'none' }}
+              />
+              <div className="space-y-2">
+                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                  Escaneie o QR Code com o aplicativo do seu banco ou use o PIX copia e cola para doar para esta campanha.
+                </p>
+                <p className="text-[11px] text-[var(--text-muted)] break-all">Chave: {pix.chave}</p>
+                <button
+                  type="button"
+                  onClick={copiarPix}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                >
+                  {copiado ? <Check size={13} /> : <Copy size={13} />}
+                  {copiado ? 'Código copiado' : 'Copiar código PIX'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-[var(--text-muted)] border border-[var(--border)] rounded-lg p-4">
+              A instituição ainda não cadastrou uma chave PIX para receber doações.
             </p>
-          </div>
+          )}
         </div>
 
         {/* Compartilhar */}
@@ -615,7 +647,7 @@ export default function Transparencia() {
         />
       )}
       {campanhaModal && (
-        <CampanhaModal campanha={campanhaModal} onFechar={() => setCampanhaModal(null)} />
+        <CampanhaModal campanha={campanhaModal} pix={dados?.pix} onFechar={() => setCampanhaModal(null)} />
       )}
     </div>
   )

@@ -1,6 +1,15 @@
 from django.db.models import Sum
 from rest_framework import serializers
-from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo
+from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoPix
+
+
+class ConfiguracaoPixSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConfiguracaoPix
+        fields = ['chave', 'nome_recebedor', 'cidade']
+
+    def validate_chave(self, value):
+        return value.strip()
 
 
 class ApoiadorSerializer(serializers.ModelSerializer):

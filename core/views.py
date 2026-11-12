@@ -14,8 +14,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 
-from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo
-from .serializers import ApoiadorSerializer, CampanhaSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer
+from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoPix
+from .serializers import ApoiadorSerializer, CampanhaSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer
 
 
 def _notificar_admins(mensagem, tipo, actor_name='', action_text='', target_type='', target_id=None):
@@ -655,7 +655,20 @@ def painel_transparencia(request):
         'campanhas': campanhas_data,
         'doacoes_recentes': doacoes_data,
         'gastos_mes_lista': gastos_mes_lista,
+        'pix': ConfiguracaoPixSerializer(ConfiguracaoPix.obter()).data,
     })
+
+
+@api_view(['GET', 'PUT'])
+@permission_classes([IsAuthenticated])
+def configuracao_pix(request):
+    config = ConfiguracaoPix.obter()
+    if request.method == 'PUT':
+        serializer = ConfiguracaoPixSerializer(config, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+    return Response(ConfiguracaoPixSerializer(config).data)
 
 
 @api_view(['POST'])

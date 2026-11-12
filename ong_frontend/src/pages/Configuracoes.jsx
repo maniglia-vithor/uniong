@@ -102,6 +102,12 @@ export default function Configuracoes() {
   // ── Privacidade ──────────────────────────────────────────────
   const [transparencia, setTransparencia] = useState(true)
   const [exportando, setExportando]       = useState(false)
+  const [pix, setPix]                     = useState({ chave: '', nome_recebedor: '', cidade: '' })
+  const [salvandoPix, setSalvandoPix]     = useState(false)
+
+  useEffect(() => {
+    api.get('/configuracoes/pix/').then(r => setPix(r.data)).catch(() => {})
+  }, [])
 
   // Carrega prefs ao montar
   useEffect(() => {
@@ -130,10 +136,19 @@ export default function Configuracoes() {
     setTimeout(() => setMsgPerfil(null), 3000)
   }
 
-  function salvarPrivacidade() {
+  async function salvarPrivacidade() {
     salvarPrefs({ ...carregarPrefs(), transparencia })
-    setMsgPerfil({ tipo: 'ok', texto: 'Configurações de privacidade salvas.' })
-    setTimeout(() => setMsgPerfil(null), 3000)
+    setSalvandoPix(true)
+    try {
+      const { data } = await api.put('/configuracoes/pix/', pix)
+      setPix(data)
+      setMsgPerfil({ tipo: 'ok', texto: 'Configurações de privacidade e chave PIX salvas.' })
+    } catch {
+      setMsgPerfil({ tipo: 'erro', texto: 'Erro ao salvar a chave PIX. Verifique os dados.' })
+    } finally {
+      setSalvandoPix(false)
+      setTimeout(() => setMsgPerfil(null), 3000)
+    }
   }
 
   async function salvarPerfil(e) {
@@ -394,6 +409,49 @@ export default function Configuracoes() {
                 </Row>
               </Card>
 
+              <Card title="Chave PIX da instituição">
+                <p className="text-xs text-[var(--text-muted)] -mt-2">
+                  Usada para gerar o QR Code de doação das campanhas no portal de transparência.
+                </p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Chave PIX</label>
+                    <input
+                      className={inputCls}
+                      value={pix.chave}
+                      onChange={e => setPix(p => ({ ...p, chave: e.target.value }))}
+                      placeholder="CNPJ, e-mail, telefone (+55...) ou chave aleatória"
+                      maxLength={77}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Nome do recebedor</label>
+                      <input
+                        className={inputCls}
+                        value={pix.nome_recebedor}
+                        onChange={e => setPix(p => ({ ...p, nome_recebedor: e.target.value }))}
+                        placeholder="UniONG"
+                        maxLength={25}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Cidade</label>
+                      <input
+                        className={inputCls}
+                        value={pix.cidade}
+                        onChange={e => setPix(p => ({ ...p, cidade: e.target.value }))}
+                        placeholder="São Paulo"
+                        maxLength={15}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-muted)]">
+                    Nome e cidade devem ser os mesmos cadastrados no banco (até 25 e 15 caracteres).
+                  </p>
+                </div>
+              </Card>
+
               <Card title="Exportação de dados">
                 <p className="text-xs text-[var(--text-muted)]">
                   Exporta todos os registros de doações, membros e campanhas em formato JSON.
@@ -411,10 +469,11 @@ export default function Configuracoes() {
               <div className="flex justify-end">
                 <button
                   onClick={salvarPrivacidade}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+                  disabled={salvandoPix}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                   style={{ backgroundColor: '#0f4c5c' }}
                 >
-                  <Save size={14} /> Salvar configurações
+                  <Save size={14} /> {salvandoPix ? 'Salvando...' : 'Salvar configurações'}
                 </button>
               </div>
             </>

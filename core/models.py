@@ -240,6 +240,26 @@ class DespesaAnexo(models.Model):
         return f'Anexo de {self.despesa}'
 
 
+class ConfiguracaoPix(models.Model):
+    """Registro único com a chave PIX da instituição."""
+
+    chave = models.CharField(max_length=77, blank=True, default='')
+    nome_recebedor = models.CharField(max_length=25, blank=True, default='')
+    cidade = models.CharField(max_length=15, blank=True, default='')
+
+    class Meta:
+        verbose_name = 'Configuração PIX'
+        verbose_name_plural = 'Configuração PIX'
+
+    @classmethod
+    def obter(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return self.chave or '(sem chave PIX)'
+
+
 class Comunicado(models.Model):
     PUBLICO_CHOICES = [
         ('publico', 'Público'),
