@@ -3,7 +3,7 @@ from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.utils import timezone
 from django.core.management.base import BaseCommand, CommandError
-from core.models import Apoiador, Campanha, Doacao
+from core.models import Apoiador, Campanha, Despesa, Doacao, Recibo
 
 
 APOIADORES = [
@@ -51,6 +51,9 @@ class Command(BaseCommand):
                 'Execute novamente com --confirmar para prosseguir.'
             )
         self.stdout.write('Limpando dados existentes...')
+        # Recibos e despesas vinculadas protegem doações e campanhas (PROTECT): solta os vínculos antes.
+        Recibo.objects.all().delete()
+        Despesa.objects.filter(campanha__isnull=False).update(campanha=None)
         Doacao.objects.all().delete()
         Campanha.objects.all().delete()
         Apoiador.objects.all().delete()
