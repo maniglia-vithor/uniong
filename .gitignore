@@ -33,3 +33,4 @@ docs/prompts/
 *.swp
 staticfiles/
 backups/
+*.sqlite3
