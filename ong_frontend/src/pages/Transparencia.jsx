@@ -353,11 +353,11 @@ export default function Transparencia() {
     meta: Number(c.meta_valor),
   })) ?? []
 
-  const dadosPie = dados?.campanhas?.map((c, i) => ({
-    name: c.titulo.length > 22 ? c.titulo.slice(0, 20) + '…' : c.titulo,
-    value: Number(c.valor_arrecadado),
-    fill: CORES_PIE[i % CORES_PIE.length],
-  })).filter(c => c.value > 0) ?? []
+  const dadosPie = dados?.distribuicao?.map((d, i) => ({
+    name: d.nome.length > 22 ? d.nome.slice(0, 20) + '…' : d.nome,
+    value: d.valor,
+    fill: d.nome === 'Sem campanha' ? '#94a3b8' : CORES_PIE[i % CORES_PIE.length],
+  })) ?? []
 
   const chartHeight = Math.max(220, dadosGraficoCampanhas.length * 55)
 
@@ -417,28 +417,28 @@ export default function Transparencia() {
               <KpiCard
                 label="Total Arrecadado"
                 valor={formatBRL(dados.kpis.total_arrecadado)}
-                desc="todas as doações confirmadas"
+                desc="Todas as doações confirmadas"
                 icone={DollarSign}
                 cor="#0f4c5c"
               />
               <KpiCard
                 label="Doações do Mês"
                 valor={formatBRL(dados.kpis.doacoes_mes)}
-                desc={`desde 01/${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}`}
+                desc={`Desde 01/${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}`}
                 icone={TrendingUp}
                 cor="#0891b2"
               />
               <KpiCard
                 label="Membros Ativos"
                 valor={dados.kpis.apoiadores_ativos}
-                desc="com status Ativo"
+                desc="Com status Ativo"
                 icone={Users}
                 cor="#7c3aed"
               />
               <KpiCard
                 label="Gastos do Mês"
                 valor={formatBRL(dados.kpis.gastos_mes)}
-                desc="despesas do mês atual"
+                desc="Despesas do mês atual"
                 icone={Receipt}
                 cor="#f97316"
                 onClick={() => setGastosModal(true)}
