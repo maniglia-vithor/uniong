@@ -279,20 +279,3 @@ class Comunicado(models.Model):
     def __str__(self):
         return self.titulo
 
-
-class ReacaoComunicado(models.Model):
-    EMOJIS = ['👍', '❤️', '👏', '🎉', '🙏', '😮']
-
-    comunicado = models.ForeignKey(Comunicado, on_delete=models.CASCADE, related_name='reacoes')
-    emoji = models.CharField(max_length=8)
-    total = models.PositiveIntegerField(default=0)
-
-    class Meta:
-        verbose_name = 'Reação a comunicado'
-        verbose_name_plural = 'Reações a comunicados'
-        constraints = [
-            models.UniqueConstraint(fields=['comunicado', 'emoji'], name='reacao_unica_por_emoji'),
-        ]
-
-    def __str__(self):
-        return f'{self.emoji} {self.total} — {self.comunicado}'

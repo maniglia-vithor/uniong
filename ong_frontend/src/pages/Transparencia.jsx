@@ -360,39 +360,24 @@ function CampanhaModal({ campanha, pix, onFechar }) {
   )
 }
 
-/* ─── Comunicados com reações ───────────────────────────────────────────── */
-function lerMinhasReacoes() {
-  try {
-    return JSON.parse(localStorage.getItem('ong_reacoes') ?? '{}')
-  } catch {
-    return {}
-  }
-}
-
+/* ─── Comunicados ───────────────────────────────────────────────────────── */
 function formatDataHora(iso) {
   const d = new Date(iso)
   return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
-function Comunicados({ lista, emojis }) {
-  const [reacoes, setReacoes] = useState(() => Object.fromEntries(lista.map(c => [c.id, c.reacoes])))
-  const [minhas, setMinhas] = useState(lerMinhasReacoes)
-  const [enviando, setEnviando] = useState(null)
+const LIMITE_CARACTERES = 280
+const LIMITE_LINHAS = 4
 
-  async function reagir(id, emoji) {
-    const jaReagi = (minhas[id] ?? []).includes(emoji)
-    setEnviando(`${id}${emoji}`)
-    try {
-      const { data } = await axios.post(`/api/public/comunicados/${id}/reagir/`, { emoji, remover: jaReagi })
-      setReacoes(r => ({ ...r, [id]: data.reacoes }))
-      const novas = {
-        ...minhas,
-        [id]: jaReagi ? (minhas[id] ?? []).filter(e => e !== emoji) : [...(minhas[id] ?? []), emoji],
-      }
-      setMinhas(novas)
-      try { localStorage.setItem('ong_reacoes', JSON.stringify(novas)) } catch { /* armazenamento indisponível */ }
-    } catch { /* mantém o estado atual se a reação falhar */ }
-    finally { setEnviando(null) }
+function ehExtenso(texto) {
+  return texto.length > LIMITE_CARACTERES || texto.split('\n').length > LIMITE_LINHAS
+}
+
+function Comunicados({ lista }) {
+  const [expandidos, setExpandidos] = useState({})
+
+  function alternar(id) {
+    setExpandidos(e => ({ ...e, [id]: !e[id] }))
   }
 
   return (
@@ -407,36 +392,34 @@ function Comunicados({ lista, emojis }) {
         </div>
       ) : (
         <div className="space-y-3">
-          {lista.map(c => (
-            <article key={c.id} className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-5">
-              <p className="text-xs text-[var(--text-muted)] mb-1">{formatDataHora(c.data_publicacao)}</p>
-              <h3 className="font-semibold text-[var(--text-primary)] mb-2">{c.titulo}</h3>
-              <p className="text-sm text-[var(--text-secondary)] whitespace-pre-line leading-relaxed">{c.conteudo}</p>
-              <div className="flex flex-wrap gap-1.5 mt-4">
-                {emojis.map(emoji => {
-                  const total = reacoes[c.id]?.[emoji] ?? 0
-                  const ativo = (minhas[c.id] ?? []).includes(emoji)
-                  return (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => reagir(c.id, emoji)}
-                      disabled={enviando === `${c.id}${emoji}`}
-                      aria-pressed={ativo}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors disabled:opacity-60 ${
-                        ativo
-                          ? 'border-[#0f4c5c] bg-[#0f4c5c]/10 text-[var(--text-primary)] font-semibold'
-                          : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
-                      }`}
-                    >
-                      <span className="text-sm leading-none">{emoji}</span>
-                      {total > 0 && <span>{total}</span>}
-                    </button>
-                  )
-                })}
-              </div>
-            </article>
-          ))}
+          {lista.map(c => {
+            const extenso = ehExtenso(c.conteudo)
+            const aberto = Boolean(expandidos[c.id])
+            return (
+              <article key={c.id} className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-5">
+                <p className="text-xs text-[var(--text-muted)] mb-1">{formatDataHora(c.data_publicacao)}</p>
+                <h3 className="font-semibold text-[var(--text-primary)] mb-2">{c.titulo}</h3>
+                <p
+                  id={`comunicado-${c.id}`}
+                  className={`text-sm text-[var(--text-secondary)] whitespace-pre-line leading-relaxed ${extenso && !aberto ? 'line-clamp-4' : ''}`}
+                >
+                  {c.conteudo}
+                </p>
+                {extenso && (
+                  <button
+                    type="button"
+                    onClick={() => alternar(c.id)}
+                    aria-expanded={aberto}
+                    aria-controls={`comunicado-${c.id}`}
+                    className="mt-2 text-xs font-semibold hover:underline"
+                    style={{ color: '#0f4c5c' }}
+                  >
+                    {aberto ? 'Mostrar menos' : 'Ler mais'}
+                  </button>
+                )}
+              </article>
+            )
+          })}
         </div>
       )}
     </section>
@@ -656,7 +639,7 @@ export default function Transparencia() {
               </div>
             )}
 
-            <Comunicados lista={dados.comunicados ?? []} emojis={dados.emojis_reacao ?? []} />
+            <Comunicados lista={dados.comunicados ?? []} />
 
             {/* Rodapé informativo */}
             <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-5 flex items-start gap-3 text-sm text-[var(--text-muted)]">
