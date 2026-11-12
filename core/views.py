@@ -67,7 +67,7 @@ class ApoiadorViewSet(viewsets.ModelViewSet):
 
 
 class CampanhaViewSet(viewsets.ModelViewSet):
-    queryset = Campanha.objects.all()
+    queryset = Campanha.objects.com_arrecadado().order_by('-data_inicio', '-id')
     serializer_class = CampanhaSerializer
 
     def get_queryset(self):
@@ -256,7 +256,7 @@ class DashboardViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'], url_path='campanhas-ativas')
     def campanhas_ativas(self, request):
-        campanhas = Campanha.objects.filter(status='ativa').order_by('-data_inicio')
+        campanhas = Campanha.objects.com_arrecadado().filter(status='ativa').order_by('-data_inicio')
         serializer = CampanhaSerializer(campanhas, many=True)
         return Response(serializer.data)
 
@@ -347,7 +347,7 @@ class DashboardViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'], url_path='kpi-campanhas-ativas')
     def kpi_campanhas_ativas(self, request):
-        campanhas = Campanha.objects.filter(status='ativa').order_by('-data_inicio')
+        campanhas = Campanha.objects.com_arrecadado().filter(status='ativa').order_by('-data_inicio')
         data = [
             {
                 'id': c.id,
@@ -545,7 +545,7 @@ def relatorio_campanhas(request):
     response = _csv_response('relatorio_campanhas.csv')
     writer = csv.writer(response)
     writer.writerow(['ID', 'Título', 'Meta (R$)', 'Arrecadado (R$)', 'Progresso (%)', 'Status', 'Início', 'Fim'])
-    for c in Campanha.objects.order_by('-data_inicio'):
+    for c in Campanha.objects.com_arrecadado().order_by('-data_inicio'):
         writer.writerow([
             c.id,
             c.titulo,
@@ -643,7 +643,7 @@ def painel_transparencia(request):
 
     apoiadores_ativos = Apoiador.objects.filter(status='ativo').count()
 
-    campanhas = Campanha.objects.filter(status='ativa').order_by('-data_inicio')
+    campanhas = Campanha.objects.com_arrecadado().filter(status='ativa').order_by('-data_inicio')
     campanhas_data = CampanhaSerializer(campanhas, many=True).data
 
     doacoes_recentes = (

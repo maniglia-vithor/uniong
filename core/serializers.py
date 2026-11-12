@@ -36,13 +36,15 @@ class ApoiadorSerializer(serializers.ModelSerializer):
 
 
 class CampanhaSerializer(serializers.ModelSerializer):
+    valor_arrecadado = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     percentual_progresso = serializers.ReadOnlyField()
+    meta_atingida = serializers.ReadOnlyField()
 
     class Meta:
         model = Campanha
         fields = [
-            'id', 'titulo', 'meta_valor', 'valor_arrecadado',
-            'percentual_progresso', 'status', 'data_inicio', 'data_fim', 'descricao',
+            'id', 'titulo', 'meta_valor', 'valor_arrecadado', 'percentual_progresso',
+            'meta_atingida', 'status', 'data_inicio', 'data_fim', 'descricao',
         ]
 
 

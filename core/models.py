@@ -1,5 +1,9 @@
-from django.db import models
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
+from django.db import models
+from django.db.models import Q, Sum, Value
+from django.db.models.functions import Coalesce
 
 from .anexos import armazenamento_privado, caminho_anexo
 
@@ -25,6 +29,18 @@ class Apoiador(models.Model):
         return self.nome
 
 
+class CampanhaQuerySet(models.QuerySet):
+    def com_arrecadado(self):
+        """Anota `arrecadado`: soma das doações confirmadas da campanha."""
+        return self.annotate(
+            arrecadado=Coalesce(
+                Sum('doacoes__valor', filter=Q(doacoes__status='confirmada')),
+                Value(Decimal('0')),
+                output_field=models.DecimalField(max_digits=14, decimal_places=2),
+            )
+        )
+
+
 class Campanha(models.Model):
     STATUS_CHOICES = [
         ('ativa', 'Ativa'),
@@ -34,11 +50,12 @@ class Campanha(models.Model):
 
     titulo = models.CharField(max_length=200)
     meta_valor = models.DecimalField(max_digits=12, decimal_places=2)
-    valor_arrecadado = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='ativa')
     data_inicio = models.DateField()
     data_fim = models.DateField(null=True, blank=True)
     descricao = models.TextField(blank=True)
+
+    objects = CampanhaQuerySet.as_manager()
 
     class Meta:
         verbose_name = 'Campanha'
@@ -46,10 +63,23 @@ class Campanha(models.Model):
         ordering = ['-data_inicio']
 
     @property
+    def valor_arrecadado(self):
+        if hasattr(self, 'arrecadado'):
+            return self.arrecadado
+        if self.pk is None:
+            return Decimal('0')
+        total = self.doacoes.filter(status='confirmada').aggregate(total=Sum('valor'))['total']
+        return total or Decimal('0')
+
+    @property
     def percentual_progresso(self):
-        if self.meta_valor == 0:
+        if not self.meta_valor:
             return 0
-        return min(round((self.valor_arrecadado / self.meta_valor) * 100, 1), 100)
+        return round((self.valor_arrecadado / self.meta_valor) * 100, 1)
+
+    @property
+    def meta_atingida(self):
+        return bool(self.meta_valor) and self.valor_arrecadado >= self.meta_valor
 
     def __str__(self):
         return self.titulo
@@ -106,36 +136,6 @@ class Doacao(models.Model):
         verbose_name = 'Doação'
         verbose_name_plural = 'Doações'
         ordering = ['-data']
-
-    def save(self, *args, **kwargs):
-        # Atualiza valor_arrecadado da campanha ao confirmar/cancelar doação
-        is_new = self.pk is None
-        old_status = None
-        old_valor = None
-
-        if not is_new:
-            old = Doacao.objects.get(pk=self.pk)
-            old_status = old.status
-            old_valor = old.valor
-
-        super().save(*args, **kwargs)
-
-        if self.campanha:
-            self._atualizar_campanha(is_new, old_status, old_valor)
-
-    def _atualizar_campanha(self, is_new, old_status, old_valor):
-        campanha = self.campanha
-        if is_new:
-            if self.status == 'confirmada':
-                campanha.valor_arrecadado += self.valor
-        else:
-            # Remove contribuição antiga se era confirmada
-            if old_status == 'confirmada':
-                campanha.valor_arrecadado -= old_valor
-            # Adiciona nova contribuição se agora é confirmada
-            if self.status == 'confirmada':
-                campanha.valor_arrecadado += self.valor
-        campanha.save()
 
     def __str__(self):
         return f'R$ {self.valor} — {self.apoiador.nome} em {self.data}'

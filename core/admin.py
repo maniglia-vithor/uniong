@@ -27,6 +27,9 @@ class ApoiadorAdmin(admin.ModelAdmin):
 @admin.register(Campanha)
 class CampanhaAdmin(admin.ModelAdmin):
     list_display = ['titulo', 'meta_valor', 'valor_arrecadado', 'percentual_progresso', 'status']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).com_arrecadado()
     list_filter = ['status']
     search_fields = ['titulo']
 

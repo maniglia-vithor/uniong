@@ -66,7 +66,6 @@ class Command(BaseCommand):
             c = Campanha.objects.create(
                 titulo=titulo,
                 meta_valor=meta,
-                valor_arrecadado=0,
                 status='ativa',
                 data_inicio=inicio,
             )
