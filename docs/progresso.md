@@ -83,14 +83,29 @@ Decisões tomadas:
 - Filtro de status na tela de Membros (RF05) já foi feito neste item 4 (ativo/inativo); a opção “interessado” entra na fase 3.
 - Relatórios passaram a usar axios (com renovação de token) em vez de `fetch`.
 
-## Fase 3 — Doação pública, despesas recorrentes, configurações e limpeza
-- [ ] 1. Doação pelo portal público
-- [ ] 2. Fila de doações pendentes
-- [ ] 3. Despesas recorrentes
-- [ ] 4. Notificações
-- [ ] 5. Configurações
-- [ ] 6. Privacidade no portal
-- [ ] 7. Limpeza e coerência
+## Fase 3 — Doação pública, despesas recorrentes, configurações e limpeza ✅
+Branch `fase-3-coerencia` (a partir de `fase-2-dados-financeiros`). 146 testes passando; oxlint 0 erros, 12 avisos.
+- [x] 1. Doação pública: status `interessado`, `origem` e `consentimento_em` (migração 0016), e-mail existente não altera dados, só campanha ativa, R$ 1 a R$ 100.000, honeypot, notificação, PIX com valor e txid `DOA{id}`, página `/privacidade`.
+- [x] 2. Fila de pendentes: abas com contador, ações por linha e em lote (`POST /api/doacoes/acao-em-lote/`), contador no menu.
+- [x] 3. Recorrência por âncora: `serie_id`, `data_ancora`, `numero_ocorrencia`, `recorrencia_fim` (migração 0017), geração só ao pagar, encerrar série, aplicar valor às próximas, status `cancelado`.
+- [x] 4. Notificações: tipo `configuracao` (migração 0018), detalhe de despesa no painel lateral, sem requisição a `undefined`.
+- [x] 5. Configurações: `PATCH /auth/me/`, `POST /auth/alterar-senha/`, `ConfiguracaoInstituicao.portal_ativo` (migração 0019) com portal indisponível, preferências sem efeito removidas.
+- [x] 6. Privacidade no portal: sem `doacoes_recentes`, `descricao_publica` (migração 0020), RH agregado.
+- [x] 7. Limpeza: páginas sem uso removidas, admin completo, QR Code local (`qrcode.react`), avisos de pureza corrigidos, aviso em Comunicação, filtro de status em Membros.
+
+Migração das séries de despesas existentes (0017): agrupa despesas fixas por descrição + periodicidade; a mais antiga é a âncora e as demais entram na série só quando o vencimento coincide exatamente com uma ocorrência prevista. No banco de desenvolvimento não havia despesas fixas, então nada foi convertido.
+
+Decisões tomadas:
+- Dependência nova `qrcode.react@4.2.0`: o QR Code era gerado por `api.qrserver.com`, que recebia o código PIX.
+- O tipo de notificação foi renomeado de `config` para `configuracao` (como pede o prompt); a coluna passou de 10 para 12 caracteres e a migração converte os registros.
+- Doação pública com honeypot preenchido responde 201 com `id: null`, sem gravar.
+- `encerrar-serie` usa como fim, por padrão, o vencimento da ocorrência atual; aceita `recorrencia_fim` explícito.
+- `aplicar-valor-proximas` copia o valor salvo (não o digitado e não salvo) para as pendentes seguintes; a tela avisa para salvar antes.
+- Restrição única `serie_id + numero_ocorrencia` sem condição: o MySQL não suporta restrição condicional, e `NULL` não conflita.
+- Despesa no painel lateral é somente leitura, com atalho para Custos (a edição completa, com anexos, fica na tela de Custos).
+- Configuração da instituição grava `LogAlteracao`, como a chave PIX.
+- Página `/privacidade` é texto-base marcado para revisão da ONG.
+- Sugestão registrada: captcha (hCaptcha/Turnstile) na doação pública, se o honeypot + throttling não bastarem.
 
 ## Fase 4 — Transparência e prestação de contas
 - [ ] 1. Despesas ligadas a campanhas
