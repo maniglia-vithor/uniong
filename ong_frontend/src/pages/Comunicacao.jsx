@@ -95,7 +95,9 @@ export default function Comunicacao() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <PublicoIcon tipo={c.publico_alvo} />
-                    <span className="text-xs text-[var(--text-muted)]">{c.publico_alvo_display}</span>
+                    <span className="text-xs text-[var(--text-muted)]">
+                      {c.publico_alvo_display}{c.publico_alvo === 'apoiadores' ? ' — não aparece no portal' : ''}
+                    </span>
                     <span className="text-[var(--text-muted)]">·</span>
                     <span className="text-xs text-[var(--text-muted)]">{formatDateTime(c.data_publicacao)}</span>
                   </div>
@@ -103,10 +105,10 @@ export default function Comunicacao() {
                   <p className="text-sm text-[var(--text-secondary)] whitespace-pre-line leading-relaxed">{c.conteudo}</p>
                 </div>
                 <div className="flex gap-1 flex-shrink-0">
-                  <button onClick={() => abrirEdicao(c)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-700 transition-colors">
+                  <button onClick={() => abrirEdicao(c)} aria-label={`Editar ${c.titulo}`} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-700 transition-colors">
                     <Pencil size={14} />
                   </button>
-                  <button onClick={() => onExcluir(c.id, c.titulo)} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
+                  <button onClick={() => onExcluir(c.id, c.titulo)} aria-label={`Excluir ${c.titulo}`} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -140,6 +142,11 @@ export default function Comunicacao() {
                 <option value="apoiadores">Somente Membros</option>
               </Select>
             </Campo>
+            {form.publico_alvo === 'apoiadores' && (
+              <p className="text-xs text-[var(--text-muted)] bg-[var(--bg-card-alt)] border border-[var(--border)] rounded-lg px-3 py-2 -mt-2">
+                Comunicados “Somente Membros” não aparecem no portal de transparência.
+              </p>
+            )}
             <div className="flex gap-3 pt-2">
               <BotaoCancelar onClick={fechar} />
               <BotaoSubmit carregando={salvando} label="Publicar" />

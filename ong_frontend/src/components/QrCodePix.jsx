@@ -1,13 +1,19 @@
 import { useState } from 'react'
+import { QRCodeCanvas } from 'qrcode.react'
 import { Copy, Check } from 'lucide-react'
 import { gerarPayloadPix } from '../utils/pix'
 
-export function urlImagemQr(payload) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${encodeURIComponent(payload)}`
+/** Converte o canvas do QR Code (pelo id) num arquivo PNG, para compartilhar a imagem. */
+export function qrComoArquivo(idCanvas, nomeArquivo = 'pix.png') {
+  const canvas = document.getElementById(idCanvas)
+  if (!canvas) return Promise.resolve(null)
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob ? new File([blob], nomeArquivo, { type: 'image/png' }) : null), 'image/png')
+  })
 }
 
-/** QR Code PIX "copia e cola" com botão de copiar. Sem chave cadastrada, mostra um aviso. */
-export default function QrCodePix({ pix, txid, valor = null, descricao }) {
+/** QR Code PIX "copia e cola" gerado localmente, com botão de copiar. Sem chave cadastrada, mostra um aviso. */
+export default function QrCodePix({ pix, txid, valor = null, descricao, idCanvas = 'qr-pix' }) {
   const [copiado, setCopiado] = useState(false)
   if (!pix?.chave) {
     return (
@@ -27,12 +33,11 @@ export default function QrCodePix({ pix, txid, valor = null, descricao }) {
   }
 
   return (
-    <div className="flex items-center gap-4 border border-[var(--border)] rounded-lg p-4">
-      <img
-        src={urlImagemQr(payload)}
-        alt="QR Code PIX"
-        className="w-[120px] h-[120px] rounded-md border border-[var(--border)] bg-white flex-shrink-0"
-      />
+    <div className="flex flex-col sm:flex-row items-center gap-4 border border-[var(--border)] rounded-lg p-4">
+      <div className="bg-white p-2 rounded-md border border-[var(--border)] flex-shrink-0">
+        <QRCodeCanvas id={idCanvas} value={payload} size={140} level="M" marginSize={1}
+          title="QR Code PIX" role="img" aria-label="QR Code PIX para doação" />
+      </div>
       <div className="space-y-2 min-w-0">
         <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{descricao}</p>
         <p className="text-[11px] text-[var(--text-muted)] break-all">Chave: {pix.chave}</p>

@@ -3,9 +3,8 @@ import { Link } from 'react-router-dom'
 import {
   HeartHandshake, DollarSign, Megaphone, Users, TrendingUp,
   Receipt, ShieldOff, ArrowLeft, X, ExternalLink, Share2,
-  CheckCircle, Plus, Copy, Check,
+  CheckCircle, Plus,
 } from 'lucide-react'
-import { gerarPayloadPix } from '../utils/pix'
 import { FaWhatsapp, FaInstagram, FaFacebook, FaLinkedin, FaTiktok } from 'react-icons/fa'
 import { MdEmail } from 'react-icons/md'
 import {
@@ -14,10 +13,13 @@ import {
 } from 'recharts'
 import axios from 'axios'
 import BarraProgresso from '../components/BarraProgresso'
-import QrCodePix from '../components/QrCodePix'
+import QrCodePix, { qrComoArquivo } from '../components/QrCodePix'
 import { mensagemErro } from '../utils/formatos'
 import { useAuth } from '../context/AuthContext'
 import logoUniONG from '../assets/Gemini_Generated_Image_g792fng792fng792.jpg'
+
+// Data de referência fixada ao carregar a página (evita chamar Date durante a renderização).
+const HOJE = new Date()
 
 const BASE_URL = typeof window !== 'undefined' ? window.location.origin : ''
 
@@ -202,7 +204,7 @@ function DonationModal({ campanhas, pix, onFechar }) {
 
 /* ─── Expenses Modal ─────────────────────────────────────────────────────── */
 function GastosModal({ lista, total, onFechar }) {
-  const mesAtual = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
+  const mesAtual = HOJE.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
   return (
     <Overlay titulo={`Gastos do Mês — ${mesAtual}`} onFechar={onFechar} largura="max-w-xl">
       {lista.length === 0 ? (
@@ -238,24 +240,8 @@ function GastosModal({ lista, total, onFechar }) {
 
 /* ─── Campaign Detail Modal ──────────────────────────────────────────────── */
 function CampanhaModal({ campanha, pix, onFechar }) {
-  const temPix = Boolean(pix?.chave)
-  const payloadPix = temPix
-    ? gerarPayloadPix({ chave: pix.chave, nome: pix.nome_recebedor, cidade: pix.cidade, txid: `CAMPANHA${campanha.id}` })
-    : ''
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${encodeURIComponent(payloadPix)}`
-
   const [aviso, setAviso] = useState(null)
-  const [copiado, setCopiado] = useState(false)
-
-  async function copiarPix() {
-    try {
-      await navigator.clipboard.writeText(payloadPix)
-      setCopiado(true)
-      setTimeout(() => setCopiado(false), 2500)
-    } catch {
-      setAviso(`Código PIX: ${payloadPix}`)
-    }
-  }
+  const idQr = `qr-campanha-${campanha.id}`
 
   const link = `${BASE_URL}/transparencia`
   const texto = `Apoie a campanha "${campanha.titulo}" da UniONG! Já arrecadamos ${formatBRL(campanha.valor_arrecadado)} de ${formatBRL(campanha.meta_valor)}. Doe via PIX:`
@@ -272,9 +258,8 @@ function CampanhaModal({ campanha, pix, onFechar }) {
   // nativo do aparelho (com o QR Code) e, sem suporte, copia o texto e abre a rede.
   async function compartilharSemUrl(nome, siteUrl) {
     try {
-      const blob = await fetch(qrUrl).then(r => r.blob())
-      const arquivo = new File([blob], 'pix-uniong.png', { type: blob.type || 'image/png' })
-      if (navigator.canShare?.({ files: [arquivo] })) {
+      const arquivo = await qrComoArquivo(idQr, 'pix-campanha.png')
+      if (arquivo && navigator.canShare?.({ files: [arquivo] })) {
         await navigator.share({ title: campanha.titulo, text: textoCompleto, files: [arquivo] })
         return
       }
@@ -329,36 +314,13 @@ function CampanhaModal({ campanha, pix, onFechar }) {
         {/* PIX */}
         <div>
           <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Doar via PIX</h3>
-          {temPix ? (
-            <div className="flex items-center gap-4 border border-[var(--border)] rounded-lg p-4">
-              <img
-                src={qrUrl}
-                alt="QR Code PIX"
-                className="w-[120px] h-[120px] rounded-md border border-[var(--border)] bg-white flex-shrink-0"
-                onError={e => { e.target.style.display = 'none' }}
-              />
-              <div className="space-y-2">
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                  Escaneie o QR Code com o aplicativo do seu banco ou use o PIX copia e cola para doar para esta campanha.
-                </p>
-                <p className="text-[11px] text-[var(--text-muted)] break-all">Chave: {pix.chave}</p>
-                <button
-                  type="button"
-                  onClick={copiarPix}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
-                >
-                  {copiado ? <Check size={13} /> : <Copy size={13} />}
-                  {copiado ? 'Código copiado' : 'Copiar código PIX'}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <p className="text-xs text-[var(--text-muted)] border border-[var(--border)] rounded-lg p-4">
-              A instituição ainda não cadastrou uma chave PIX para receber doações.
-            </p>
-          )}
+          <QrCodePix
+            pix={pix}
+            txid={`CAMPANHA${campanha.id}`}
+            idCanvas={idQr}
+            descricao="Escaneie o QR Code com o aplicativo do seu banco ou use o PIX copia e cola para doar para esta campanha."
+          />
         </div>
-
         {/* Compartilhar */}
         <div>
           <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3 flex items-center gap-2">
@@ -572,7 +534,7 @@ export default function Transparencia() {
               <KpiCard
                 label="Doações do Mês"
                 valor={formatBRL(dados.kpis.doacoes_mes)}
-                desc={`Desde 01/${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}`}
+                desc={`Desde 01/${String(HOJE.getMonth() + 1).padStart(2, '0')}/${HOJE.getFullYear()}`}
                 icone={TrendingUp}
                 cor="#0891b2"
               />
@@ -702,7 +664,7 @@ export default function Transparencia() {
       {/* Footer */}
       <footer className="border-t border-[var(--border)] bg-[var(--bg-card)] mt-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between text-xs text-[var(--text-muted)]">
-          <span>© {new Date().getFullYear()} UniONG · Portal de Transparência</span>
+          <span>© {HOJE.getFullYear()} UniONG · Portal de Transparência</span>
           <Link to="/login" className="flex items-center gap-1 hover:text-[var(--text-secondary)] transition-colors">
             <ExternalLink size={11} /> Acesso Administrativo
           </Link>
