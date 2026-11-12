@@ -107,13 +107,34 @@ Decisões tomadas:
 - Página `/privacidade` é texto-base marcado para revisão da ONG.
 - Sugestão registrada: captcha (hCaptcha/Turnstile) na doação pública, se o honeypot + throttling não bastarem.
 
-## Fase 4 — Transparência e prestação de contas
-- [ ] 1. Despesas ligadas a campanhas
-- [ ] 2. Saldo e histórico
-- [ ] 3. Comprovantes públicos
-- [ ] 4. Relatórios
-- [ ] 5. Trilha de auditoria
-- [ ] 6. Página pública por campanha
+## Fase 4 — Transparência e prestação de contas ✅
+Branch `fase-4-transparencia` (a partir de `fase-3-coerencia`). 180 testes passando; oxlint 0 erros, 12 avisos.
+- [x] 1. Despesas ligadas a campanhas: `Despesa.campanha` PROTECT (migração 0021); arrecadado, gasto e saldo por campanha (subconsultas, sem somas duplicadas); `GET /campanhas/{id}/despesas/`.
+- [x] 2. Saldo e histórico: funções de período em `core/indicadores.py`, card “Saldo do Mês”, gráfico receitas × despesas com saldo acumulado, seção pública “Prestação de contas” por ano.
+- [x] 3. Comprovantes públicos: `DespesaAnexo.publico` (migração 0022), rota pública só para anexos públicos de despesas pagas (nunca RH), ícone no portal.
+- [x] 4. Relatórios: CSV de despesas; prestação de contas por período em HTML imprimível.
+- [x] 5. Auditoria: `LogAlteracao.acao` (migração 0023), `AuditoriaMixin` nos 4 ViewSets, `GET /api/historico/` e tela “Histórico” (só superusuário), aba no painel lateral.
+- [x] 6. Página pública por campanha: `/transparencia/campanha/:id`, `/c/<id>/` com Open Graph, imagem validada, status efetivo pela data de fim, aviso único de meta atingida (migração 0024).
+
+Telas novas (descrição):
+- Painel: 5º card “Saldo do Mês” (receitas − despesas pagas) e gráfico “Receitas × despesas (últimos 12 meses)” com barras agrupadas, linha de saldo acumulado e botão “Ver como tabela”.
+- Portal: seção “Prestação de contas” com seletor de ano, três totais (recebido, gasto, saldo), pizza de gasto por categoria e evolução mensal; lista de gastos com ícone “Comprovante”.
+- Portal: página da campanha com imagem de capa, selo de status, progresso, arrecadado/meta/gasto/saldo, QR Code PIX (ou aviso de encerrada), botões de compartilhamento e tabela de despesas da campanha.
+- Painel: menu “Histórico” (superusuário) com filtros por registro, ação, período e busca; tabela com usuário, campo, antes e depois. Aba “Histórico” no painel lateral de cada registro.
+- Relatórios: card “Prestação de contas” (período + formato) que abre uma página branca imprimível; card de CSV de despesas com categoria.
+- Custos: seleção de campanha e caixa “Público no portal” nos anexos. Campanhas: campo de imagem.
+
+Decisões tomadas:
+- PDF: `reportlab` não era dependência; a prestação de contas é uma página HTML com CSS de impressão (`window.print()`), que o navegador salva em PDF.
+- A soma de doações e despesas por campanha usa subconsultas; com `JOIN` duplo os valores seriam multiplicados.
+- Campanhas pausadas não têm página pública; encerradas têm (sem QR Code de doação).
+- Comprovantes de Recursos Humanos nunca são públicos (mesmo marcados), coerente com a agregação da fase 3.
+- Imagem de campanha é servida por uma rota da API (`/api/public/campanhas/{id}/imagem/`), já que `/media` deixou de ser servido na fase 1.
+- O registro de auditoria fica em `create/update/destroy` (não em `perform_*`), porque os ViewSets já personalizam `perform_*`. A próxima ocorrência de despesa gerada automaticamente não gera log de criação (é ação do sistema).
+- O aviso de meta atingida é disparado na confirmação de doação (cadastro, edição e ação em lote).
+- `FRONTEND_URL` (novo, `.env`) define para onde `/c/<id>/` redireciona. O Vite faz proxy de `/c/`; reiniciar o `npm run dev` para valer.
+
+Teste manual sugerido: cadastrar uma despesa paga ligada a uma campanha com anexo marcado como público; abrir o portal, a campanha e o link `/c/<id>/`; gerar a prestação de contas do ano em Relatórios e imprimir; editar uma doação e conferir a aba Histórico.
 
 ## Fase 5 — Funcionalidades essenciais que faltam
 - [ ] 1. Equipe (usuários do painel)
