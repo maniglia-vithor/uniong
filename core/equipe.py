@@ -2,7 +2,7 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
-from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.contrib.auth.tokens import PasswordResetTokenGenerator, default_token_generator
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.mail import send_mail
 from django.db import transaction
@@ -186,3 +186,49 @@ def ativar_convite(request):
     usuario.is_active = True
     usuario.save(update_fields=['password', 'is_active'])
     return Response({'mensagem': 'Acesso ativado. Você já pode entrar no painel.'})
+
+
+# ── Recuperação de senha ──────────────────────────────────────────────
+
+MENSAGEM_RECUPERACAO = 'Se houver um acesso ativo com este e-mail, enviamos um link para redefinir a senha.'
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([AuthThrottle])
+def recuperar_senha(request):
+    """Sempre responde 200 com a mesma mensagem, para não revelar quais e-mails têm acesso."""
+    email = normalizar_email(request.data.get('email') or '')
+    if email:
+        for usuario in Usuario.objects.filter(email__iexact=email, is_active=True, is_staff=True):
+            link = link_com_token('redefinir-senha', usuario, default_token_generator)
+            horas = settings.PASSWORD_RESET_TIMEOUT // 3600
+            send_mail(
+                subject='Redefinição de senha do painel',
+                message=(
+                    f'Olá, {usuario.first_name or usuario.username}!\n\n'
+                    'Recebemos um pedido para redefinir a sua senha do painel administrativo.\n'
+                    f'Use este link (válido por {horas} hora{"s" if horas != 1 else ""}):\n{link}\n\n'
+                    'Se não foi você, ignore esta mensagem: a senha atual continua valendo.'
+                ),
+                from_email=None,
+                recipient_list=[usuario.email],
+            )
+    return Response({'mensagem': MENSAGEM_RECUPERACAO})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([AuthThrottle])
+def redefinir_senha(request):
+    usuario = usuario_do_link(request.data.get('uid', ''), request.data.get('token', ''), default_token_generator)
+    if usuario is None or not (usuario.is_active and usuario.is_staff):
+        return Response({'erro': 'Link inválido ou expirado. Peça uma nova redefinição.'}, status=400)
+    senha = request.data.get('senha') or ''
+    try:
+        validate_password(senha, usuario)
+    except DjangoValidationError as e:
+        return Response({'senha': list(e.messages)}, status=400)
+    usuario.set_password(senha)
+    usuario.save(update_fields=['password'])
+    return Response({'mensagem': 'Senha alterada.'})

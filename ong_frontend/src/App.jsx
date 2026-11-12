@@ -15,6 +15,7 @@ import Configuracoes from './pages/Configuracoes'
 import Historico from './pages/Historico'
 import Equipe from './pages/Equipe'
 import DefinirSenha from './pages/DefinirSenha'
+import RecuperarSenha from './pages/RecuperarSenha'
 import Transparencia from './pages/Transparencia'
 import Privacidade from './pages/Privacidade'
 import CampanhaPublica from './pages/CampanhaPublica'
@@ -42,6 +43,8 @@ export default function App() {
           <Route path="/transparencia/campanha/:id" element={<CampanhaPublica />} />
           <Route path="/login" element={<Login />} />
           <Route path="/definir-senha/:uid/:token" element={<DefinirSenha modo="convite" />} />
+          <Route path="/recuperar-senha" element={<RecuperarSenha />} />
+          <Route path="/redefinir-senha/:uid/:token" element={<DefinirSenha modo="redefinir" />} />
 
           {/* Rotas administrativas protegidas */}
           <Route element={<RotaProtegida />}>

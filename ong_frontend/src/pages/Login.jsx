@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, LogIn } from 'lucide-react'
 import { GoogleLogin } from '@react-oauth/google'
 import axios from 'axios'
@@ -209,15 +209,12 @@ export default function Login() {
               </button>
 
               <div className="text-right -mt-1">
-                <button
-                  type="button"
-                  className="text-xs transition-colors"
-                  style={{ color: '#94a3b8' }}
-                  onMouseEnter={e => e.target.style.color = '#f97316'}
-                  onMouseLeave={e => e.target.style.color = '#94a3b8'}
+                <Link
+                  to="/recuperar-senha"
+                  className="text-xs transition-colors text-slate-500 hover:text-orange-600"
                 >
-                  Esqueci minha senha?
-                </button>
+                  Esqueci minha senha
+                </Link>
               </div>
             </form>
 

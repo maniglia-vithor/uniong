@@ -4,6 +4,7 @@ from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core import mail
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
@@ -22,6 +23,7 @@ def _link(corpo):
 @override_settings(FRONTEND_URL='http://painel.exemplo.org')
 class EquipeTests(TestCase):
     def setUp(self):
+        cache.clear()
         self.admin = criar_staff(is_superuser=True)
         self.cliente = APIClient()
         self.cliente.force_authenticate(self.admin)
@@ -119,3 +121,52 @@ class EquipeTests(TestCase):
         r = self.cliente.post(f'/api/equipe/{novo.id}/reenviar-convite/')
         self.assertEqual(r.status_code, 200)
         self.assertEqual(len(mail.outbox), 2)
+
+
+def _link_redefinicao(corpo):
+    return re.search(r'/redefinir-senha/([^/\s]+)/([^/\s]+)', corpo).groups()
+
+
+@override_settings(FRONTEND_URL='http://painel.exemplo.org')
+class RecuperacaoSenhaTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.cliente = APIClient()
+        self.staff = criar_staff(email='equipe@exemplo.org', first_name='Bia')
+
+    def pedir(self, email):
+        return self.cliente.post('/api/auth/recuperar-senha/', {'email': email}, format='json')
+
+    def test_resposta_igual_para_email_existente_ou_nao(self):
+        r1 = self.pedir('EQUIPE@exemplo.org')
+        r2 = self.pedir('ninguem@exemplo.org')
+        self.assertEqual((r1.status_code, r2.status_code), (200, 200))
+        self.assertEqual(r1.data, r2.data)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['equipe@exemplo.org'])
+
+    def test_nao_envia_para_inativo_ou_quem_nao_e_equipe(self):
+        criar_staff(email='inativo@exemplo.org', is_active=False)
+        from .factories import criar_usuario
+        criar_usuario(email='comum@exemplo.org')
+        self.pedir('inativo@exemplo.org')
+        self.pedir('comum@exemplo.org')
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_redefine_pelo_link_uma_unica_vez(self):
+        self.pedir('equipe@exemplo.org')
+        uid, token = _link_redefinicao(mail.outbox[0].body)
+        r = self.cliente.post('/api/auth/redefinir-senha/', {'uid': uid, 'token': token, 'senha': 'Nova-Senha-2026'}, format='json')
+        self.assertEqual(r.status_code, 200, r.data)
+        self.staff.refresh_from_db()
+        self.assertTrue(self.staff.check_password('Nova-Senha-2026'))
+        r = self.cliente.post('/api/auth/redefinir-senha/', {'uid': uid, 'token': token, 'senha': 'Outra-Senha-2026'}, format='json')
+        self.assertEqual(r.status_code, 400)
+
+    def test_token_invalido(self):
+        r = self.cliente.post('/api/auth/redefinir-senha/', {'uid': 'xx', 'token': 'abc-def', 'senha': 'Nova-Senha-2026'}, format='json')
+        self.assertEqual(r.status_code, 400)
+
+    def test_limite_de_tentativas(self):
+        codigos = [self.pedir('ninguem@exemplo.org').status_code for _ in range(11)]
+        self.assertEqual(codigos[-1], 429)
