@@ -14,7 +14,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 
-from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoPix
+from django.db.models import F
+from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoPix, ReacaoComunicado
 from .serializers import ApoiadorSerializer, CampanhaSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer
 
 
@@ -656,6 +657,40 @@ def painel_transparencia(request):
         'doacoes_recentes': doacoes_data,
         'gastos_mes_lista': gastos_mes_lista,
         'pix': ConfiguracaoPixSerializer(ConfiguracaoPix.obter()).data,
+        'comunicados': [
+            {
+                'id': c.id,
+                'titulo': c.titulo,
+                'conteudo': c.conteudo,
+                'data_publicacao': c.data_publicacao.isoformat(),
+                'reacoes': {r.emoji: r.total for r in c.reacoes.all() if r.total},
+            }
+            for c in Comunicado.objects.filter(publico_alvo='publico').prefetch_related('reacoes')[:10]
+        ],
+        'emojis_reacao': ReacaoComunicado.EMOJIS,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def reagir_comunicado(request, pk):
+    emoji = request.data.get('emoji')
+    remover = bool(request.data.get('remover'))
+    if emoji not in ReacaoComunicado.EMOJIS:
+        return Response({'erro': 'Reação inválida.'}, status=400)
+    try:
+        comunicado = Comunicado.objects.get(pk=pk, publico_alvo='publico')
+    except Comunicado.DoesNotExist:
+        return Response({'erro': 'Comunicado não encontrado.'}, status=404)
+
+    reacao, _ = ReacaoComunicado.objects.get_or_create(comunicado=comunicado, emoji=emoji)
+    if remover:
+        ReacaoComunicado.objects.filter(pk=reacao.pk, total__gt=0).update(total=F('total') - 1)
+    else:
+        ReacaoComunicado.objects.filter(pk=reacao.pk).update(total=F('total') + 1)
+
+    return Response({
+        'reacoes': {r.emoji: r.total for r in comunicado.reacoes.all() if r.total},
     })
 
 

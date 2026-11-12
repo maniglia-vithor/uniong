@@ -360,6 +360,89 @@ function CampanhaModal({ campanha, pix, onFechar }) {
   )
 }
 
+/* ─── Comunicados com reações ───────────────────────────────────────────── */
+function lerMinhasReacoes() {
+  try {
+    return JSON.parse(localStorage.getItem('ong_reacoes') ?? '{}')
+  } catch {
+    return {}
+  }
+}
+
+function formatDataHora(iso) {
+  const d = new Date(iso)
+  return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+}
+
+function Comunicados({ lista, emojis }) {
+  const [reacoes, setReacoes] = useState(() => Object.fromEntries(lista.map(c => [c.id, c.reacoes])))
+  const [minhas, setMinhas] = useState(lerMinhasReacoes)
+  const [enviando, setEnviando] = useState(null)
+
+  async function reagir(id, emoji) {
+    const jaReagi = (minhas[id] ?? []).includes(emoji)
+    setEnviando(`${id}${emoji}`)
+    try {
+      const { data } = await axios.post(`/api/public/comunicados/${id}/reagir/`, { emoji, remover: jaReagi })
+      setReacoes(r => ({ ...r, [id]: data.reacoes }))
+      const novas = {
+        ...minhas,
+        [id]: jaReagi ? (minhas[id] ?? []).filter(e => e !== emoji) : [...(minhas[id] ?? []), emoji],
+      }
+      setMinhas(novas)
+      try { localStorage.setItem('ong_reacoes', JSON.stringify(novas)) } catch { /* armazenamento indisponível */ }
+    } catch { /* mantém o estado atual se a reação falhar */ }
+    finally { setEnviando(null) }
+  }
+
+  return (
+    <section>
+      <h2 className="text-base font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
+        <Megaphone size={16} className="text-[var(--text-muted)]" />
+        Comunicados
+      </h2>
+      {lista.length === 0 ? (
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm py-10 text-center text-sm text-[var(--text-muted)]">
+          Nenhum comunicado publicado ainda.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {lista.map(c => (
+            <article key={c.id} className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-5">
+              <p className="text-xs text-[var(--text-muted)] mb-1">{formatDataHora(c.data_publicacao)}</p>
+              <h3 className="font-semibold text-[var(--text-primary)] mb-2">{c.titulo}</h3>
+              <p className="text-sm text-[var(--text-secondary)] whitespace-pre-line leading-relaxed">{c.conteudo}</p>
+              <div className="flex flex-wrap gap-1.5 mt-4">
+                {emojis.map(emoji => {
+                  const total = reacoes[c.id]?.[emoji] ?? 0
+                  const ativo = (minhas[c.id] ?? []).includes(emoji)
+                  return (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => reagir(c.id, emoji)}
+                      disabled={enviando === `${c.id}${emoji}`}
+                      aria-pressed={ativo}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors disabled:opacity-60 ${
+                        ativo
+                          ? 'border-[#0f4c5c] bg-[#0f4c5c]/10 text-[var(--text-primary)] font-semibold'
+                          : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                      }`}
+                    >
+                      <span className="text-sm leading-none">{emoji}</span>
+                      {total > 0 && <span>{total}</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 /* ─── Main Page ─────────────────────────────────────────────────────────── */
 export default function Transparencia() {
   const { role, switchRole } = useRole()
@@ -573,45 +656,7 @@ export default function Transparencia() {
               </div>
             )}
 
-            {/* Doações Recentes */}
-            <section>
-              <h2 className="text-base font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-                <DollarSign size={16} style={{ color: '#0f4c5c' }} />
-                Doações Recentes
-                <span className="text-xs font-normal text-[var(--text-muted)] ml-1">(nomes parcialmente anonimizados)</span>
-              </h2>
-              <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--border)]">
-                      <th className="text-left text-xs font-medium text-[var(--text-muted)] px-5 py-3">Doador</th>
-                      <th className="text-left text-xs font-medium text-[var(--text-muted)] px-5 py-3">Campanha</th>
-                      <th className="text-right text-xs font-medium text-[var(--text-muted)] px-5 py-3">Valor</th>
-                      <th className="text-left text-xs font-medium text-[var(--text-muted)] px-5 py-3">Data</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--border-subtle)]">
-                    {dados.doacoes_recentes.map((d, i) => (
-                      <tr key={i} className="hover:bg-[var(--bg-hover)] transition-colors">
-                        <td className="px-5 py-3 font-medium text-[var(--text-primary)]">{d.doador}</td>
-                        <td className="px-5 py-3 text-[var(--text-secondary)]">
-                          {d.campanha || <span className="text-[var(--text-muted)]">—</span>}
-                        </td>
-                        <td className="px-5 py-3 text-right font-semibold text-[var(--text-primary)]">{formatBRL(d.valor)}</td>
-                        <td className="px-5 py-3 text-[var(--text-secondary)]">{formatData(d.data)}</td>
-                      </tr>
-                    ))}
-                    {dados.doacoes_recentes.length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="px-5 py-10 text-center text-[var(--text-muted)] text-sm">
-                          Nenhuma doação registrada ainda.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </section>
+            <Comunicados lista={dados.comunicados ?? []} emojis={dados.emojis_reacao ?? []} />
 
             {/* Rodapé informativo */}
             <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-5 flex items-start gap-3 text-sm text-[var(--text-muted)]">
