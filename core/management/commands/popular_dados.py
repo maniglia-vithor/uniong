@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
+from django.utils import timezone
 from django.core.management.base import BaseCommand, CommandError
 from core.models import Apoiador, Campanha, Doacao
 
@@ -72,7 +73,7 @@ class Command(BaseCommand):
             campanhas.append(c)
 
         self.stdout.write('Criando doações (12 meses)...')
-        hoje = date.today()
+        hoje = timezone.localdate()
         apoiador_idx = 0
 
         for i, total_mes in enumerate(DOACOES_MENSAIS):

@@ -1,4 +1,5 @@
 from django.db.models import Sum
+from django.utils import timezone
 from rest_framework import serializers
 from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoPix
 from .normalizacao import normalizar_celular, normalizar_email
@@ -131,6 +132,13 @@ class DespesaSerializer(serializers.ModelSerializer):
     def validate_valor(self, value):
         return _positivo(value, 'O valor deve ser maior que zero.')
 
+    def validate(self, attrs):
+        status = attrs.get('status', getattr(self.instance, 'status', None))
+        pagamento = attrs.get('data_pagamento', getattr(self.instance, 'data_pagamento', None))
+        if status == 'pago' and not pagamento:
+            attrs['data_pagamento'] = timezone.localdate()
+        return attrs
+
 
 class DoacaoSerializer(serializers.ModelSerializer):
     apoiador_nome = serializers.CharField(source='apoiador.nome', read_only=True)
@@ -145,6 +153,11 @@ class DoacaoSerializer(serializers.ModelSerializer):
 
     def validate_valor(self, value):
         return _positivo(value, 'O valor deve ser maior que zero.')
+
+    def validate_data(self, value):
+        if value > timezone.localdate():
+            raise serializers.ValidationError('A data da doação não pode estar no futuro.')
+        return value
 
     def validate_campanha(self, value):
         mesma_de_antes = self.instance is not None and value is not None and self.instance.campanha_id == value.pk

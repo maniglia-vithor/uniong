@@ -104,6 +104,10 @@ export default function Dashboard() {
       valor: formatBRL(resumo.total_arrecadado.value),
       trend_percentage: resumo.total_arrecadado.trend_percentage,
       trend_direction: resumo.total_arrecadado.trend_direction,
+      rotuloTendencia: `+${formatBRL(resumo.total_arrecadado.acrescimo_mes ?? 0)} neste mês` +
+        (resumo.total_arrecadado.trend_percentage !== null
+          ? ` (+${resumo.total_arrecadado.trend_percentage.toFixed(1)}% sobre o mês anterior)`
+          : ''),
       icone: DollarSign,
       cor: '#0f4c5c',
     },

@@ -536,7 +536,7 @@ export default function Transparencia() {
               <KpiCard
                 label="Gastos do Mês"
                 valor={formatBRL(dados.kpis.gastos_mes)}
-                desc="Despesas do mês atual"
+                desc="Despesas pagas no mês"
                 icone={Receipt}
                 cor="#f97316"
                 onClick={() => setGastosModal(true)}

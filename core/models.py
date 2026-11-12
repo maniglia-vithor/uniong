@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.db import models
 from django.db.models import Q, Sum, Value
 from django.db.models.functions import Coalesce
+from django.utils import timezone
 
 from .anexos import armazenamento_privado, caminho_anexo
 
@@ -149,10 +150,10 @@ class Despesa(models.Model):
         ('captacao', 'Captação de Recursos'),
         ('outros', 'Outros'),
     ]
+    # "Atrasado" não é gravado: é a pendente com vencimento anterior a hoje (status_efetivo).
     STATUS_CHOICES = [
         ('pendente', 'Pendente'),
         ('pago', 'Pago'),
-        ('atrasado', 'Atrasado'),
     ]
     RECORRENCIA_CHOICES = [
         ('mensal', 'Mensal'),
@@ -178,8 +179,7 @@ class Despesa(models.Model):
 
     def status_efetivo(self):
         """Retorna 'atrasado' se pendente e vencida, independente do campo salvo."""
-        from datetime import date
-        if self.status == 'pendente' and self.data_vencimento < date.today():
+        if self.status == 'pendente' and self.data_vencimento < timezone.localdate():
             return 'atrasado'
         return self.status
 

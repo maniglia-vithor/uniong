@@ -1,6 +1,5 @@
 import csv
 import os
-from datetime import date
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -8,7 +7,6 @@ from google.oauth2 import id_token as google_id_token
 from google.auth.exceptions import GoogleAuthError
 from google.auth.transport import requests as google_requests
 from rest_framework_simplejwt.tokens import RefreshToken
-from dateutil.relativedelta import relativedelta
 from decimal import Decimal
 
 from django.db.models import Case, Count, DecimalField, F, ProtectedError, Q, Sum, Value, When
@@ -25,6 +23,7 @@ from django.db import transaction
 from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoPix, LogAlteracao
 from .anexos import TIPOS_PERMITIDOS, validar_anexo
 from .normalizacao import normalizar_email
+from . import indicadores
 from .paginacao import filtrar_periodo
 from .pix import mascarar
 from .throttles import AuthThrottle, DoacaoPublicaThrottle
@@ -204,104 +203,16 @@ class DashboardViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'], url_path='resumo')
     def resumo(self, request):
-        hoje = date.today()
-        inicio_mes_atual = hoje.replace(day=1)
-        inicio_mes_anterior = (inicio_mes_atual - relativedelta(months=1))
-        fim_mes_anterior = inicio_mes_atual
-
-        def calcular_trend(atual, anterior):
-            if anterior == 0:
-                pct = 100.0 if atual > 0 else 0.0
-            else:
-                pct = round(((atual - anterior) / anterior) * 100, 1)
-            if pct > 0:
-                direction = 'positive'
-            elif pct < 0:
-                direction = 'negative'
-            else:
-                direction = 'neutral'
-            return pct, direction
-
-        total_arrecadado = Doacao.objects.filter(status='confirmada').aggregate(
-            total=Sum('valor')
-        )['total'] or 0
-        total_anterior = Doacao.objects.filter(
-            status='confirmada', data__lt=inicio_mes_atual
-        ).aggregate(total=Sum('valor'))['total'] or 0
-        total_trend, total_direction = calcular_trend(float(total_arrecadado), float(total_anterior))
-
-        doacoes_mes = Doacao.objects.filter(
-            status='confirmada', data__gte=inicio_mes_atual
-        ).aggregate(total=Sum('valor'))['total'] or 0
-        doacoes_mes_anterior = Doacao.objects.filter(
-            status='confirmada', data__gte=inicio_mes_anterior, data__lt=fim_mes_anterior
-        ).aggregate(total=Sum('valor'))['total'] or 0
-        doacoes_trend, doacoes_direction = calcular_trend(float(doacoes_mes), float(doacoes_mes_anterior))
-
-        apoiadores_ativos = Apoiador.objects.filter(status='ativo').count()
-        apoiadores_anterior = Apoiador.objects.filter(
-            status='ativo', data_cadastro__lt=inicio_mes_atual
-        ).count()
-        apoiadores_trend, apoiadores_direction = calcular_trend(apoiadores_ativos, apoiadores_anterior)
-
-        campanhas_ativas = Campanha.objects.filter(status='ativa').count()
-        campanhas_anterior = Campanha.objects.filter(
-            status='ativa', data_inicio__lt=inicio_mes_atual
-        ).count()
-        campanhas_trend, campanhas_direction = calcular_trend(campanhas_ativas, campanhas_anterior)
-
-        return Response({
-            'total_arrecadado': {
-                'value': float(total_arrecadado),
-                'trend_percentage': total_trend,
-                'trend_direction': total_direction,
-            },
-            'doacoes_mes': {
-                'value': float(doacoes_mes),
-                'trend_percentage': doacoes_trend,
-                'trend_direction': doacoes_direction,
-            },
-            'apoiadores_ativos': {
-                'value': apoiadores_ativos,
-                'trend_percentage': apoiadores_trend,
-                'trend_direction': apoiadores_direction,
-            },
-            'campanhas_ativas': {
-                'value': campanhas_ativas,
-                'trend_percentage': campanhas_trend,
-                'trend_direction': campanhas_direction,
-            },
-        })
+        return Response(indicadores.resumo_painel())
 
     @action(detail=False, methods=['get'], url_path='grafico-mensal')
     def grafico_mensal(self, request):
-        hoje = date.today()
-        meses = []
-
-        MESES_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
-
-        for i in range(11, -1, -1):
-            inicio = (hoje - relativedelta(months=i)).replace(day=1)
-            fim = (inicio + relativedelta(months=1))
-            total = Doacao.objects.filter(
-                status='confirmada',
-                data__gte=inicio,
-                data__lt=fim,
-            ).aggregate(total=Sum('valor'))['total'] or 0
-
-            meses.append({
-                'mes': f"{MESES_PT[inicio.month - 1]}/{inicio.strftime('%y')}",
-                'isoMes': inicio.strftime('%Y-%m'),
-                'total': float(total),
-            })
-
-        return Response(meses)
+        return Response(indicadores.serie_mensal_doacoes())
 
     @action(detail=False, methods=['get'], url_path='doacoes-recentes')
     def doacoes_recentes(self, request):
-        doacoes = Doacao.objects.select_related('apoiador', 'campanha').order_by('-data')[:10]
-        serializer = DoacaoSerializer(doacoes, many=True)
-        return Response(serializer.data)
+        doacoes = Doacao.objects.select_related('apoiador', 'campanha').order_by('-data', '-id')[:10]
+        return Response(DoacaoSerializer(doacoes, many=True).data)
 
     @action(detail=False, methods=['get'], url_path='top-apoiadores')
     def top_apoiadores(self, request):
@@ -311,107 +222,60 @@ class DashboardViewSet(viewsets.ViewSet):
             .annotate(total_doado=Sum('doacoes__valor'))
             .order_by('-total_doado')[:5]
         )
-        data = [
+        return Response([
             {'id': a.id, 'nome': a.nome, 'total_doado': float(a.total_doado or 0)}
             for a in top
-        ]
-        return Response(data)
+        ])
 
     @action(detail=False, methods=['get'], url_path='campanhas-ativas')
     def campanhas_ativas(self, request):
         campanhas = Campanha.objects.com_arrecadado().filter(status='ativa').order_by('-data_inicio')
-        serializer = CampanhaSerializer(campanhas, many=True)
-        return Response(serializer.data)
+        return Response(CampanhaSerializer(campanhas, many=True).data)
 
-    @action(detail=False, methods=['get'], url_path='kpi-doacoes')
-    def kpi_doacoes(self, request):
-        doacoes = (
-            Doacao.objects
-            .select_related('apoiador', 'campanha')
-            .filter(status='confirmada')
-            .order_by('-data')
-        )
-        data = [
+    @staticmethod
+    def _lista_doacoes(qs):
+        return [
             {
                 'id': d.id,
                 'apoiador_nome': d.apoiador.nome,
                 'valor': float(d.valor),
                 'data': d.data.isoformat(),
+                'campanha': d.campanha.titulo if d.campanha else None,
             }
-            for d in doacoes
+            for d in qs.select_related('apoiador', 'campanha').order_by('-data', '-id')
         ]
-        return Response(data)
+
+    @action(detail=False, methods=['get'], url_path='kpi-doacoes')
+    def kpi_doacoes(self, request):
+        return Response(self._lista_doacoes(indicadores.doacoes_confirmadas()))
 
     @action(detail=False, methods=['get'], url_path='doacoes-por-mes')
     def doacoes_por_mes(self, request):
-        """Retorna doações confirmadas de um mês específico (formato: YYYY-MM)."""
+        """Doações confirmadas de um mês específico (?mes=AAAA-MM)."""
         mes_param = request.query_params.get('mes')
         if not mes_param:
             return Response({'erro': 'Parâmetro "mes" obrigatório (ex: 2026-11).'}, status=400)
         try:
-            ano, mes = int(mes_param.split('-')[0]), int(mes_param.split('-')[1])
-        except (ValueError, IndexError):
-            return Response({'erro': 'Formato inválido. Use YYYY-MM.'}, status=400)
-
-        inicio = date(ano, mes, 1)
-        fim = inicio + relativedelta(months=1)
-        doacoes = (
-            Doacao.objects
-            .select_related('apoiador', 'campanha')
-            .filter(status='confirmada', data__gte=inicio, data__lt=fim)
-            .order_by('-data')
-        )
-        data = [
-            {
-                'id': d.id,
-                'apoiador_nome': d.apoiador.nome,
-                'valor': float(d.valor),
-                'data': d.data.isoformat(),
-                'campanha': d.campanha.titulo if d.campanha else None,
-            }
-            for d in doacoes
-        ]
-        return Response(data)
+            mes = indicadores.mes_do_parametro(mes_param)
+        except ValueError:
+            return Response({'erro': 'Formato inválido. Use AAAA-MM.'}, status=400)
+        return Response(self._lista_doacoes(indicadores.doacoes_do_mes(mes)))
 
     @action(detail=False, methods=['get'], url_path='kpi-doacoes-mes')
     def kpi_doacoes_mes(self, request):
-        inicio_mes = date.today().replace(day=1)
-        doacoes = (
-            Doacao.objects
-            .select_related('apoiador', 'campanha')
-            .filter(status='confirmada', data__gte=inicio_mes)
-            .order_by('-data')
-        )
-        data = [
-            {
-                'id': d.id,
-                'apoiador_nome': d.apoiador.nome,
-                'valor': float(d.valor),
-                'data': d.data.isoformat(),
-                'campanha': d.campanha.titulo if d.campanha else None,
-            }
-            for d in doacoes
-        ]
-        return Response(data)
+        return Response(self._lista_doacoes(indicadores.doacoes_do_mes()))
 
     @action(detail=False, methods=['get'], url_path='kpi-apoiadores-ativos')
     def kpi_apoiadores_ativos(self, request):
-        apoiadores = Apoiador.objects.filter(status='ativo').order_by('nome')
-        data = [
-            {
-                'id': a.id,
-                'nome': a.nome,
-                'email': a.email,
-                'data_cadastro': a.data_cadastro.isoformat(),
-            }
-            for a in apoiadores
-        ]
-        return Response(data)
+        return Response([
+            {'id': a.id, 'nome': a.nome, 'email': a.email, 'data_cadastro': a.data_cadastro.isoformat()}
+            for a in indicadores.membros_ativos().order_by('nome')
+        ])
 
     @action(detail=False, methods=['get'], url_path='kpi-campanhas-ativas')
     def kpi_campanhas_ativas(self, request):
-        campanhas = Campanha.objects.com_arrecadado().filter(status='ativa').order_by('-data_inicio')
-        data = [
+        campanhas = indicadores.campanhas_ativas().com_arrecadado().order_by('-data_inicio')
+        return Response([
             {
                 'id': c.id,
                 'titulo': c.titulo,
@@ -421,8 +285,7 @@ class DashboardViewSet(viewsets.ViewSet):
                 'valor_arrecadado': float(c.valor_arrecadado),
             }
             for c in campanhas
-        ]
-        return Response(data)
+        ])
 
 
 class DespesaViewSet(viewsets.ModelViewSet):
@@ -435,7 +298,9 @@ class DespesaViewSet(viewsets.ModelViewSet):
         qs = Despesa.objects.prefetch_related('anexos')
         status = self.request.query_params.get('status')
         categoria = self.request.query_params.get('categoria')
-        if status:
+        if status == 'atrasado':
+            qs = qs.filter(status='pendente', data_vencimento__lt=indicadores.hoje())
+        elif status:
             qs = qs.filter(status=status)
         if categoria:
             qs = qs.filter(categoria=categoria)
@@ -517,59 +382,11 @@ class DespesaViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='resumo')
     def resumo(self, request):
-        hoje = date.today()
-        inicio_mes = hoje.replace(day=1)
-        fim_mes = inicio_mes + relativedelta(months=1)
-
-        todas = Despesa.objects.all()
-
-        gasto_mes = todas.filter(
-            data_vencimento__gte=inicio_mes, data_vencimento__lt=fim_mes
-        ).aggregate(total=Sum('valor'))['total'] or 0
-
-        # Pendentes consideram status_efetivo, então incluímos 'pendente' e 'atrasado'
-        total_pendente = todas.filter(
-            status__in=['pendente', 'atrasado']
-        ).aggregate(total=Sum('valor'))['total'] or 0
-
-        # Maior categoria do mês
-        from django.db.models import Sum as DjSum
-        por_categoria = (
-            todas
-            .filter(data_vencimento__gte=inicio_mes, data_vencimento__lt=fim_mes)
-            .values('categoria')
-            .annotate(total=DjSum('valor'))
-            .order_by('-total')
-        )
-        maior_categoria = por_categoria[0]['categoria'] if por_categoria else None
-        maior_categoria_display = dict(Despesa.CATEGORIA_CHOICES).get(maior_categoria, '—')
-
-        return Response({
-            'gasto_mes': float(gasto_mes),
-            'total_pendente': float(total_pendente),
-            'maior_categoria': maior_categoria,
-            'maior_categoria_display': maior_categoria_display,
-        })
+        return Response(indicadores.resumo_despesas())
 
     @action(detail=False, methods=['get'], url_path='por-categoria')
     def por_categoria(self, request):
-        hoje = date.today()
-        inicio_mes = hoje.replace(day=1)
-        fim_mes = inicio_mes + relativedelta(months=1)
-
-        dados = (
-            Despesa.objects
-            .filter(data_vencimento__gte=inicio_mes, data_vencimento__lt=fim_mes)
-            .values('categoria')
-            .annotate(total=Sum('valor'))
-            .order_by('-total')
-        )
-        label_map = dict(Despesa.CATEGORIA_CHOICES)
-        return Response([
-            {'categoria': d['categoria'], 'label': label_map.get(d['categoria'], d['categoria']), 'total': float(d['total'])}
-            for d in dados
-        ])
-
+        return Response(indicadores.gastos_por_categoria())
 
 class ComunicadoViewSet(viewsets.ModelViewSet):
     queryset = Comunicado.objects.all()
@@ -693,20 +510,11 @@ def _anonimizar(nome):
 @permission_classes([AllowAny])
 def painel_transparencia(request):
     """Endpoint público — sem dados sensíveis."""
-    hoje = date.today()
-    inicio_mes = hoje.replace(day=1)
+    total_arrecadado = indicadores.total_arrecadado()
+    doacoes_mes = indicadores.doacoes_do_mes().aggregate(total=Sum('valor'))['total'] or 0
+    apoiadores_ativos = indicadores.membros_ativos().count()
 
-    total_arrecadado = Doacao.objects.filter(status='confirmada').aggregate(
-        total=Sum('valor')
-    )['total'] or 0
-
-    doacoes_mes = Doacao.objects.filter(
-        status='confirmada', data__gte=inicio_mes
-    ).aggregate(total=Sum('valor'))['total'] or 0
-
-    apoiadores_ativos = Apoiador.objects.filter(status='ativo').count()
-
-    campanhas = Campanha.objects.com_arrecadado().filter(status='ativa').order_by('-data_inicio')
+    campanhas = indicadores.campanhas_ativas().com_arrecadado().order_by('-data_inicio')
     campanhas_data = CampanhaSerializer(campanhas, many=True).data
 
     doacoes_recentes = (
@@ -725,10 +533,8 @@ def painel_transparencia(request):
         for d in doacoes_recentes
     ]
 
-    gastos_mes_qs = Despesa.objects.filter(
-        data_vencimento__gte=inicio_mes,
-        data_vencimento__lt=inicio_mes + relativedelta(months=1),
-    )
+    gastos_mes_qs = indicadores.despesas_pagas_no_mes()
+    a_pagar_mes = indicadores.despesas_a_pagar_no_mes().aggregate(total=Sum('valor'))['total'] or 0
     gastos_mes_total = gastos_mes_qs.aggregate(total=Sum('valor'))['total'] or 0
     gastos_mes_lista = [
         {
@@ -746,6 +552,7 @@ def painel_transparencia(request):
             'apoiadores_ativos': apoiadores_ativos,
             'campanhas_ativas': campanhas.count(),
             'gastos_mes': float(gastos_mes_total),
+            'a_pagar_mes': float(a_pagar_mes),
         },
         'campanhas': campanhas_data,
         'doacoes_recentes': doacoes_data,
@@ -840,7 +647,7 @@ def public_doacao(request):
         apoiador=apoiador,
         campanha=campanha,
         valor=max(valor_decimal, 0.01),
-        data=date.today(),
+        data=indicadores.hoje(),
         status='pendente',
     )
 

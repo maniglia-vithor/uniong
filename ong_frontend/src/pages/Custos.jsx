@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
-import { Plus, Pencil, Trash2, TrendingDown, AlertCircle, Tag, Paperclip, X, RefreshCw, Repeat } from 'lucide-react'
+import { Plus, Pencil, Trash2, TrendingDown, AlertCircle, Tag, CalendarClock, Paperclip, X, RefreshCw, Repeat } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import Modal from '../components/Modal'
 import { Campo, Input, Select, BotaoSubmit, BotaoCancelar } from '../components/CampoForm'
@@ -204,25 +204,32 @@ export default function Custos() {
 
       {/* KPI Cards */}
       {resumo && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <KpiCusto
             titulo="Gasto do Mês"
             valor={formatBRL(resumo.gasto_mes)}
-            subtitulo="Despesas com vencimento neste mês"
+            subtitulo="Despesas pagas neste mês (data de pagamento)"
             icone={TrendingDown}
             cor="#dc2626"
           />
           <KpiCusto
+            titulo="A Pagar no Mês"
+            valor={formatBRL(resumo.a_pagar_mes)}
+            subtitulo="Pendentes com vencimento neste mês"
+            icone={CalendarClock}
+            cor="#0891b2"
+          />
+          <KpiCusto
             titulo="Total Pendente"
             valor={formatBRL(resumo.total_pendente)}
-            subtitulo="Inclui pendentes e atrasadas"
+            subtitulo={`Todas as pendentes; ${formatBRL(resumo.total_atrasado)} já vencidas`}
             icone={AlertCircle}
             cor="#f97316"
           />
           <KpiCusto
             titulo="Maior Categoria"
             valor={resumo.maior_categoria_display || '—'}
-            subtitulo="Categoria com mais gastos no mês"
+            subtitulo="Categoria com mais gastos pagos no mês"
             icone={Tag}
             cor="#7c3aed"
           />
@@ -233,7 +240,7 @@ export default function Custos() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Donut */}
         <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border)] p-5 flex flex-col">
-          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Distribuição por Categoria (mês atual)</h2>
+          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Gastos pagos por categoria (mês atual)</h2>
           {grafico.length === 0 ? (
             <div className="flex-1 flex items-center justify-center text-[var(--text-muted)] text-sm">Sem dados</div>
           ) : (
@@ -350,7 +357,6 @@ export default function Custos() {
                 <Select name="status" value={form.status} onChange={onChange}>
                   <option value="pendente">Pendente</option>
                   <option value="pago">Pago</option>
-                  <option value="atrasado">Atrasado</option>
                 </Select>
               </Campo>
             </div>
