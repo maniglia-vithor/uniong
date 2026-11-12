@@ -14,7 +14,7 @@ function normalizar(texto, max) {
     .slice(0, max)
 }
 
-function crc16(payload) {
+export function crc16(payload) {
   let crc = 0xffff
   for (let i = 0; i < payload.length; i++) {
     crc ^= payload.charCodeAt(i) << 8
