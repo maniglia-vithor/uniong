@@ -2,6 +2,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from .campanhas_publicas import campanha_publica, imagem_campanha
+from .comunicados import descadastrar
 from .equipe import EquipeViewSet
 from .relatorios import (
     relatorio_apoiadores, relatorio_campanhas, relatorio_despesas, relatorio_doacoes, relatorio_prestacao_contas,
@@ -35,6 +36,7 @@ urlpatterns = router.urls + [
     path('configuracoes/instituicao/', configuracao_instituicao, name='configuracao_instituicao'),
     path('configuracoes/instituicao/logo/', logo_instituicao, name='logo_instituicao'),
     path('public/instituicao/', instituicao_publica, name='instituicao_publica'),
+    path('public/descadastrar/<str:token>/', descadastrar, name='descadastrar'),
     path('public/instituicao/logo/', logo_publico, name='logo_publico'),
     path('auth/google/', google_login, name='google_login'),
     path('relatorios/doacoes/', relatorio_doacoes, name='relatorio_doacoes'),

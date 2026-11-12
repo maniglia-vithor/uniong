@@ -26,6 +26,8 @@ class Apoiador(models.Model):
     celular = models.CharField(max_length=20, null=True, blank=True)
     # CPF ou CNPJ, só dígitos (opcional; aparece no recibo).
     documento = models.CharField(max_length=14, blank=True, default='')
+    # Desligado pelo link de descadastro dos e-mails de comunicados.
+    recebe_comunicados = models.BooleanField(default=True)
     data_cadastro = models.DateField(auto_now_add=True)
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='ativo')
 
@@ -527,13 +529,16 @@ class ConfiguracaoPix(models.Model):
 class Comunicado(models.Model):
     PUBLICO_CHOICES = [
         ('publico', 'Público'),
-        ('apoiadores', 'Somente Apoiadores'),
+        ('apoiadores', 'Somente Membros'),
     ]
 
     titulo = models.CharField(max_length=200)
     conteudo = models.TextField()
     data_publicacao = models.DateTimeField(auto_now_add=True)
     publico_alvo = models.CharField(max_length=12, choices=PUBLICO_CHOICES, default='publico')
+    # Envio por e-mail aos membros ativos (só "Somente Membros"): quantos e quando.
+    emails_enviados = models.PositiveIntegerField(default=0)
+    enviado_em = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'Comunicado'

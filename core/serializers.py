@@ -104,7 +104,7 @@ class ApoiadorSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Apoiador
-        fields = ['id', 'nome', 'email', 'celular', 'documento', 'documento_formatado', 'data_cadastro', 'status', 'total_doado']
+        fields = ['id', 'nome', 'email', 'celular', 'documento', 'documento_formatado', 'recebe_comunicados', 'data_cadastro', 'status', 'total_doado']
 
     def get_documento_formatado(self, obj):
         return formatar_documento(obj.documento)
@@ -173,8 +173,8 @@ class ComunicadoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comunicado
-        fields = ['id', 'titulo', 'conteudo', 'data_publicacao', 'publico_alvo', 'publico_alvo_display']
-        read_only_fields = ['data_publicacao']
+        fields = ['id', 'titulo', 'conteudo', 'data_publicacao', 'publico_alvo', 'publico_alvo_display', 'emails_enviados', 'enviado_em']
+        read_only_fields = ['data_publicacao', 'emails_enviados', 'enviado_em']
 
 
 class NotificacaoSerializer(serializers.ModelSerializer):

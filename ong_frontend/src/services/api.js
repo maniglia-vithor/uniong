@@ -139,6 +139,8 @@ export const getComunicados        = (params) => api.get('/comunicados/', { para
 export const criarComunicado       = (data) => api.post('/comunicados/', data)
 export const atualizarComunicado   = (id, data) => api.put(`/comunicados/${id}/`, data)
 export const excluirComunicado     = (id) => api.delete(`/comunicados/${id}/`)
+export const enviarComunicadoEmail = (id) => api.post(`/comunicados/${id}/enviar-email/`)
+export const getDestinatariosComunicado = () => api.get('/comunicados/destinatarios/')
 
 // Relatórios CSV (via axios: usa o token e a renovação automática)
 export const downloadRelatorio = (tipo, params) => api.get(`/relatorios/${tipo}/`, { params, responseType: 'blob' })

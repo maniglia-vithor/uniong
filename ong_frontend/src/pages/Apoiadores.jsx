@@ -11,7 +11,7 @@ import useListaPaginada from '../hooks/useListaPaginada'
 import { formatBRL, formatCelular, formatData, mensagemErro } from '../utils/formatos'
 import { getApoiadores, criarApoiador, atualizarApoiador, excluirApoiador } from '../services/api'
 
-const VAZIO = { nome: '', email: '', celular: '', documento: '', status: 'ativo' }
+const VAZIO = { nome: '', email: '', celular: '', documento: '', status: 'ativo', recebe_comunicados: true }
 
 function iniciais(nome) {
   return nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
@@ -34,7 +34,7 @@ export default function Apoiadores() {
 
   function abrirEdicao(item) {
     setEditando(item)
-    setForm({ nome: item.nome, email: item.email, celular: item.celular || '', documento: item.documento_formatado || '', status: item.status })
+    setForm({ nome: item.nome, email: item.email, celular: item.celular || '', documento: item.documento_formatado || '', status: item.status, recebe_comunicados: item.recebe_comunicados })
     setModal(true)
   }
 
@@ -175,6 +175,10 @@ export default function Apoiadores() {
             <Campo label="Celular (opcional)">
               <Input name="celular" value={form.celular} onChange={onChange} placeholder="(11) 99999-9999" />
             </Campo>
+            <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+              <input type="checkbox" checked={form.recebe_comunicados} onChange={(e) => setForm((f) => ({ ...f, recebe_comunicados: e.target.checked }))} />
+              Recebe comunicados por e-mail
+            </label>
             <Campo label="CPF ou CNPJ (opcional, aparece no recibo)">
               <Input name="documento" value={form.documento} onChange={onChange} placeholder="000.000.000-00" inputMode="numeric" maxLength={18} />
             </Campo>

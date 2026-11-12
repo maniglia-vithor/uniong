@@ -23,7 +23,7 @@ from django.db import transaction
 from .models import Apoiador, Campanha, Contribuicao, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoInstituicao, ConfiguracaoPix, LogAlteracao
 from .anexos import TIPOS_PERMITIDOS, validar_anexo
 from .doacao_publica import DoacaoPublicaSerializer, ativar_membro_interessado, registrar_doacao_publica
-from . import indicadores, recibos
+from . import comunicados, indicadores, recibos
 from .auditoria import AuditoriaMixin, registrar as registrar_auditoria
 from .campanhas_publicas import avisar_meta_atingida, validar_imagem
 from .paginacao import filtrar_periodo
@@ -574,6 +574,24 @@ class ComunicadoViewSet(viewsets.ModelViewSet):
     search_fields = ['titulo', 'conteudo']
     ordering_fields = ['titulo', 'data_publicacao', 'publico_alvo']
     ordering = ['-data_publicacao', '-id']
+
+    @action(detail=False, methods=['get'], url_path='destinatarios')
+    def destinatarios(self, request):
+        """Quantos membros receberiam o e-mail agora e o limite do envio pela tela."""
+        return Response({
+            'quantidade': comunicados.destinatarios().count(),
+            'limite': settings.COMUNICADOS_LIMITE_SINCRONO,
+        })
+
+    @action(detail=True, methods=['post'], url_path='enviar-email')
+    def enviar_email(self, request, pk=None):
+        comunicado = self.get_object()
+        try:
+            enviados = comunicados.enviar(comunicado, limite=settings.COMUNICADOS_LIMITE_SINCRONO)
+        except comunicados.EnvioIndisponivel as e:
+            return Response({'erro': str(e)}, status=400)
+        registrar_auditoria(request.user, comunicado, 'edicao', 'envio por e-mail', '', f'{enviados} e-mail(s)')
+        return Response(ComunicadoSerializer(comunicado).data)
 
 
 @api_view(['POST'])

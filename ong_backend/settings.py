@@ -172,4 +172,7 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='UniONG <nao-responda@
 
 # Links de convite da equipe valem 72 h; os de recuperação de senha, 2 h.
 CONVITE_VALIDADE_SEGUNDOS = 72 * 3600
+# Comunicados por e-mail: mensagens por conexão SMTP e máximo de destinatários no envio pela tela.
+COMUNICADOS_LOTE = config('COMUNICADOS_LOTE', default=50, cast=int)
+COMUNICADOS_LIMITE_SINCRONO = config('COMUNICADOS_LIMITE_SINCRONO', default=300, cast=int)
 PASSWORD_RESET_TIMEOUT = config('PASSWORD_RESET_TIMEOUT', default=2 * 3600, cast=int)

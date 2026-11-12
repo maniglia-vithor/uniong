@@ -1,14 +1,14 @@
-import { useState } from 'react'
-import { Pencil, Trash2, Plus, Megaphone, Globe, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Pencil, Trash2, Plus, Megaphone, Globe, Users, Mail } from 'lucide-react'
 import Modal from '../components/Modal'
 import { Campo, Input, Select, BotaoSubmit, BotaoCancelar } from '../components/CampoForm'
 import Paginacao from '../components/Paginacao'
 import { CampoBusca } from '../components/CabecalhoOrdenavel'
 import useListaPaginada from '../hooks/useListaPaginada'
 import { mensagemErro } from '../utils/formatos'
-import { getComunicados, criarComunicado, atualizarComunicado, excluirComunicado } from '../services/api'
+import { getComunicados, criarComunicado, atualizarComunicado, excluirComunicado, enviarComunicadoEmail, getDestinatariosComunicado } from '../services/api'
 
-const VAZIO = { titulo: '', conteudo: '', publico_alvo: 'publico' }
+const VAZIO = { titulo: '', conteudo: '', publico_alvo: 'publico', enviar_email: false }
 
 function formatDateTime(iso) {
   if (!iso) return '—'
@@ -27,27 +27,47 @@ export default function Comunicacao() {
   const [editando, setEditando] = useState(null)
   const [form, setForm] = useState(VAZIO)
   const [salvando, setSalvando] = useState(false)
+  const [destinatarios, setDestinatarios] = useState(null)
+
+  useEffect(() => {
+    if (modal) getDestinatariosComunicado().then(({ data }) => setDestinatarios(data)).catch(() => {})
+  }, [modal])
 
   const carregar = lista.recarregar
 
   function abrirNovo() { setEditando(null); setForm(VAZIO); setModal(true) }
   function abrirEdicao(item) {
     setEditando(item)
-    setForm({ titulo: item.titulo, conteudo: item.conteudo, publico_alvo: item.publico_alvo })
+    setForm({ titulo: item.titulo, conteudo: item.conteudo, publico_alvo: item.publico_alvo, enviar_email: false })
     setModal(true)
   }
   function fechar() { setModal(false); setEditando(null) }
-  function onChange(e) { setForm((f) => ({ ...f, [e.target.name]: e.target.value })) }
+  function onChange(e) {
+    const { name, type, checked, value } = e.target
+    setForm((f) => ({ ...f, [name]: type === 'checkbox' ? checked : value }))
+  }
 
   async function onSubmit(e) {
     e.preventDefault()
     setSalvando(true)
+    const { enviar_email: enviarEmail, ...dados } = form
     try {
-      if (editando) await atualizarComunicado(editando.id, form)
-      else await criarComunicado(form)
+      const { data } = editando ? await atualizarComunicado(editando.id, dados) : await criarComunicado(dados)
+      if (enviarEmail && data.publico_alvo === 'apoiadores') await enviarEmail_(data.id, false)
       fechar(); carregar()
     } catch (err) { alert(mensagemErro(err, 'Erro ao salvar comunicado.')) }
     finally { setSalvando(false) }
+  }
+
+  async function enviarEmail_(id, perguntar = true) {
+    if (perguntar && !confirm('Enviar este comunicado por e-mail aos membros ativos? O envio não pode ser desfeito.')) return
+    try {
+      const { data } = await enviarComunicadoEmail(id)
+      alert(`Comunicado enviado por e-mail para ${data.emails_enviados} membro(s).`)
+      carregar()
+    } catch (err) {
+      alert(mensagemErro(err, 'Não foi possível enviar o comunicado por e-mail.'))
+    }
   }
 
   async function onExcluir(id, titulo) {
@@ -98,6 +118,11 @@ export default function Comunicacao() {
                     <span className="text-xs text-[var(--text-muted)]">
                       {c.publico_alvo_display}{c.publico_alvo === 'apoiadores' ? ' — não aparece no portal' : ''}
                     </span>
+                    {c.enviado_em && (
+                      <span className="text-xs text-emerald-700 flex items-center gap-1">
+                        <Mail size={12} aria-hidden="true" /> enviado a {c.emails_enviados} membro(s) em {formatDateTime(c.enviado_em)}
+                      </span>
+                    )}
                     <span className="text-[var(--text-muted)]">·</span>
                     <span className="text-xs text-[var(--text-muted)]">{formatDateTime(c.data_publicacao)}</span>
                   </div>
@@ -105,6 +130,11 @@ export default function Comunicacao() {
                   <p className="text-sm text-[var(--text-secondary)] whitespace-pre-line leading-relaxed">{c.conteudo}</p>
                 </div>
                 <div className="flex gap-1 flex-shrink-0">
+                  {c.publico_alvo === 'apoiadores' && !c.enviado_em && (
+                    <button onClick={() => enviarEmail_(c.id)} className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
+                      <Mail size={12} aria-hidden="true" /> Enviar por e-mail
+                    </button>
+                  )}
                   <button onClick={() => abrirEdicao(c)} aria-label={`Editar ${c.titulo}`} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-700 transition-colors">
                     <Pencil size={14} />
                   </button>
@@ -143,9 +173,22 @@ export default function Comunicacao() {
               </Select>
             </Campo>
             {form.publico_alvo === 'apoiadores' && (
-              <p className="text-xs text-[var(--text-muted)] bg-[var(--bg-card-alt)] border border-[var(--border)] rounded-lg px-3 py-2 -mt-2">
-                Comunicados “Somente Membros” não aparecem no portal de transparência.
-              </p>
+              <div className="text-xs text-[var(--text-muted)] bg-[var(--bg-card-alt)] border border-[var(--border)] rounded-lg px-3 py-2 -mt-2 space-y-2">
+                <p>Comunicados “Somente Membros” não aparecem no portal de transparência.</p>
+                {!editando?.enviado_em && (
+                  <label className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
+                    <input type="checkbox" name="enviar_email" checked={form.enviar_email} onChange={onChange} className="mt-0.5" />
+                    <span>
+                      Enviar por e-mail aos membros ativos
+                      {destinatarios && <> ({destinatarios.quantidade} destinatário{destinatarios.quantidade !== 1 ? 's' : ''})</>}
+                      {destinatarios && destinatarios.quantidade > destinatarios.limite && (
+                        <span className="block text-amber-700">Acima do limite de {destinatarios.limite} do envio pela tela: o envio deve ser feito pelo comando enviar_comunicado.</span>
+                      )}
+                    </span>
+                  </label>
+                )}
+                <p>Cada e-mail traz um link para o membro deixar de receber comunicados.</p>
+              </div>
             )}
             <div className="flex gap-3 pt-2">
               <BotaoCancelar onClick={fechar} />
