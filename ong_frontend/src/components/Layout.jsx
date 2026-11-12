@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext'
 
 import api, { buscarTodas } from '../services/api'
 import logoIcon from '../assets/Gemini_Generated_Image_g792fng792fng792.jpg'
-import RecordDetailDrawer from './RecordDetailDrawer'
+import RecordDetailDrawer, { TIPOS_COM_DETALHE } from './RecordDetailDrawer'
 
 const navItems = [
   { to: '/admin', label: 'Painel', icon: LayoutDashboard, end: true },
@@ -36,7 +36,7 @@ const tipoBadge = {
   campanha: { label: 'Campanha', bg: '#dbeafe', color: '#2563eb' },
   apoiador: { label: 'Membro', bg: '#f3e8ff', color: '#7c3aed' },
   despesa:  { label: 'Despesa',  bg: '#fee2e2', color: '#dc2626' },
-  config:   { label: 'Configuração', bg: '#e2e8f0', color: '#475569' },
+  configuracao: { label: 'Configuração', bg: '#e2e8f0', color: '#475569' },
 }
 
 function formatarTempo(isoStr) {
@@ -119,7 +119,7 @@ export default function Layout() {
     }
     setAberto(false)
     // abre drawer se tem target_type e target_id
-    if (n.target_type && n.target_id) {
+    if (n.target_id && TIPOS_COM_DETALHE.includes(n.target_type)) {
       setDrawerTarget({ type: n.target_type, id: n.target_id })
     }
   }

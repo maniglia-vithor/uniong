@@ -282,6 +282,55 @@ function EditApoiador({ record, onSaved, onCancel }) {
   )
 }
 
+// ── Detalhe Despesa (somente leitura) ───────────────────────
+function DetalheDespesa({ record }) {
+  async function baixar(anexo) {
+    try {
+      const { data } = await api.get(`/despesas/${record.id}/anexos/${anexo.id}/download/`, { responseType: 'blob' })
+      const url = URL.createObjectURL(data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = anexo.nome_original || 'anexo'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('Não foi possível baixar o anexo.')
+    }
+  }
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className="font-semibold text-[var(--text-primary)] text-base">{record.descricao}</p>
+        <p className="text-xs text-[var(--text-muted)]">
+          {record.categoria_display}
+          {record.is_fixed && record.recurrence_period_display ? ` · despesa fixa (${record.recurrence_period_display.toLowerCase()})` : ''}
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <InfoBox label="Valor" value={formatBRL(record.valor)} destaque />
+        <InfoBox label="Status" value={<BadgeStatus status={record.status_efetivo} />} />
+        <InfoBox label="Vencimento" value={formatData(record.data_vencimento)} />
+        <InfoBox label="Pagamento" value={formatData(record.data_pagamento)} />
+      </div>
+      {record.anexos?.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">Anexos</p>
+          {record.anexos.map((a) => (
+            <button key={a.id} type="button" onClick={() => baixar(a)} className="block text-sm text-teal-700 hover:underline truncate">
+              {a.nome_original}
+            </button>
+          ))}
+        </div>
+      )}
+      <a href="/admin/custos"
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+        style={{ backgroundColor: '#0f4c5c' }}>
+        <Pencil size={14} aria-hidden="true" /> Abrir em Custos
+      </a>
+    </div>
+  )
+}
+
 // ── Caixa de info ────────────────────────────────────────────
 function InfoBox({ label, value, destaque }) {
   return (
@@ -292,6 +341,12 @@ function InfoBox({ label, value, destaque }) {
   )
 }
 
+const endpointMap = { doacao: 'doacoes', campanha: 'campanhas', apoiador: 'apoiadores', despesa: 'despesas' }
+const tituloMap = { doacao: 'Doação', campanha: 'Campanha', apoiador: 'Membro', despesa: 'Despesa' }
+const corMap = { doacao: '#22c55e', campanha: '#f97316', apoiador: '#3b82f6', despesa: '#dc2626' }
+
+export const TIPOS_COM_DETALHE = Object.keys(endpointMap)
+
 // ── Drawer principal ────────────────────────────────────────
 export default function RecordDetailDrawer({ target, onClose, onRefresh }) {
   const [record, setRecord] = useState(null)
@@ -300,14 +355,12 @@ export default function RecordDetailDrawer({ target, onClose, onRefresh }) {
   const [apoiadores, setApoiadores] = useState([])
   const [campanhas, setCampanhas] = useState([])
 
-  const endpointMap = { doacao: 'doacoes', campanha: 'campanhas', apoiador: 'apoiadores' }
-  const tituloMap = { doacao: 'Doação', campanha: 'Campanha', apoiador: 'Membro' }
-
   useEffect(() => {
     if (!target) return
+    const ep = endpointMap[target.type]
+    if (!ep) return
     setCarregando(true)
     setEditando(false)
-    const ep = endpointMap[target.type]
     const reqs = [api.get(`/${ep}/${target.id}/`)]
     if (target.type === 'doacao') {
       reqs.push(api.get('/apoiadores/opcoes/'))
@@ -346,7 +399,7 @@ export default function RecordDetailDrawer({ target, onClose, onRefresh }) {
     return () => { document.body.style.overflow = '' }
   }, [])
 
-  if (!target) return null
+  if (!target || !endpointMap[target.type]) return null
 
   function handleSaved() {
     setEditando(false)
@@ -369,7 +422,7 @@ export default function RecordDetailDrawer({ target, onClose, onRefresh }) {
           <div className="flex items-center gap-2">
             <span
               className="text-xs font-semibold px-2 py-0.5 rounded-full text-white"
-              style={{ backgroundColor: target.type === 'doacao' ? '#22c55e' : target.type === 'campanha' ? '#f97316' : '#3b82f6' }}
+              style={{ backgroundColor: corMap[target.type] }}
             >
               {tituloMap[target.type]}
             </span>
@@ -377,7 +430,7 @@ export default function RecordDetailDrawer({ target, onClose, onRefresh }) {
               {editando ? `Editar ${tituloMap[target.type]}` : 'Detalhes'}
             </span>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+          <button onClick={onClose} aria-label="Fechar" className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)]">
             <X size={18} />
           </button>
         </div>
@@ -408,6 +461,7 @@ export default function RecordDetailDrawer({ target, onClose, onRefresh }) {
               {target.type === 'doacao' && <DetalheDoacao record={record} onEdit={() => setEditando(true)} />}
               {target.type === 'campanha' && <DetalheCampanha record={record} onEdit={() => setEditando(true)} />}
               {target.type === 'apoiador' && <DetalheApoiador record={record} onEdit={() => setEditando(true)} />}
+              {target.type === 'despesa' && <DetalheDespesa record={record} />}
             </>
           )}
         </div>

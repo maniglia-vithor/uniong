@@ -64,7 +64,7 @@ class ConfiguracaoPixApiTests(APITestCase):
         log_chave = logs.get(campo='chave')
         self.assertEqual((log_chave.antes, log_chave.depois, log_chave.usuario), ('', '52998224725', self.super))
 
-        notifs = Notificacao.objects.filter(tipo='config')
+        notifs = Notificacao.objects.filter(tipo='configuracao')
         self.assertEqual(set(notifs.values_list('usuario__username', flat=True)), {'chefe', 'equipe'})
         texto = notifs.first().action_text
         self.assertIn('529******25', texto)

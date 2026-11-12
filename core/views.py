@@ -575,7 +575,7 @@ def configuracao_pix(request):
             acao = ('alterou a configuração PIX: ' + '; '.join(mudancas))[:200]
             _notificar_admins(
                 mensagem=f'{actor} {acao}'[:300],
-                tipo='config',
+                tipo='configuracao',
                 actor_name=actor,
                 action_text=acao,
             )

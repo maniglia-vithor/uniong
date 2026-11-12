@@ -97,14 +97,14 @@ class Notificacao(models.Model):
         ('campanha', 'Campanha'),
         ('apoiador', 'Apoiador'),
         ('despesa', 'Despesa'),
-        ('config', 'Configuração'),
+        ('configuracao', 'Configuração'),
     ]
 
     usuario = models.ForeignKey(
         get_user_model(), on_delete=models.CASCADE, related_name='notificacoes'
     )
     mensagem = models.CharField(max_length=300)
-    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, default='doacao')
+    tipo = models.CharField(max_length=12, choices=TIPO_CHOICES, default='doacao')
     lida = models.BooleanField(default=False)
     criada_em = models.DateTimeField(auto_now_add=True)
     actor_name = models.CharField(max_length=150, blank=True, default='')
