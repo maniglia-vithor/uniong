@@ -3,8 +3,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import {
   HeartHandshake, DollarSign, Megaphone, Users, TrendingUp,
   Receipt, ShieldOff, ArrowLeft, X, ExternalLink, Share2,
-  Camera, Mail, Globe, Briefcase, MessageCircle, CheckCircle,
+  CheckCircle,
 } from 'lucide-react'
+import { FaWhatsapp, FaInstagram, FaFacebook, FaLinkedin, FaTiktok } from 'react-icons/fa'
+import { MdEmail } from 'react-icons/md'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
@@ -209,46 +211,48 @@ function CampanhaModal({ campanha, onFechar }) {
   const qrData = encodeURIComponent(`PIX:UniONG:${campanha.titulo}:${campanha.id}`)
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${qrData}&color=0f4c5c`
 
-  const shareText = encodeURIComponent(`Apoie a campanha "${campanha.titulo}" da UniONG! Meta: ${formatBRL(campanha.meta_valor)} — ${BASE_URL}/transparencia`)
-  const shareUrl = encodeURIComponent(`${BASE_URL}/transparencia`)
+  const [aviso, setAviso] = useState(null)
 
-  const shareLinks = [
-    {
-      label: 'WhatsApp',
-      icon: MessageCircle,
-      cor: '#25d366',
-      href: `https://wa.me/?text=${shareText}`,
-    },
-    {
-      label: 'Instagram',
-      icon: Camera,
-      cor: '#e1306c',
-      href: `https://instagram.com`,
-    },
-    {
-      label: 'Facebook',
-      icon: Globe,
-      cor: '#1877f2',
-      href: `https://www.facebook.com/sharer/sharer.php?u=${shareUrl}&quote=${shareText}`,
-    },
-    {
-      label: 'LinkedIn',
-      icon: Briefcase,
-      cor: '#0a66c2',
-      href: `https://www.linkedin.com/sharing/share-offsite/?url=${shareUrl}`,
-    },
-    {
-      label: 'E-mail',
-      icon: Mail,
-      cor: '#6b7280',
-      href: `mailto:?subject=${encodeURIComponent('Apoie esta campanha!')}&body=${shareText}`,
-    },
-    {
-      label: 'TikTok',
-      icon: ExternalLink,
-      cor: '#010101',
-      href: `https://www.tiktok.com`,
-    },
+  const link = `${BASE_URL}/transparencia`
+  const texto = `Apoie a campanha "${campanha.titulo}" da UniONG! Já arrecadamos ${formatBRL(campanha.valor_arrecadado)} de ${formatBRL(campanha.meta_valor)}. Doe via PIX:`
+  const textoCompleto = `${texto} ${link}`
+  const t = encodeURIComponent(texto)
+  const tc = encodeURIComponent(textoCompleto)
+  const u = encodeURIComponent(link)
+
+  function abrirPopup(url) {
+    window.open(url, '_blank', 'noopener,noreferrer,width=640,height=640')
+  }
+
+  // Instagram e TikTok não têm URL de compartilhamento na web: usa o compartilhamento
+  // nativo do aparelho (com o QR Code) e, sem suporte, copia o texto e abre a rede.
+  async function compartilharSemUrl(nome, siteUrl) {
+    try {
+      const blob = await fetch(qrUrl).then(r => r.blob())
+      const arquivo = new File([blob], 'pix-uniong.png', { type: blob.type || 'image/png' })
+      if (navigator.canShare?.({ files: [arquivo] })) {
+        await navigator.share({ title: campanha.titulo, text: textoCompleto, files: [arquivo] })
+        return
+      }
+    } catch (e) {
+      if (e?.name === 'AbortError') return
+    }
+    try {
+      await navigator.clipboard.writeText(textoCompleto)
+      setAviso(`Texto da campanha copiado! Cole no ${nome} para compartilhar.`)
+    } catch {
+      setAviso(`Abra o ${nome} e compartilhe o link: ${link}`)
+    }
+    window.open(siteUrl, '_blank', 'noopener,noreferrer')
+  }
+
+  const redes = [
+    { label: 'WhatsApp', Icon: FaWhatsapp, cor: '#25d366', onClick: () => abrirPopup(`https://wa.me/?text=${tc}`) },
+    { label: 'Instagram', Icon: FaInstagram, cor: '#e1306c', onClick: () => compartilharSemUrl('Instagram', 'https://www.instagram.com/') },
+    { label: 'Facebook', Icon: FaFacebook, cor: '#1877f2', onClick: () => abrirPopup(`https://www.facebook.com/sharer/sharer.php?u=${u}&quote=${t}`) },
+    { label: 'LinkedIn', Icon: FaLinkedin, cor: '#0a66c2', onClick: () => abrirPopup(`https://www.linkedin.com/sharing/share-offsite/?url=${u}`) },
+    { label: 'E-mail', Icon: MdEmail, cor: '#ea4335', onClick: () => { window.location.href = `mailto:?subject=${encodeURIComponent(`Apoie a campanha: ${campanha.titulo}`)}&body=${tc}` } },
+    { label: 'TikTok', Icon: FaTiktok, cor: '#ff0050', onClick: () => compartilharSemUrl('TikTok', 'https://www.tiktok.com/') },
   ]
 
   return (
@@ -297,21 +301,24 @@ function CampanhaModal({ campanha, onFechar }) {
           <Share2 size={14} className="text-[var(--text-muted)]" />
           <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">Compartilhar campanha</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {shareLinks.map(({ label, icon: Icon, cor, href }) => (
-            <a
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {redes.map(({ label, Icon, cor, onClick }) => (
+            <button
               key={label}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors hover:opacity-90"
-              style={{ borderColor: `${cor}40`, color: cor, backgroundColor: `${cor}0f` }}
+              type="button"
+              onClick={onClick}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
             >
-              <Icon size={13} />
+              <Icon size={18} style={{ color: cor }} className="flex-shrink-0" />
               {label}
-            </a>
+            </button>
           ))}
         </div>
+        {aviso && (
+          <p className="mt-3 text-xs text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+            {aviso}
+          </p>
+        )}
       </div>
     </Overlay>
   )
