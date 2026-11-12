@@ -31,3 +31,4 @@ docs/prompts/
 .vscode/
 .idea/
 *.swp
+staticfiles/

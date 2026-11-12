@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .campanhas_publicas import campanha_publica, imagem_campanha
 from .comunicados import descadastrar
 from .equipe import EquipeViewSet
+from .saude import health
 from .voluntarios import AtividadeViewSet, VoluntarioViewSet
 from .relatorios import (
     relatorio_apoiadores, relatorio_campanhas, relatorio_despesas, relatorio_doacoes, relatorio_prestacao_contas,
@@ -38,6 +39,7 @@ urlpatterns = router.urls + [
     path('configuracoes/pix/', configuracao_pix, name='configuracao_pix'),
     path('configuracoes/instituicao/', configuracao_instituicao, name='configuracao_instituicao'),
     path('configuracoes/instituicao/logo/', logo_instituicao, name='logo_instituicao'),
+    path('health/', health, name='health'),
     path('public/instituicao/', instituicao_publica, name='instituicao_publica'),
     path('public/descadastrar/<str:token>/', descadastrar, name='descadastrar'),
     path('public/instituicao/logo/', logo_publico, name='logo_publico'),

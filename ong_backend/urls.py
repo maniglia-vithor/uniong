@@ -5,7 +5,8 @@ from core.campanhas_publicas import pagina_compartilhamento
 from core.equipe import ativar_convite, recuperar_senha, redefinir_senha
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # /admin é rota do React; o admin do Django fica em /admin-django/.
+    path('admin-django/', admin.site.urls),
     path('api/auth/token/', TokenView.as_view(), name='token_obtain_pair'),
     path('api/auth/token/refresh/', RenovarTokenView.as_view(), name='token_refresh'),
     path('api/auth/me/', eu, name='auth_me'),
