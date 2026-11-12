@@ -35,6 +35,7 @@ export const NOMES_MODELOS = {
   Despesa: 'Despesa',
   ConfiguracaoPix: 'Chave PIX',
   ConfiguracaoInstituicao: 'Instituição',
+  User: 'Usuário da equipe',
 }
 
 export function formatarMomento(iso) {

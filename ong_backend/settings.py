@@ -161,8 +161,15 @@ PRIVATE_MEDIA_ROOT = config('PRIVATE_MEDIA_ROOT', default=str(BASE_DIR / 'privad
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
+# E-mail: console em desenvolvimento (mensagens aparecem no terminal do runserver); SMTP em produção.
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = config('EMAIL_HOST', default='')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='UniONG <nao-responda@localhost>')
+
+# Links de convite da equipe valem 72 h; os de recuperação de senha, 2 h.
+CONVITE_VALIDADE_SEGUNDOS = 72 * 3600
+PASSWORD_RESET_TIMEOUT = config('PASSWORD_RESET_TIMEOUT', default=2 * 3600, cast=int)

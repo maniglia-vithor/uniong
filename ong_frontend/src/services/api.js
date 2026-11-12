@@ -113,6 +113,12 @@ export const getDespesasPorCategoria = () => api.get('/despesas/por-categoria/')
 // Histórico (auditoria, só superusuário)
 export const getHistorico           = (params) => api.get('/historico/', { params })
 
+// Equipe (superusuário)
+export const getEquipe              = (params) => api.get('/equipe/', { params })
+export const convidarEquipe         = (data) => api.post('/equipe/convidar/', data)
+export const alterarAcessoEquipe    = (id, data) => api.patch(`/equipe/${id}/acesso/`, data)
+export const reenviarConviteEquipe  = (id) => api.post(`/equipe/${id}/reenviar-convite/`)
+
 // Comunicados
 export const getComunicados        = (params) => api.get('/comunicados/', { params })
 export const criarComunicado       = (data) => api.post('/comunicados/', data)

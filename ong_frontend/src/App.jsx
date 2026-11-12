@@ -13,6 +13,8 @@ import Custos from './pages/Custos'
 import Relatorios from './pages/Relatorios'
 import Configuracoes from './pages/Configuracoes'
 import Historico from './pages/Historico'
+import Equipe from './pages/Equipe'
+import DefinirSenha from './pages/DefinirSenha'
 import Transparencia from './pages/Transparencia'
 import Privacidade from './pages/Privacidade'
 import CampanhaPublica from './pages/CampanhaPublica'
@@ -39,6 +41,7 @@ export default function App() {
           <Route path="/privacidade" element={<Privacidade />} />
           <Route path="/transparencia/campanha/:id" element={<CampanhaPublica />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/definir-senha/:uid/:token" element={<DefinirSenha modo="convite" />} />
 
           {/* Rotas administrativas protegidas */}
           <Route element={<RotaProtegida />}>
@@ -53,6 +56,7 @@ export default function App() {
               <Route path="relatorios" element={<Relatorios />} />
               <Route path="configuracoes" element={<Configuracoes />} />
               <Route path="historico" element={<Historico />} />
+              <Route path="equipe" element={<Equipe />} />
             </Route>
           </Route>
 
