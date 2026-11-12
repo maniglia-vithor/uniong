@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   HeartHandshake, DollarSign, Megaphone, Users, TrendingUp,
@@ -366,20 +366,49 @@ function formatDataHora(iso) {
   return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
-const LIMITE_CARACTERES = 280
-const LIMITE_LINHAS = 4
+function ComunicadoItem({ comunicado: c }) {
+  const textoRef = useRef(null)
+  const [aberto, setAberto] = useState(false)
+  const [extenso, setExtenso] = useState(false)
 
-function ehExtenso(texto) {
-  return texto.length > LIMITE_CARACTERES || texto.split('\n').length > LIMITE_LINHAS
+  useLayoutEffect(() => {
+    const el = textoRef.current
+    if (!el || aberto) return
+    const medir = () => setExtenso(el.scrollHeight > el.clientHeight + 1)
+    medir()
+    const obs = new ResizeObserver(medir)
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [aberto, c.conteudo])
+
+  return (
+    <article className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-5">
+      <p className="text-xs text-[var(--text-muted)] mb-1">{formatDataHora(c.data_publicacao)}</p>
+      <h3 className="font-semibold text-[var(--text-primary)] mb-2">{c.titulo}</h3>
+      <p
+        ref={textoRef}
+        id={`comunicado-${c.id}`}
+        className={`text-sm text-[var(--text-secondary)] whitespace-pre-line leading-relaxed ${aberto ? '' : 'line-clamp-6'}`}
+      >
+        {c.conteudo}
+      </p>
+      {(extenso || aberto) && (
+        <button
+          type="button"
+          onClick={() => setAberto(v => !v)}
+          aria-expanded={aberto}
+          aria-controls={`comunicado-${c.id}`}
+          className="mt-2 text-xs font-semibold hover:underline"
+          style={{ color: '#0f4c5c' }}
+        >
+          {aberto ? 'Mostrar menos' : 'Ler mais'}
+        </button>
+      )}
+    </article>
+  )
 }
 
 function Comunicados({ lista }) {
-  const [expandidos, setExpandidos] = useState({})
-
-  function alternar(id) {
-    setExpandidos(e => ({ ...e, [id]: !e[id] }))
-  }
-
   return (
     <section>
       <h2 className="text-base font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
@@ -392,34 +421,7 @@ function Comunicados({ lista }) {
         </div>
       ) : (
         <div className="space-y-3">
-          {lista.map(c => {
-            const extenso = ehExtenso(c.conteudo)
-            const aberto = Boolean(expandidos[c.id])
-            return (
-              <article key={c.id} className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-5">
-                <p className="text-xs text-[var(--text-muted)] mb-1">{formatDataHora(c.data_publicacao)}</p>
-                <h3 className="font-semibold text-[var(--text-primary)] mb-2">{c.titulo}</h3>
-                <p
-                  id={`comunicado-${c.id}`}
-                  className={`text-sm text-[var(--text-secondary)] whitespace-pre-line leading-relaxed ${extenso && !aberto ? 'line-clamp-4' : ''}`}
-                >
-                  {c.conteudo}
-                </p>
-                {extenso && (
-                  <button
-                    type="button"
-                    onClick={() => alternar(c.id)}
-                    aria-expanded={aberto}
-                    aria-controls={`comunicado-${c.id}`}
-                    className="mt-2 text-xs font-semibold hover:underline"
-                    style={{ color: '#0f4c5c' }}
-                  >
-                    {aberto ? 'Mostrar menos' : 'Ler mais'}
-                  </button>
-                )}
-              </article>
-            )
-          })}
+          {lista.map(c => <ComunicadoItem key={c.id} comunicado={c} />)}
         </div>
       )}
     </section>
