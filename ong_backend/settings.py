@@ -122,6 +122,9 @@ STATIC_URL = 'static/'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Anexos de despesas: fora de MEDIA_ROOT, servidos só pela API autenticada.
+PRIVATE_MEDIA_ROOT = config('PRIVATE_MEDIA_ROOT', default=str(BASE_DIR / 'privado'))
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MAILERS = {

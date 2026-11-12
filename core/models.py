@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 
+from .anexos import armazenamento_privado, caminho_anexo
+
 
 class Apoiador(models.Model):
     STATUS_CHOICES = [
@@ -223,7 +225,7 @@ class DespesaAnexo(models.Model):
     despesa = models.ForeignKey(
         Despesa, on_delete=models.CASCADE, related_name='anexos'
     )
-    arquivo = models.FileField(upload_to='despesas/anexos/')
+    arquivo = models.FileField(upload_to=caminho_anexo, storage=armazenamento_privado)
     nome_original = models.CharField(max_length=255, blank=True)
     enviado_em = models.DateTimeField(auto_now_add=True)
 

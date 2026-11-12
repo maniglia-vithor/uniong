@@ -1,4 +1,5 @@
 import csv
+import os
 from datetime import date
 
 from django.conf import settings
@@ -9,15 +10,17 @@ from google.auth.transport import requests as google_requests
 from rest_framework_simplejwt.tokens import RefreshToken
 from dateutil.relativedelta import relativedelta
 from django.db.models import Sum, Q
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
 from rest_framework import viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from django.db import transaction
 
 from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoPix, LogAlteracao
+from .anexos import TIPOS_PERMITIDOS, validar_anexo
 from .pix import mascarar
 from .throttles import AuthThrottle, DoacaoPublicaThrottle
 from .serializers import ApoiadorSerializer, CampanhaSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer
@@ -378,16 +381,27 @@ class DespesaViewSet(viewsets.ModelViewSet):
             qs = qs.filter(categoria=categoria)
         return qs
 
+    def _anexos_validados(self):
+        arquivos = self.request.FILES.getlist('anexos')
+        erros = []
+        for arq in arquivos:
+            try:
+                validar_anexo(arq)
+            except ValueError as e:
+                erros.append(str(e))
+        if erros:
+            raise ValidationError({'anexos': erros})
+        return arquivos
+
     def _salvar_anexos(self, despesa, arquivos):
         for arq in arquivos:
-            import os
-            anexo = DespesaAnexo(despesa=despesa, nome_original=arq.name)
+            anexo = DespesaAnexo(despesa=despesa, nome_original=os.path.basename(arq.name)[:255])
             anexo.arquivo = arq
             anexo.save()
 
     def perform_create(self, serializer):
+        arquivos = self._anexos_validados()
         despesa = serializer.save()
-        arquivos = self.request.FILES.getlist('anexos')
         if arquivos:
             self._salvar_anexos(despesa, arquivos)
         # Gera primeira recorrência ao criar despesa fixa
@@ -406,9 +420,9 @@ class DespesaViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
+        arquivos = self._anexos_validados()
         status_anterior = serializer.instance.status
         despesa = serializer.save()
-        arquivos = self.request.FILES.getlist('anexos')
         if arquivos:
             self._salvar_anexos(despesa, arquivos)
         # Gera próxima recorrência quando marcada como paga
@@ -425,6 +439,21 @@ class DespesaViewSet(viewsets.ModelViewSet):
             return Response(status=204)
         except DespesaAnexo.DoesNotExist:
             return Response({'erro': 'Anexo não encontrado.'}, status=404)
+
+    @action(detail=True, methods=['get'], url_path=r'anexos/(?P<anexo_id>\d+)/download')
+    def baixar_anexo(self, request, pk=None, anexo_id=None):
+        anexo = DespesaAnexo.objects.filter(pk=anexo_id, despesa_id=pk).first()
+        if anexo is None or not anexo.arquivo.storage.exists(anexo.arquivo.name):
+            return Response({'erro': 'Anexo não encontrado.'}, status=404)
+        extensao = os.path.splitext(anexo.arquivo.name)[1].lower()
+        resposta = FileResponse(
+            anexo.arquivo.open('rb'),
+            as_attachment=True,
+            filename=anexo.nome_original or os.path.basename(anexo.arquivo.name),
+            content_type=TIPOS_PERMITIDOS.get(extensao, 'application/octet-stream'),
+        )
+        resposta['X-Content-Type-Options'] = 'nosniff'
+        return resposta
 
     @action(detail=False, methods=['get'], url_path='resumo')
     def resumo(self, request):

@@ -8,7 +8,7 @@ import BadgeStatus from '../components/BadgeStatus'
 import TabelaVazia from '../components/TabelaVazia'
 import {
   getDespesas, criarDespesa, atualizarDespesa, excluirDespesa,
-  removerAnexoDespesa, getDespesasResumo, getDespesasPorCategoria,
+  removerAnexoDespesa, baixarAnexoDespesa, getDespesasResumo, getDespesasPorCategoria,
 } from '../services/api'
 
 const VAZIO = {
@@ -159,8 +159,25 @@ export default function Custos() {
       else await criarDespesa(fd)
       fechar()
       carregar()
-    } catch { alert('Erro ao salvar. Verifique os dados.') }
+    } catch (err) {
+      const erros = err.response?.data?.anexos
+      alert(Array.isArray(erros) ? erros.join('\n') : 'Erro ao salvar. Verifique os dados.')
+    }
     finally { setSalvando(false) }
+  }
+
+  async function onBaixarAnexo(anexo) {
+    try {
+      const { data } = await baixarAnexoDespesa(editando.id, anexo.id)
+      const url = URL.createObjectURL(data)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = anexo.nome_original || 'anexo'
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('Não foi possível baixar o anexo.')
+    }
   }
 
   async function onExcluir(id) {
@@ -428,15 +445,14 @@ export default function Custos() {
                 <div className="space-y-1 mb-2">
                   {editando.anexos.map((a) => (
                     <div key={a.id} className="flex items-center justify-between gap-2 px-3 py-1.5 bg-[var(--bg-card-alt)] rounded-lg border border-[var(--border)]">
-                      <a
-                        href={a.url}
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => onBaixarAnexo(a)}
                         className="text-xs text-teal-700 hover:underline truncate flex items-center gap-1.5"
                       >
                         <Paperclip size={11} className="flex-shrink-0" />
                         {a.nome_original}
-                      </a>
+                      </button>
                       <button
                         type="button"
                         onClick={() => removerAnexoExistente(a.id)}
@@ -473,11 +489,12 @@ export default function Custos() {
               >
                 <Paperclip size={18} className="text-[var(--text-muted)]" />
                 <span className="text-xs text-[var(--text-secondary)] font-medium">Adicionar anexo</span>
-                <span className="text-[11px] text-[var(--text-muted)]">Clique para selecionar arquivos</span>
+                <span className="text-[11px] text-[var(--text-muted)]">PDF, JPG, PNG ou WEBP, até 5 MB cada</span>
               </div>
               <input
                 ref={fileInputRef}
                 type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
                 multiple
                 className="hidden"
                 onChange={onAddFiles}

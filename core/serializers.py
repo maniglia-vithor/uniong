@@ -70,10 +70,7 @@ class DespesaAnexoSerializer(serializers.ModelSerializer):
         fields = ['id', 'nome_original', 'url', 'enviado_em']
 
     def get_url(self, obj):
-        request = self.context.get('request')
-        if obj.arquivo and request:
-            return request.build_absolute_uri(obj.arquivo.url)
-        return obj.arquivo.url if obj.arquivo else None
+        return f'/api/despesas/{obj.despesa_id}/anexos/{obj.id}/download/'
 
 
 class DespesaSerializer(serializers.ModelSerializer):

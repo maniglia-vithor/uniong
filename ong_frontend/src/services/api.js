@@ -91,6 +91,7 @@ export const criarDespesa            = (fd) => api.post('/despesas/', fd, { head
 export const atualizarDespesa        = (id, fd) => api.put(`/despesas/${id}/`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
 export const excluirDespesa          = (id) => api.delete(`/despesas/${id}/`)
 export const removerAnexoDespesa     = (despesaId, anexoId) => api.delete(`/despesas/${despesaId}/anexos/${anexoId}/`)
+export const baixarAnexoDespesa      = (despesaId, anexoId) => api.get(`/despesas/${despesaId}/anexos/${anexoId}/download/`, { responseType: 'blob' })
 export const getDespesasResumo       = () => api.get('/despesas/resumo/')
 export const getDespesasPorCategoria = () => api.get('/despesas/por-categoria/')
 
