@@ -58,6 +58,8 @@ class Notificacao(models.Model):
         ('doacao', 'Doação'),
         ('campanha', 'Campanha'),
         ('apoiador', 'Apoiador'),
+        ('despesa', 'Despesa'),
+        ('config', 'Configuração'),
     ]
 
     usuario = models.ForeignKey(
@@ -238,6 +240,28 @@ class DespesaAnexo(models.Model):
 
     def __str__(self):
         return f'Anexo de {self.despesa}'
+
+
+class LogAlteracao(models.Model):
+    """Registro de auditoria: quem alterou qual campo de qual registro."""
+
+    usuario = models.ForeignKey(
+        get_user_model(), on_delete=models.SET_NULL, null=True, blank=True, related_name='alteracoes'
+    )
+    data = models.DateTimeField(auto_now_add=True)
+    modelo = models.CharField(max_length=50)
+    objeto_id = models.PositiveIntegerField(null=True, blank=True)
+    campo = models.CharField(max_length=50)
+    antes = models.TextField(blank=True, default='')
+    depois = models.TextField(blank=True, default='')
+
+    class Meta:
+        verbose_name = 'Log de alteração'
+        verbose_name_plural = 'Logs de alteração'
+        ordering = ['-data']
+
+    def __str__(self):
+        return f'{self.modelo}#{self.objeto_id} {self.campo} ({self.data:%d/%m/%Y %H:%M})'
 
 
 class ConfiguracaoPix(models.Model):

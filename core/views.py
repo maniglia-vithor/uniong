@@ -15,15 +15,16 @@ from rest_framework.permissions import AllowAny
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 
-from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoPix
+from django.db import transaction
+
+from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoPix, LogAlteracao
+from .pix import mascarar
 from .serializers import ApoiadorSerializer, CampanhaSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer
 
 
 def _notificar_admins(mensagem, tipo, actor_name='', action_text='', target_type='', target_id=None):
     User = get_user_model()
-    admins = User.objects.filter(is_staff=True)
-    if not admins.exists():
-        admins = User.objects.all()
+    admins = User.objects.filter(is_staff=True, is_active=True)
     Notificacao.objects.bulk_create([
         Notificacao(
             usuario=u,
@@ -668,15 +669,43 @@ def painel_transparencia(request):
     })
 
 
+CAMPOS_PIX = {'chave': 'chave', 'nome_recebedor': 'nome do recebedor', 'cidade': 'cidade'}
+
+
 @api_view(['GET', 'PUT'])
 def configuracao_pix(request):
     config = ConfiguracaoPix.obter()
-    if request.method == 'PUT':
-        serializer = ConfiguracaoPixSerializer(config, data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
-    return Response(ConfiguracaoPixSerializer(config).data)
+    if request.method == 'GET':
+        return Response(ConfiguracaoPixSerializer(config).data)
+
+    if not request.user.is_superuser:
+        return Response({'erro': 'Apenas superusuários podem alterar a chave PIX.'}, status=403)
+
+    antes = {campo: getattr(config, campo) for campo in CAMPOS_PIX}
+    serializer = ConfiguracaoPixSerializer(config, data=request.data)
+    serializer.is_valid(raise_exception=True)
+    with transaction.atomic():
+        config = serializer.save()
+        mudancas = []
+        for campo, rotulo in CAMPOS_PIX.items():
+            novo = getattr(config, campo)
+            if novo == antes[campo]:
+                continue
+            LogAlteracao.objects.create(
+                usuario=request.user, modelo='ConfiguracaoPix', objeto_id=config.pk,
+                campo=campo, antes=antes[campo], depois=novo,
+            )
+            mudancas.append(f'{rotulo} de {mascarar(antes[campo])} para {mascarar(novo)}')
+        if mudancas:
+            actor = request.user.get_full_name() or request.user.username
+            acao = ('alterou a configuração PIX: ' + '; '.join(mudancas))[:200]
+            _notificar_admins(
+                mensagem=f'{actor} {acao}'[:300],
+                tipo='config',
+                actor_name=actor,
+                action_text=acao,
+            )
+    return Response(serializer.data)
 
 
 @api_view(['POST'])

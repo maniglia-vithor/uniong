@@ -62,6 +62,7 @@ function salvarPrefs(prefs) {
 
 export default function Configuracoes() {
   const { usuario } = useAuth()
+  const podeEditarPix = Boolean(usuario?.is_superuser)
   const { theme, toggleTheme } = useTheme()
   const [aba, setAba] = useState('aparencia')
 
@@ -124,13 +125,20 @@ export default function Configuracoes() {
 
   async function salvarPrivacidade() {
     salvarPrefs({ ...carregarPrefs(), transparencia })
+    if (!podeEditarPix) {
+      setMsgPerfil({ tipo: 'ok', texto: 'Configurações de privacidade salvas.' })
+      setTimeout(() => setMsgPerfil(null), 3000)
+      return
+    }
     setSalvandoPix(true)
     try {
       const { data } = await api.put('/configuracoes/pix/', pix)
       setPix(data)
       setMsgPerfil({ tipo: 'ok', texto: 'Configurações de privacidade e chave PIX salvas.' })
-    } catch {
-      setMsgPerfil({ tipo: 'erro', texto: 'Erro ao salvar a chave PIX. Verifique os dados.' })
+    } catch (err) {
+      const d = err.response?.data
+      const detalhe = d?.erro ?? d?.chave?.[0] ?? d?.nome_recebedor?.[0] ?? d?.cidade?.[0]
+      setMsgPerfil({ tipo: 'erro', texto: detalhe ?? 'Erro ao salvar a chave PIX. Verifique os dados.' })
     } finally {
       setSalvandoPix(false)
       setTimeout(() => setMsgPerfil(null), 3000)
@@ -398,8 +406,9 @@ export default function Configuracoes() {
               <Card title="Chave PIX da instituição">
                 <p className="text-xs text-[var(--text-muted)] -mt-2">
                   Usada para gerar o QR Code de doação das campanhas no portal de transparência.
+                  {!podeEditarPix && ' Somente superusuários podem alterá-la.'}
                 </p>
-                <div className="space-y-3">
+                <fieldset disabled={!podeEditarPix} className="space-y-3 disabled:opacity-60">
                   <div>
                     <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Chave PIX</label>
                     <input
@@ -434,8 +443,9 @@ export default function Configuracoes() {
                   </div>
                   <p className="text-[11px] text-[var(--text-muted)]">
                     Nome e cidade devem ser os mesmos cadastrados no banco (até 25 e 15 caracteres).
+                    Toda alteração é registrada e notificada à equipe.
                   </p>
-                </div>
+                </fieldset>
               </Card>
 
               <Card title="Exportação de dados">

@@ -1,6 +1,7 @@
 from django.db.models import Sum
 from rest_framework import serializers
 from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoPix
+from .pix import normalizar_chave_pix
 
 
 class ConfiguracaoPixSerializer(serializers.ModelSerializer):
@@ -9,6 +10,16 @@ class ConfiguracaoPixSerializer(serializers.ModelSerializer):
         fields = ['chave', 'nome_recebedor', 'cidade']
 
     def validate_chave(self, value):
+        try:
+            chave, _tipo = normalizar_chave_pix(value)
+        except ValueError as e:
+            raise serializers.ValidationError(str(e))
+        return chave
+
+    def validate_nome_recebedor(self, value):
+        return value.strip()
+
+    def validate_cidade(self, value):
         return value.strip()
 
 

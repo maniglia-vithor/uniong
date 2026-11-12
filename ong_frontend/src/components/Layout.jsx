@@ -36,6 +36,7 @@ const tipoBadge = {
   campanha: { label: 'Campanha', bg: '#dbeafe', color: '#2563eb' },
   apoiador: { label: 'Membro', bg: '#f3e8ff', color: '#7c3aed' },
   despesa:  { label: 'Despesa',  bg: '#fee2e2', color: '#dc2626' },
+  config:   { label: 'Configuração', bg: '#e2e8f0', color: '#475569' },
 }
 
 function formatarTempo(isoStr) {

@@ -1,5 +1,20 @@
 from django.contrib import admin
-from .models import Apoiador, Campanha, Doacao, Comunicado
+from .models import Apoiador, Campanha, Doacao, Comunicado, LogAlteracao
+
+
+@admin.register(LogAlteracao)
+class LogAlteracaoAdmin(admin.ModelAdmin):
+    list_display = ['data', 'usuario', 'modelo', 'objeto_id', 'campo']
+    list_filter = ['modelo', 'campo']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Apoiador)
