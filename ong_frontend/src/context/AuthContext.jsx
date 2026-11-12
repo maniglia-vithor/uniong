@@ -22,6 +22,14 @@ export function AuthProvider({ children }) {
     setUsuario(dadosUsuario)
   }, [])
 
+  const entrarComTokens = useCallback(async (access, refresh) => {
+    const dadosUsuario = { username: 'Google' }
+    localStorage.setItem('ong_usuario', JSON.stringify(dadosUsuario))
+    localStorage.setItem('ong_access', access)
+    localStorage.setItem('ong_refresh', refresh)
+    setUsuario(dadosUsuario)
+  }, [])
+
   const logout = useCallback(() => {
     localStorage.removeItem('ong_usuario')
     localStorage.removeItem('ong_access')
@@ -30,7 +38,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ usuario, login, logout, autenticado: !!usuario }}>
+    <AuthContext.Provider value={{ usuario, login, entrarComTokens, logout, autenticado: !!usuario }}>
       {children}
     </AuthContext.Provider>
   )

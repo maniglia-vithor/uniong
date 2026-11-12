@@ -4,6 +4,7 @@ from datetime import date
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from google.oauth2 import id_token as google_id_token
+from google.auth.exceptions import GoogleAuthError
 from google.auth.transport import requests as google_requests
 from rest_framework_simplejwt.tokens import RefreshToken
 from dateutil.relativedelta import relativedelta
@@ -562,29 +563,38 @@ def relatorio_apoiadores(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def google_login(request):
-    """
-    Aceita o access_token do Google (fluxo implícito) + email/nome
-    já validados pelo frontend via googleapis.com/oauth2/v3/userinfo.
-    Para produção com id_token, configure GOOGLE_CLIENT_ID e use verify_oauth2_token.
-    """
-    email = request.data.get('email')
-    nome = request.data.get('nome', email)
+    """Troca o id_token (credential) do Google por JWT, apenas para staff já cadastrado."""
+    if not settings.GOOGLE_CLIENT_ID:
+        return Response({'erro': 'Login com Google não está configurado.'}, status=503)
 
-    if not email:
-        return Response({'erro': 'E-mail não fornecido.'}, status=400)
+    credential = request.data.get('credential')
+    if not credential or not isinstance(credential, str):
+        return Response({'erro': 'Token do Google ausente.'}, status=400)
 
-    User = get_user_model()
-    usuario, _ = User.objects.get_or_create(
-        username=email,
-        defaults={'email': email, 'first_name': nome or ''},
-    )
+    try:
+        info = google_id_token.verify_oauth2_token(
+            credential, google_requests.Request(), settings.GOOGLE_CLIENT_ID
+        )
+    except ValueError:
+        return Response({'erro': 'Token do Google inválido.'}, status=401)
+    except GoogleAuthError:
+        return Response({'erro': 'Não foi possível validar o login com o Google.'}, status=503)
+
+    if not info.get('email_verified'):
+        return Response({'erro': 'E-mail do Google não verificado.'}, status=401)
+
+    email = (info.get('email') or '').strip()
+    usuario = (
+        get_user_model().objects
+        .filter(email__iexact=email, is_active=True, is_staff=True)
+        .order_by('id')
+        .first()
+    ) if email else None
+    if usuario is None:
+        return Response({'erro': 'Conta não autorizada. Peça acesso a um administrador.'}, status=403)
 
     refresh = RefreshToken.for_user(usuario)
-    return Response({
-        'access': str(refresh.access_token),
-        'refresh': str(refresh),
-        'username': usuario.username,
-    })
+    return Response({'access': str(refresh.access_token), 'refresh': str(refresh)})
 
 
 def _anonimizar(nome):

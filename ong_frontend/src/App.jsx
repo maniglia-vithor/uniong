@@ -14,9 +14,16 @@ import Relatorios from './pages/Relatorios'
 import Configuracoes from './pages/Configuracoes'
 import Transparencia from './pages/Transparencia'
 
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
+
+function ProvedorGoogle({ children }) {
+  if (!GOOGLE_CLIENT_ID) return children
+  return <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>{children}</GoogleOAuthProvider>
+}
+
 export default function App() {
   return (
-    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''}>
+    <ProvedorGoogle>
     <AuthProvider>
       <BrowserRouter>
         <Routes>
@@ -45,6 +52,6 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
-    </GoogleOAuthProvider>
+    </ProvedorGoogle>
   )
 }

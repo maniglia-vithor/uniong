@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, LogIn } from 'lucide-react'
-import { useGoogleLogin } from '@react-oauth/google'
+import { GoogleLogin } from '@react-oauth/google'
 import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
 import logoUniONG from '../assets/Gemini_Generated_Image_g792fng792fng792.jpg'
 
+const GOOGLE_ATIVO = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID)
+
 export default function Login() {
-  const { login } = useAuth()
+  const { login, entrarComTokens } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState({ username: '', password: '' })
   const [mostrarSenha, setMostrarSenha] = useState(false)
@@ -15,34 +17,19 @@ export default function Login() {
   const [carregandoGoogle, setCarregandoGoogle] = useState(false)
   const [erro, setErro] = useState(null)
 
-  const googleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setCarregandoGoogle(true)
-      setErro(null)
-      try {
-        // Troca o access_token do Google pelo id_token via userinfo
-        const userInfo = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-        })
-        // Envia o sub (id único) + email para o backend gerar JWT local
-        const { data } = await axios.post('/api/auth/google/', {
-          id_token: tokenResponse.access_token,
-          email: userInfo.data.email,
-          nome: userInfo.data.name,
-        })
-        const dadosUsuario = { username: data.username, access: data.access, refresh: data.refresh }
-        localStorage.setItem('ong_usuario', JSON.stringify(dadosUsuario))
-        localStorage.setItem('ong_access', data.access)
-        localStorage.setItem('ong_refresh', data.refresh)
-        navigate('/admin', { replace: true })
-      } catch {
-        setErro('Falha ao autenticar com o Google. Tente novamente.')
-      } finally {
-        setCarregandoGoogle(false)
-      }
-    },
-    onError: () => setErro('Login com Google cancelado ou falhou.'),
-  })
+  async function onGoogleSuccess({ credential }) {
+    setCarregandoGoogle(true)
+    setErro(null)
+    try {
+      const { data } = await axios.post('/api/auth/google/', { credential })
+      await entrarComTokens(data.access, data.refresh)
+      navigate('/admin', { replace: true })
+    } catch (err) {
+      setErro(err.response?.data?.erro ?? 'Falha ao autenticar com o Google. Tente novamente.')
+    } finally {
+      setCarregandoGoogle(false)
+    }
+  }
 
   function onChange(e) {
     setErro(null)
@@ -234,36 +221,32 @@ export default function Login() {
               </div>
             </form>
 
-            {/* Divider */}
-            <div className="flex items-center gap-3 my-5">
-              <div className="flex-1 h-px bg-[var(--border)]" />
-              <span className="text-xs text-[var(--text-muted)] font-medium">OU</span>
-              <div className="flex-1 h-px bg-[var(--border)]" />
-            </div>
+            {GOOGLE_ATIVO && (
+              <>
+                <div className="flex items-center gap-3 my-5">
+                  <div className="flex-1 h-px bg-[var(--border)]" />
+                  <span className="text-xs text-[var(--text-muted)] font-medium">OU</span>
+                  <div className="flex-1 h-px bg-[var(--border)]" />
+                </div>
 
-            {/* Botão Google */}
-            <button
-              type="button"
-              onClick={() => googleLogin()}
-              disabled={carregandoGoogle}
-              className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors border disabled:opacity-60"
-              style={{ color: 'var(--text-primary)', borderColor: 'var(--border)', backgroundColor: 'var(--bg-card-alt)' }}
-              onMouseEnter={e => { if (!carregandoGoogle) e.currentTarget.style.backgroundColor = 'var(--bg-hover)' }}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--bg-card-alt)'}
-            >
-              {carregandoGoogle ? (
-                <div className="w-4 h-4 border-2 border-[var(--border)] border-t-[var(--text-secondary)] rounded-full animate-spin" />
-              ) : (
-                <svg width="16" height="16" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                  <path fill="none" d="M0 0h48v48H0z"/>
-                </svg>
-              )}
-              {carregandoGoogle ? 'Autenticando...' : 'Entrar com o Google'}
-            </button>
+                <div className="flex justify-center">
+                  {carregandoGoogle ? (
+                    <div className="flex items-center gap-2 text-sm text-[var(--text-muted)] py-2">
+                      <div className="w-4 h-4 border-2 border-[var(--border)] border-t-[var(--text-secondary)] rounded-full animate-spin" />
+                      Autenticando...
+                    </div>
+                  ) : (
+                    <GoogleLogin
+                      onSuccess={onGoogleSuccess}
+                      onError={() => setErro('Login com Google cancelado ou falhou.')}
+                      text="signin_with"
+                      locale="pt-BR"
+                      width="320"
+                    />
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           <p className="text-center text-xs text-[var(--text-muted)] mt-5">
