@@ -1,7 +1,10 @@
+import os
+
 from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import serializers
 from .models import Apoiador, Campanha, Contribuicao, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoInstituicao, ConfiguracaoPix, LogAlteracao
+from .documentos import formatar_documento, normalizar_documento
 from .normalizacao import normalizar_celular, normalizar_email
 from .pix import normalizar_chave_pix
 
@@ -20,10 +23,53 @@ class LogAlteracaoSerializer(serializers.ModelSerializer):
         return obj.usuario.get_full_name() or obj.usuario.username
 
 
+CAMPOS_PUBLICOS_INSTITUICAO = [
+    'nome', 'cnpj', 'descricao', 'email', 'telefone', 'endereco', 'site', 'instagram', 'facebook', 'linkedin', 'youtube',
+]
+
+
 class ConfiguracaoInstituicaoSerializer(serializers.ModelSerializer):
+    cnpj = serializers.CharField(required=False, allow_blank=True, max_length=18)
+    logo_url = serializers.SerializerMethodField()
+    cnpj_formatado = serializers.SerializerMethodField()
+
     class Meta:
         model = ConfiguracaoInstituicao
-        fields = ['portal_ativo']
+        fields = ['portal_ativo', *CAMPOS_PUBLICOS_INSTITUICAO, 'cnpj_formatado', 'logo_url']
+
+    def get_logo_url(self, obj):
+        return logo_url(obj)
+
+    def get_cnpj_formatado(self, obj):
+        return formatar_documento(obj.cnpj)
+
+    def validate_cnpj(self, value):
+        try:
+            return normalizar_documento(value, aceitar=('cnpj',))
+        except ValueError as e:
+            raise serializers.ValidationError(str(e))
+
+    def validate_email(self, value):
+        return normalizar_email(value) if value else ''
+
+    def validate_telefone(self, value):
+        try:
+            return normalizar_celular(value) or ''
+        except ValueError:
+            raise serializers.ValidationError('Telefone inválido. Informe DDD e número (10 ou 11 dígitos).')
+
+
+def logo_url(config):
+    if not config.logo:
+        return None
+    # O nome do arquivo entra na URL para que um logo novo não fique preso no cache do navegador.
+    return f'/api/public/instituicao/logo/?v={os.path.basename(config.logo.name)}'
+
+
+def dados_publicos_instituicao(config):
+    dados = {campo: getattr(config, campo) for campo in CAMPOS_PUBLICOS_INSTITUICAO}
+    dados.update(cnpj_formatado=formatar_documento(config.cnpj), logo_url=logo_url(config))
+    return dados
 
 
 class ConfiguracaoPixSerializer(serializers.ModelSerializer):

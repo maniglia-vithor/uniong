@@ -7,7 +7,8 @@ import {
 import { useAuth } from '../context/AuthContext'
 
 import api, { buscarTodas } from '../services/api'
-import logoIcon from '../assets/Gemini_Generated_Image_g792fng792fng792.jpg'
+import useInstituicao from '../hooks/useInstituicao'
+import LogoInstituicao from './LogoInstituicao'
 import RecordDetailDrawer, { TIPOS_COM_DETALHE } from './RecordDetailDrawer'
 
 const navItems = [
@@ -63,6 +64,7 @@ function avatarCor(nome = '') {
 }
 
 export default function Layout() {
+  const instituicao = useInstituicao()
   const { pathname } = useLocation()
   const { usuario, logout } = useAuth()
   const navigate = useNavigate()
@@ -150,13 +152,9 @@ export default function Layout() {
         <aside className="w-64 flex-shrink-0 flex flex-col" style={{ backgroundColor: '#0f4c5c' }}>
           {/* Branding */}
           <div className="flex items-center gap-3 px-5 py-4 border-b border-white/10">
-            <img
-              src={logoIcon}
-              alt="UniONG"
-              className="w-9 h-9 rounded-lg object-contain flex-shrink-0"
-            />
-            <div>
-              <p className="text-white font-bold text-sm leading-tight">UniONG</p>
+            <LogoInstituicao instituicao={instituicao} claro />
+            <div className="min-w-0">
+              <p className="text-white font-bold text-sm leading-tight truncate" title={instituicao.nome}>{instituicao.nome}</p>
               <p className="text-white/50 text-xs">Painel Administrativo</p>
             </div>
           </div>

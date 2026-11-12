@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react'
-import { User, Shield, Palette, Save, Eye, EyeOff, Download, Sun, Moon } from 'lucide-react'
+import { useCallback, useState, useEffect } from 'react'
+import { User, Shield, Palette, Save, Eye, EyeOff, Download, Sun, Moon, Building2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import api, { buscarTodas } from '../services/api'
 import { mensagemErro } from '../utils/formatos'
+import FormInstituicao from '../components/FormInstituicao'
 
 const ABAS = [
   { id: 'aparencia', label: 'Aparência', icon: Palette },
   { id: 'perfil', label: 'Perfil', icon: User },
   { id: 'privacidade', label: 'Privacidade & Dados', icon: Shield },
+  { id: 'instituicao', label: 'Instituição', icon: Building2, soSuperusuario: true },
 ]
 
 const inputCls = 'w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500 bg-[var(--bg-input)] text-[var(--text-primary)] disabled:opacity-60'
@@ -75,10 +77,10 @@ export default function Configuracoes() {
     api.get('/configuracoes/instituicao/').then((r) => setPortalAtivo(r.data.portal_ativo)).catch(() => {})
   }, [])
 
-  function avisar(tipo, texto) {
+  const avisar = useCallback((tipo, texto) => {
     setMensagem({ tipo, texto })
     setTimeout(() => setMensagem(null), 4000)
-  }
+  }, [])
 
   async function salvarPerfil(e) {
     e.preventDefault()
@@ -170,7 +172,7 @@ export default function Configuracoes() {
 
       <div className="flex flex-col sm:flex-row gap-6">
         <nav className="sm:w-48 flex-shrink-0 flex sm:flex-col gap-1" aria-label="Seções das configurações">
-          {ABAS.map(({ id, label, icon: Icon }) => (
+          {ABAS.filter((a) => !a.soSuperusuario || ehSuperusuario).map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setAba(id)}
@@ -260,6 +262,8 @@ export default function Configuracoes() {
             </>
           )}
 
+          {aba === 'instituicao' && ehSuperusuario && <FormInstituicao avisar={avisar} />}
+
           {aba === 'privacidade' && (
             <>
               {!ehSuperusuario && (
@@ -288,7 +292,7 @@ export default function Configuracoes() {
                     placeholder="CPF, CNPJ, e-mail, telefone (+55...) ou chave aleatória"
                     onChange={(e) => setPix((p) => ({ ...p, chave: e.target.value }))} />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <CampoTexto id="pix-nome" rotulo="Nome do recebedor" value={pix.nome_recebedor} maxLength={25} placeholder="UniONG"
+                    <CampoTexto id="pix-nome" rotulo="Nome do recebedor" value={pix.nome_recebedor} maxLength={25} placeholder="Como no cadastro do banco"
                       onChange={(e) => setPix((p) => ({ ...p, nome_recebedor: e.target.value }))} />
                     <CampoTexto id="pix-cidade" rotulo="Cidade" value={pix.cidade} maxLength={15} placeholder="São Paulo"
                       onChange={(e) => setPix((p) => ({ ...p, cidade: e.target.value }))} />

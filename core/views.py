@@ -30,7 +30,7 @@ from .paginacao import filtrar_periodo
 from .portal import CATEGORIA_AGREGADA, despesas_publicas
 from .pix import mascarar
 from .throttles import AuthThrottle, DoacaoPublicaThrottle
-from .serializers import ApoiadorSerializer, CampanhaSerializer, ContribuicaoSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer, ConfiguracaoInstituicaoSerializer, LogAlteracaoSerializer
+from .serializers import ApoiadorSerializer, CampanhaSerializer, ContribuicaoSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer, ConfiguracaoInstituicaoSerializer, LogAlteracaoSerializer, dados_publicos_instituicao
 
 
 def _notificar_admins(mensagem, tipo, actor_name='', action_text='', target_type='', target_id=None):
@@ -706,12 +706,55 @@ def configuracao_instituicao(request):
     serializer.is_valid(raise_exception=True)
     serializer.save()
     for campo, novo in serializer.data.items():
-        if antes.get(campo) != novo:
+        if campo not in ('cnpj_formatado', 'logo_url') and antes.get(campo) != novo:
             LogAlteracao.objects.create(
                 usuario=request.user, modelo='ConfiguracaoInstituicao', objeto_id=config.pk,
                 campo=campo, antes=str(antes.get(campo)), depois=str(novo),
             )
     return Response(serializer.data)
+
+
+@api_view(['POST', 'DELETE'])
+def logo_instituicao(request):
+    """POST (multipart, campo "logo") envia o logo; DELETE remove. Só superusuário."""
+    if not request.user.is_superuser:
+        return Response({'erro': 'Apenas superusuários podem alterar o logo da instituição.'}, status=403)
+    config = ConfiguracaoInstituicao.obter()
+    anterior = config.logo.name if config.logo else ''
+    if request.method == 'POST':
+        arquivo = request.FILES.get('logo')
+        if arquivo is None:
+            return Response({'logo': 'Envie um arquivo no campo "logo".'}, status=400)
+        try:
+            validar_imagem(arquivo)
+        except ValueError as e:
+            return Response({'logo': str(e)}, status=400)
+    if config.logo:
+        config.logo.delete(save=False)
+    config.logo = arquivo if request.method == 'POST' else ''
+    config.save(update_fields=['logo'])
+    registrar_auditoria(request.user, config, 'edicao', 'logo', anterior, config.logo.name if config.logo else '')
+    return Response(ConfiguracaoInstituicaoSerializer(config).data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def instituicao_publica(request):
+    """Nome, contatos e logo da instituição (usados no portal, no login e no painel)."""
+    return Response(dados_publicos_instituicao(ConfiguracaoInstituicao.obter()))
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def logo_publico(request):
+    config = ConfiguracaoInstituicao.obter()
+    if not config.logo or not config.logo.storage.exists(config.logo.name):
+        return Response({'erro': 'Logo não cadastrado.'}, status=404)
+    extensao = os.path.splitext(config.logo.name)[1].lower()
+    resposta = FileResponse(config.logo.open('rb'), content_type=TIPOS_PERMITIDOS.get(extensao, 'application/octet-stream'))
+    resposta['X-Content-Type-Options'] = 'nosniff'
+    resposta['Cache-Control'] = 'public, max-age=86400'
+    return resposta
 
 
 CAMPOS_PIX = {'chave': 'chave', 'nome_recebedor': 'nome do recebedor', 'cidade': 'cidade'}

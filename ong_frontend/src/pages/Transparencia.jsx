@@ -18,7 +18,9 @@ import PrestacaoContas from '../components/PrestacaoContas'
 import ListaDespesasPublicas from '../components/ListaDespesasPublicas'
 import { mensagemErro } from '../utils/formatos'
 import { useAuth } from '../context/AuthContext'
-import logoUniONG from '../assets/Gemini_Generated_Image_g792fng792fng792.jpg'
+import useInstituicao from '../hooks/useInstituicao'
+import LogoInstituicao from '../components/LogoInstituicao'
+import RodapeInstituicao from '../components/RodapeInstituicao'
 
 // Data de referência fixada ao carregar a página (evita chamar Date durante a renderização).
 const HOJE = new Date()
@@ -309,6 +311,7 @@ function Comunicados({ lista }) {
 
 /* ─── Main Page ─────────────────────────────────────────────────────────── */
 export default function Transparencia() {
+  const instituicao = useInstituicao()
   const { autenticado } = useAuth()
   const [dados, setDados] = useState(null)
   const [carregando, setCarregando] = useState(true)
@@ -376,12 +379,14 @@ export default function Transparencia() {
         {/* Hero Banner */}
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-6 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
-            <img src={logoUniONG} alt="UniONG" className="h-16 w-16 object-contain rounded-xl flex-shrink-0" />
+            <LogoInstituicao instituicao={instituicao} className="h-16 w-16 text-2xl" />
             <div>
+              {instituicao.configurada && (
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#0f4c5c' }}>{instituicao.nome}</p>
+              )}
               <h1 className="text-2xl font-bold text-[var(--text-primary)]">Portal de Transparência</h1>
               <p className="text-sm text-[var(--text-secondary)] mt-1 max-w-xl">
-                Acompanhe em tempo real o impacto das nossas campanhas, o total arrecadado
-                e como cada doação está sendo utilizada pela nossa comunidade.
+                {instituicao.descricao || 'Acompanhe em tempo real o impacto das nossas campanhas, o total arrecadado e como cada doação está sendo utilizada pela nossa comunidade.'}
               </p>
             </div>
           </div>
@@ -557,8 +562,11 @@ export default function Transparencia() {
 
       {/* Footer */}
       <footer className="border-t border-[var(--border)] bg-[var(--bg-card)] mt-12">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between text-xs text-[var(--text-muted)]">
-          <span>© {HOJE.getFullYear()} UniONG · Portal de Transparência</span>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-5">
+          <RodapeInstituicao instituicao={instituicao} />
+        </div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 flex flex-wrap gap-2 items-center justify-between text-xs text-[var(--text-muted)]">
+          <span>© {HOJE.getFullYear()} {instituicao.nome} · Portal de Transparência · desenvolvido com UniONG</span>
           <Link to="/login" className="flex items-center gap-1 hover:text-[var(--text-secondary)] transition-colors">
             <ExternalLink size={11} /> Acesso Administrativo
           </Link>

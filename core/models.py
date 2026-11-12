@@ -445,9 +445,21 @@ class LogAlteracao(models.Model):
 
 
 class ConfiguracaoInstituicao(models.Model):
-    """Registro único com as configurações da instituição (ampliado na fase 5)."""
+    """Registro único com os dados públicos e as configurações da instituição."""
 
     portal_ativo = models.BooleanField(default=True)
+    nome = models.CharField(max_length=150, blank=True, default='')
+    cnpj = models.CharField(max_length=14, blank=True, default='')  # só dígitos
+    descricao = models.CharField(max_length=300, blank=True, default='')
+    logo = models.FileField(upload_to='instituicao/', blank=True, default='')
+    email = models.EmailField(blank=True, default='')
+    telefone = models.CharField(max_length=20, blank=True, default='')
+    endereco = models.CharField(max_length=255, blank=True, default='')
+    site = models.URLField(blank=True, default='')
+    instagram = models.URLField(blank=True, default='')
+    facebook = models.URLField(blank=True, default='')
+    linkedin = models.URLField(blank=True, default='')
+    youtube = models.URLField(blank=True, default='')
 
     class Meta:
         verbose_name = 'Configuração da instituição'

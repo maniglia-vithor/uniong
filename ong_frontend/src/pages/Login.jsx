@@ -4,12 +4,14 @@ import { Eye, EyeOff, LogIn } from 'lucide-react'
 import { GoogleLogin } from '@react-oauth/google'
 import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
+import useInstituicao from '../hooks/useInstituicao'
 import logoUniONG from '../assets/Gemini_Generated_Image_g792fng792fng792.jpg'
 
 const GOOGLE_ATIVO = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID)
 
 export default function Login() {
   const { login, entrarComTokens } = useAuth()
+  const instituicao = useInstituicao()
   const navigate = useNavigate()
   const [form, setForm] = useState({ username: '', password: '' })
   const [mostrarSenha, setMostrarSenha] = useState(false)
@@ -136,7 +138,9 @@ export default function Login() {
 
             <div className="mb-6">
               <h2 className="text-xl font-bold text-[var(--text-primary)]">Bem-vindo de volta</h2>
-              <p className="text-sm text-[var(--text-muted)] mt-1">Acesse o painel administrativo</p>
+              <p className="text-sm text-[var(--text-muted)] mt-1">
+                Acesse o painel administrativo{instituicao.configurada ? ` de ${instituicao.nome}` : ''}
+              </p>
             </div>
 
             <form onSubmit={onSubmit} className="space-y-4">

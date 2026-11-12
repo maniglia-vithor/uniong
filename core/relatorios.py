@@ -12,7 +12,8 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from . import indicadores
-from .models import Apoiador, Campanha, Despesa, Doacao
+from .models import Apoiador, Campanha, ConfiguracaoInstituicao, Despesa, Doacao
+from .serializers import dados_publicos_instituicao
 from .paginacao import filtrar_periodo
 
 INICIOS_PERIGOSOS = ('=', '+', '-', '@', '\t', '\r')
@@ -128,6 +129,7 @@ def relatorio_prestacao_contas(request):
     total_receitas = indicadores.receitas_confirmadas(inicio, fim)
     total_despesas = indicadores.despesas_pagas(inicio, fim)
     return Response({
+        'instituicao': dados_publicos_instituicao(ConfiguracaoInstituicao.obter()),
         'data_inicio': inicio.isoformat(),
         'data_fim': fim.isoformat(),
         'gerado_em': timezone.localtime().isoformat(),

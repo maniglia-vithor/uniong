@@ -97,6 +97,9 @@ def pagina_compartilhamento(request, pk):
         descricao = f'Arrecadados R$ {arrecadado} de R$ {meta}. {campanha.descricao[:160]}'.strip()
         imagem = request.build_absolute_uri(f'/api/public/campanhas/{pk}/imagem/') if campanha.imagem else ''
     meta_imagem = f'<meta property="og:image" content="{escape(imagem)}">\n  ' if imagem else ''
+    nome_instituicao = ConfiguracaoInstituicao.obter().nome
+    if nome_instituicao:
+        meta_imagem += f'<meta property="og:site_name" content="{escape(nome_instituicao)}">\n  '
     html = f"""<!doctype html>
 <html lang="pt-BR">
 <head>

@@ -62,6 +62,18 @@ export default function PrestacaoContasImpressao() {
 
       <main className="max-w-3xl mx-auto px-8 py-10 space-y-8">
         <header className="border-b-2 border-slate-800 pb-4">
+          {dados.instituicao?.nome && (
+            <div className="flex items-center gap-3 mb-3">
+              {dados.instituicao.logo_url && <img src={dados.instituicao.logo_url} alt="" className="h-12 w-12 object-contain" />}
+              <div>
+                <p className="font-bold">{dados.instituicao.nome}</p>
+                <p className="text-xs text-slate-600">
+                  {[dados.instituicao.cnpj_formatado && `CNPJ ${dados.instituicao.cnpj_formatado}`, dados.instituicao.endereco, dados.instituicao.email]
+                    .filter(Boolean).join(' · ')}
+                </p>
+              </div>
+            </div>
+          )}
           <h1 className="text-2xl font-bold">Prestação de contas</h1>
           <p className="text-sm text-slate-600 mt-1">
             Período: {formatData(dados.data_inicio)} a {formatData(dados.data_fim)} · Gerado em {new Date(dados.gerado_em).toLocaleString('pt-BR')}
@@ -108,7 +120,7 @@ export default function PrestacaoContasImpressao() {
         </section>
 
         <footer className="text-xs text-slate-500 border-t border-slate-300 pt-3">
-          Relatório gerado pelo sistema UniONG. Valores de doações consideram apenas as confirmadas; despesas, apenas as pagas no período.
+          Relatório gerado com UniONG. Valores de doações consideram apenas as confirmadas; despesas, apenas as pagas no período.
         </footer>
       </main>
     </div>

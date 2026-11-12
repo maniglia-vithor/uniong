@@ -9,7 +9,7 @@ from .relatorios import (
 from .views import (
     ApoiadorViewSet, CampanhaViewSet, ContribuicaoViewSet, DoacaoViewSet, DashboardViewSet,
     ComunicadoViewSet, NotificacaoViewSet, DespesaViewSet, HistoricoViewSet,
-    painel_transparencia, public_doacao, configuracao_pix, configuracao_instituicao, google_login, prestacao_contas_publica, comprovante_publico,
+    painel_transparencia, public_doacao, configuracao_pix, configuracao_instituicao, logo_instituicao, instituicao_publica, logo_publico, google_login, prestacao_contas_publica, comprovante_publico,
 )
 
 router = DefaultRouter()
@@ -33,6 +33,9 @@ urlpatterns = router.urls + [
     path('public/despesas/<int:despesa_id>/comprovantes/<int:anexo_id>/', comprovante_publico, name='comprovante_publico'),
     path('configuracoes/pix/', configuracao_pix, name='configuracao_pix'),
     path('configuracoes/instituicao/', configuracao_instituicao, name='configuracao_instituicao'),
+    path('configuracoes/instituicao/logo/', logo_instituicao, name='logo_instituicao'),
+    path('public/instituicao/', instituicao_publica, name='instituicao_publica'),
+    path('public/instituicao/logo/', logo_publico, name='logo_publico'),
     path('auth/google/', google_login, name='google_login'),
     path('relatorios/doacoes/', relatorio_doacoes, name='relatorio_doacoes'),
     path('relatorios/campanhas/', relatorio_campanhas, name='relatorio_campanhas'),

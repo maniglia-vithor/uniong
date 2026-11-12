@@ -59,11 +59,11 @@ class PortalAtivoTests(APITestCase):
 
     def test_so_superuser_altera_e_gera_log(self):
         self.client.force_authenticate(self.staff)
-        self.assertEqual(self.client.get('/api/configuracoes/instituicao/').data, {'portal_ativo': True})
+        self.assertEqual(self.client.get('/api/configuracoes/instituicao/').data['portal_ativo'], True)
         self.assertEqual(self.client.patch('/api/configuracoes/instituicao/', {'portal_ativo': False}, format='json').status_code, 403)
         self.client.force_authenticate(self.super)
         resp = self.client.patch('/api/configuracoes/instituicao/', {'portal_ativo': False}, format='json')
-        self.assertEqual(resp.data, {'portal_ativo': False})
+        self.assertIs(resp.data['portal_ativo'], False)
         self.assertTrue(LogAlteracao.objects.filter(modelo='ConfiguracaoInstituicao', campo='portal_ativo').exists())
         self.client.force_authenticate(None)
         self.assertEqual(self.client.get('/api/public/transparencia/').status_code, 404)
