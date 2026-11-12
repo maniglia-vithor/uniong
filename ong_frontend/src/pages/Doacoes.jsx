@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Pencil, Trash2, Plus } from 'lucide-react'
-import { useOutletContext } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
 import Modal from '../components/Modal'
 import { Campo, Input, Select, BotaoSubmit, BotaoCancelar } from '../components/CampoForm'
 import CampoData from '../components/CampoData'
@@ -324,6 +324,12 @@ export default function Doacoes() {
                               Cancelar
                             </button>
                           </>
+                        )}
+                        {d.status === 'confirmada' && (
+                          <Link to={`/admin/doacoes/${d.id}/recibo`} title={d.recibo_numero ? `Recibo nº ${d.recibo_numero}` : 'Gerar recibo'}
+                            className="px-2 py-1 rounded-lg text-[11px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] whitespace-nowrap">
+                            {d.recibo_numero ? 'Ver recibo' : 'Gerar recibo'}
+                          </Link>
                         )}
                         <button onClick={() => abrirEdicao(d)} aria-label="Editar doação" className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-600 transition-colors">
                           <Pencil size={14} />

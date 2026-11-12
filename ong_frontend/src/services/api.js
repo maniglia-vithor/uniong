@@ -103,6 +103,8 @@ export const enviarComprovanteDoacao = (id, arquivo) => {
 }
 export const baixarComprovanteDoacao = (id) => api.get(`/doacoes/${id}/comprovante/`, { responseType: 'blob' })
 export const removerComprovanteDoacao = (id) => api.delete(`/doacoes/${id}/comprovante/`)
+export const emitirRecibo          = (id) => api.post(`/doacoes/${id}/recibo/`)
+export const enviarRecibo          = (id) => api.post(`/doacoes/${id}/recibo/enviar/`)
 
 // Contribuições periódicas
 export const getContribuicoes      = (params) => api.get('/contribuicoes/', { params })

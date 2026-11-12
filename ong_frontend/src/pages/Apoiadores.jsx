@@ -11,7 +11,7 @@ import useListaPaginada from '../hooks/useListaPaginada'
 import { formatBRL, formatCelular, formatData, mensagemErro } from '../utils/formatos'
 import { getApoiadores, criarApoiador, atualizarApoiador, excluirApoiador } from '../services/api'
 
-const VAZIO = { nome: '', email: '', celular: '', status: 'ativo' }
+const VAZIO = { nome: '', email: '', celular: '', documento: '', status: 'ativo' }
 
 function iniciais(nome) {
   return nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
@@ -34,7 +34,7 @@ export default function Apoiadores() {
 
   function abrirEdicao(item) {
     setEditando(item)
-    setForm({ nome: item.nome, email: item.email, celular: item.celular || '', status: item.status })
+    setForm({ nome: item.nome, email: item.email, celular: item.celular || '', documento: item.documento_formatado || '', status: item.status })
     setModal(true)
   }
 
@@ -174,6 +174,9 @@ export default function Apoiadores() {
             </Campo>
             <Campo label="Celular (opcional)">
               <Input name="celular" value={form.celular} onChange={onChange} placeholder="(11) 99999-9999" />
+            </Campo>
+            <Campo label="CPF ou CNPJ (opcional, aparece no recibo)">
+              <Input name="documento" value={form.documento} onChange={onChange} placeholder="000.000.000-00" inputMode="numeric" maxLength={18} />
             </Campo>
             <Campo label="Status">
               <Select name="status" value={form.status} onChange={onChange}>

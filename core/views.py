@@ -23,7 +23,7 @@ from django.db import transaction
 from .models import Apoiador, Campanha, Contribuicao, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoInstituicao, ConfiguracaoPix, LogAlteracao
 from .anexos import TIPOS_PERMITIDOS, validar_anexo
 from .doacao_publica import DoacaoPublicaSerializer, ativar_membro_interessado, registrar_doacao_publica
-from . import indicadores
+from . import indicadores, recibos
 from .auditoria import AuditoriaMixin, registrar as registrar_auditoria
 from .campanhas_publicas import avisar_meta_atingida, validar_imagem
 from .paginacao import filtrar_periodo
@@ -177,14 +177,15 @@ class CampanhaViewSet(AuditoriaMixin, ExclusaoProtegidaMixin, viewsets.ModelView
         )
 
 
-class DoacaoViewSet(AuditoriaMixin, viewsets.ModelViewSet):
+class DoacaoViewSet(AuditoriaMixin, ExclusaoProtegidaMixin, viewsets.ModelViewSet):
     serializer_class = DoacaoSerializer
+    mensagem_exclusao_protegida = 'Não é possível excluir: já foi emitido recibo para esta doação. Cancele-a, se for o caso.'
     search_fields = ['apoiador__nome', 'campanha__titulo', 'descricao_bens', 'observacao']
     ordering_fields = ['apoiador__nome', 'campanha__titulo', 'valor', 'data', 'status', 'forma_pagamento']
     ordering = ['-data', '-id']
 
     def get_queryset(self):
-        qs = Doacao.objects.select_related('apoiador', 'campanha')
+        qs = Doacao.objects.select_related('apoiador', 'campanha', 'recibo')
         status = self.request.query_params.get('status')
         campanha = self.request.query_params.get('campanha')
         apoiador = self.request.query_params.get('apoiador')
@@ -215,6 +216,25 @@ class DoacaoViewSet(AuditoriaMixin, viewsets.ModelViewSet):
             'bens_quantidade': bens['quantidade'],
             'bens_valor_estimado': float(bens['estimado'] or 0),
         })
+
+    @action(detail=True, methods=['post'], url_path='recibo')
+    def recibo(self, request, pk=None):
+        """Emite (ou devolve, com o mesmo número) o recibo da doação confirmada."""
+        try:
+            recibo = recibos.emitir(self.get_object(), request.user)
+        except recibos.ReciboIndisponivel as e:
+            return Response({'erro': str(e)}, status=400)
+        return Response(recibos.dados_recibo(recibo))
+
+    @action(detail=True, methods=['post'], url_path='recibo/enviar')
+    def enviar_recibo(self, request, pk=None):
+        try:
+            recibo = recibos.emitir(self.get_object(), request.user)
+            email = recibos.enviar_por_email(recibo)
+        except recibos.ReciboIndisponivel as e:
+            return Response({'erro': str(e)}, status=400)
+        registrar_auditoria(request.user, recibo.doacao, 'edicao', 'recibo', '', f'enviado para {email}')
+        return Response({'mensagem': f'Recibo enviado para {email}.', **recibos.dados_recibo(recibo)})
 
     @action(detail=True, methods=['get', 'post', 'delete'], url_path='comprovante')
     def comprovante(self, request, pk=None):

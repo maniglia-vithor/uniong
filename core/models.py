@@ -24,6 +24,8 @@ class Apoiador(models.Model):
     nome = models.CharField(max_length=150)
     email = models.EmailField(unique=True)
     celular = models.CharField(max_length=20, null=True, blank=True)
+    # CPF ou CNPJ, só dígitos (opcional; aparece no recibo).
+    documento = models.CharField(max_length=14, blank=True, default='')
     data_cadastro = models.DateField(auto_now_add=True)
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='ativo')
 
@@ -275,6 +277,34 @@ class Doacao(models.Model):
         if self.tipo == 'bens':
             return f'Bens — {self.nome_doador} em {self.data}'
         return f'R$ {self.valor} — {self.nome_doador} em {self.data}'
+
+
+class Recibo(models.Model):
+    """Recibo emitido para uma doação confirmada. O número é o id: sequencial e nunca reutilizado."""
+
+    doacao = models.OneToOneField(Doacao, on_delete=models.PROTECT, related_name='recibo')
+    emitido_em = models.DateTimeField(auto_now_add=True)
+    emitido_por = models.ForeignKey(
+        get_user_model(), on_delete=models.SET_NULL, null=True, blank=True, related_name='recibos_emitidos'
+    )
+    enviado_para = models.EmailField(blank=True, default='')
+    enviado_em = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Recibo'
+        verbose_name_plural = 'Recibos'
+        ordering = ['-id']
+
+    @property
+    def numero(self):
+        return self.pk
+
+    @property
+    def numero_formatado(self):
+        return f'{self.emitido_em:%Y}/{self.pk:06d}'
+
+    def __str__(self):
+        return f'Recibo nº {self.numero_formatado}'
 
 
 class Despesa(models.Model):

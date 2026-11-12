@@ -99,10 +99,21 @@ def _positivo(valor, mensagem):
 
 class ApoiadorSerializer(serializers.ModelSerializer):
     total_doado = serializers.SerializerMethodField()
+    documento_formatado = serializers.SerializerMethodField()
+    documento = serializers.CharField(required=False, allow_blank=True, max_length=18)
 
     class Meta:
         model = Apoiador
-        fields = ['id', 'nome', 'email', 'celular', 'data_cadastro', 'status', 'total_doado']
+        fields = ['id', 'nome', 'email', 'celular', 'documento', 'documento_formatado', 'data_cadastro', 'status', 'total_doado']
+
+    def get_documento_formatado(self, obj):
+        return formatar_documento(obj.documento)
+
+    def validate_documento(self, value):
+        try:
+            return normalizar_documento(value)
+        except ValueError as e:
+            raise serializers.ValidationError(str(e))
 
     def get_total_doado(self, obj):
         total = getattr(obj, 'total_doado', None)
@@ -230,6 +241,7 @@ class DoacaoSerializer(serializers.ModelSerializer):
     forma_pagamento_display = serializers.CharField(source='get_forma_pagamento_display', read_only=True)
     tem_comprovante = serializers.SerializerMethodField()
     anonima = serializers.SerializerMethodField()
+    recibo_numero = serializers.SerializerMethodField()
 
     class Meta:
         model = Doacao
@@ -237,13 +249,17 @@ class DoacaoSerializer(serializers.ModelSerializer):
             'id', 'apoiador', 'apoiador_nome', 'anonima', 'campanha', 'campanha_titulo',
             'tipo', 'valor', 'descricao_bens', 'valor_estimado',
             'data', 'status', 'origem', 'forma_pagamento', 'forma_pagamento_display', 'observacao',
-            'tem_comprovante', 'comprovante_nome', 'contribuicao', 'competencia', 'consentimento_em',
+            'tem_comprovante', 'comprovante_nome', 'contribuicao', 'competencia', 'consentimento_em', 'recibo_numero',
         ]
         read_only_fields = ['origem', 'consentimento_em', 'comprovante_nome', 'contribuicao', 'competencia']
         extra_kwargs = {'valor': {'required': False}}
 
     def get_tem_comprovante(self, obj):
         return bool(obj.comprovante)
+
+    def get_recibo_numero(self, obj):
+        recibo = getattr(obj, 'recibo', None)
+        return recibo.numero_formatado if recibo else None
 
     def get_anonima(self, obj):
         return obj.apoiador_id is None

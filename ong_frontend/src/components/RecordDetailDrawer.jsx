@@ -63,6 +63,11 @@ function DetalheDoacao({ record, onEdit }) {
       </div>
       {record.tipo === 'bens' && <InfoBox label="Itens doados" value={record.descricao_bens} />}
       {record.observacao && <InfoBox label="Observação" value={record.observacao} />}
+      {record.status === 'confirmada' && (
+        <a href={`/admin/doacoes/${record.id}/recibo`} className="block text-xs font-semibold underline" style={{ color: '#0f4c5c' }}>
+          {record.recibo_numero ? `Ver recibo nº ${record.recibo_numero}` : 'Gerar recibo'}
+        </a>
+      )}
       {record.tem_comprovante && (
         <button type="button" onClick={() => baixarDoComprovante(record)}
           className="text-xs font-semibold underline" style={{ color: '#0f4c5c' }}>
