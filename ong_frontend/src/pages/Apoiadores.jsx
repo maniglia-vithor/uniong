@@ -5,6 +5,7 @@ import Modal from '../components/Modal'
 import { Campo, Input, Select, BotaoSubmit, BotaoCancelar } from '../components/CampoForm'
 import BadgeStatus from '../components/BadgeStatus'
 import TabelaVazia from '../components/TabelaVazia'
+import { formatCelular, mensagemErro } from '../utils/formatos'
 import { getApoiadores, criarApoiador, atualizarApoiador, excluirApoiador } from '../services/api'
 
 const VAZIO = { nome: '', email: '', celular: '', status: 'ativo' }
@@ -117,8 +118,8 @@ export default function Apoiadores() {
       }
       fechar()
       carregar()
-    } catch {
-      alert('Erro ao salvar. Verifique os dados e tente novamente.')
+    } catch (err) {
+      alert(mensagemErro(err))
     } finally {
       setSalvando(false)
     }
@@ -129,8 +130,8 @@ export default function Apoiadores() {
     try {
       await excluirApoiador(id)
       carregar()
-    } catch {
-      alert('Não é possível excluir: este membro possui doações vinculadas.')
+    } catch (err) {
+      alert(mensagemErro(err, 'Não foi possível excluir o membro.'))
     }
   }
 
@@ -187,7 +188,7 @@ export default function Apoiadores() {
                       </div>
                     </td>
                     <td className="px-5 py-3 text-[var(--text-secondary)]">{a.email}</td>
-                    <td className="px-5 py-3 text-[var(--text-secondary)]">{a.celular || <span className="text-[var(--text-muted)]">—</span>}</td>
+                    <td className="px-5 py-3 text-[var(--text-secondary)]">{a.celular ? formatCelular(a.celular) : <span className="text-[var(--text-muted)]">—</span>}</td>
                     <td className="px-5 py-3 text-[var(--text-secondary)]">{formatData(a.data_cadastro)}</td>
                     <td className="px-5 py-3 text-right font-semibold text-[var(--text-primary)]">{formatBRL(a.total_doado)}</td>
                     <td className="px-5 py-3"><BadgeStatus status={a.status} /></td>

@@ -9,7 +9,7 @@ from google.auth.exceptions import GoogleAuthError
 from google.auth.transport import requests as google_requests
 from rest_framework_simplejwt.tokens import RefreshToken
 from dateutil.relativedelta import relativedelta
-from django.db.models import Sum, Q
+from django.db.models import ProtectedError, Q, Sum
 from django.http import FileResponse, HttpResponse
 from rest_framework import viewsets
 from rest_framework.permissions import AllowAny
@@ -21,6 +21,7 @@ from django.db import transaction
 
 from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoPix, LogAlteracao
 from .anexos import TIPOS_PERMITIDOS, validar_anexo
+from .normalizacao import normalizar_email
 from .pix import mascarar
 from .throttles import AuthThrottle, DoacaoPublicaThrottle
 from .serializers import ApoiadorSerializer, CampanhaSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer
@@ -42,9 +43,23 @@ def _notificar_admins(mensagem, tipo, actor_name='', action_text='', target_type
     ])
 
 
-class ApoiadorViewSet(viewsets.ModelViewSet):
+class ExclusaoProtegidaMixin:
+    """Responde 400 com mensagem clara quando o registro tem dependentes protegidos (PROTECT)."""
+
+    mensagem_exclusao_protegida = 'Este registro não pode ser excluído porque possui registros vinculados.'
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            with transaction.atomic():
+                return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            return Response({'erro': self.mensagem_exclusao_protegida}, status=400)
+
+
+class ApoiadorViewSet(ExclusaoProtegidaMixin, viewsets.ModelViewSet):
     queryset = Apoiador.objects.all()
     serializer_class = ApoiadorSerializer
+    mensagem_exclusao_protegida = 'Não é possível excluir: este membro possui doações vinculadas.'
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -66,9 +81,12 @@ class ApoiadorViewSet(viewsets.ModelViewSet):
         )
 
 
-class CampanhaViewSet(viewsets.ModelViewSet):
+class CampanhaViewSet(ExclusaoProtegidaMixin, viewsets.ModelViewSet):
     queryset = Campanha.objects.com_arrecadado().order_by('-data_inicio', '-id')
     serializer_class = CampanhaSerializer
+    mensagem_exclusao_protegida = (
+        'Não é possível excluir: existem doações vinculadas a esta campanha. Encerre a campanha em vez de excluí-la.'
+    )
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -745,7 +763,7 @@ def configuracao_pix(request):
 def public_doacao(request):
     """Endpoint público para registrar intenção de doação."""
     nome = request.data.get('nome', '').strip()
-    email = request.data.get('email', '').strip()
+    email = normalizar_email(request.data.get('email', ''))
     celular = request.data.get('celular', '').strip()
     campaign_id = request.data.get('campaign_id')
     valor = request.data.get('valor', 0)

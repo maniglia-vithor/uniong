@@ -6,7 +6,8 @@ import { Campo, Input, Select, BotaoSubmit, BotaoCancelar } from '../components/
 import CampoData from '../components/CampoData'
 import BadgeStatus from '../components/BadgeStatus'
 import BarraProgresso from '../components/BarraProgresso'
-import { getCampanhas, criarCampanha, atualizarCampanha, excluirCampanha } from '../services/api'
+import { formatData, mensagemErro } from '../utils/formatos'
+import { getCampanhas, criarCampanha, atualizarCampanha, excluirCampanha, encerrarCampanha } from '../services/api'
 
 const VAZIO = { titulo: '', meta_valor: '', status: 'ativa', data_inicio: '', data_fim: '', descricao: '' }
 
@@ -87,8 +88,8 @@ export default function Campanhas() {
       }
       fechar()
       carregar()
-    } catch {
-      alert('Erro ao salvar. Verifique os dados.')
+    } catch (err) {
+      alert(mensagemErro(err))
     } finally {
       setSalvando(false)
     }
@@ -99,8 +100,18 @@ export default function Campanhas() {
     try {
       await excluirCampanha(id)
       carregar()
-    } catch {
-      alert('Não é possível excluir: existem doações vinculadas a esta campanha.')
+    } catch (err) {
+      alert(mensagemErro(err, 'Não foi possível excluir a campanha.'))
+    }
+  }
+
+  async function onEncerrar(campanha) {
+    if (!confirm(`Encerrar a campanha "${campanha.titulo}"? Ela deixa de receber doações.`)) return
+    try {
+      await encerrarCampanha(campanha.id)
+      carregar()
+    } catch (err) {
+      alert(mensagemErro(err, 'Não foi possível encerrar a campanha.'))
     }
   }
 
@@ -172,8 +183,16 @@ export default function Campanhas() {
               </div>
 
               <div className="flex items-center justify-between mt-auto pt-2 border-t border-[var(--border-subtle)]">
-                <span className="text-xs text-[var(--text-muted)]">Início: {c.data_inicio}</span>
-                <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                <span className="text-xs text-[var(--text-muted)]">Início: {formatData(c.data_inicio)}</span>
+                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  {c.status !== 'encerrada' && (
+                    <button
+                      onClick={() => onEncerrar(c)}
+                      className="px-2 py-1 rounded-lg text-[11px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                    >
+                      Encerrar campanha
+                    </button>
+                  )}
                   <button onClick={() => abrirEdicao(c)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-600 transition-colors">
                     <Pencil size={14} />
                   </button>

@@ -78,6 +78,7 @@ export const getCampanhas          = () => api.get('/campanhas/')
 export const criarCampanha         = (data) => api.post('/campanhas/', data)
 export const atualizarCampanha     = (id, data) => api.put(`/campanhas/${id}/`, data)
 export const excluirCampanha       = (id) => api.delete(`/campanhas/${id}/`)
+export const encerrarCampanha      = (id) => api.patch(`/campanhas/${id}/`, { status: 'encerrada' })
 
 // Doações
 export const getDoacoes            = () => api.get('/doacoes/')

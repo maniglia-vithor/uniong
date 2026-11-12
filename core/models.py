@@ -126,7 +126,7 @@ class Doacao(models.Model):
         Apoiador, on_delete=models.PROTECT, related_name='doacoes'
     )
     campanha = models.ForeignKey(
-        Campanha, on_delete=models.SET_NULL, null=True, blank=True, related_name='doacoes'
+        Campanha, on_delete=models.PROTECT, null=True, blank=True, related_name='doacoes'
     )
     valor = models.DecimalField(max_digits=10, decimal_places=2)
     data = models.DateField()

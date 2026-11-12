@@ -6,6 +6,7 @@ import { Campo, Input, Select, BotaoSubmit, BotaoCancelar } from '../components/
 import CampoData from '../components/CampoData'
 import BadgeStatus from '../components/BadgeStatus'
 import TabelaVazia from '../components/TabelaVazia'
+import { mensagemErro } from '../utils/formatos'
 import { getDoacoes, criarDoacao, atualizarDoacao, excluirDoacao, getApoiadores, getCampanhas } from '../services/api'
 
 const VAZIO = { apoiador: '', campanha: '', valor: '', data: '', status: 'confirmada' }
@@ -127,8 +128,8 @@ export default function Doacoes() {
       }
       fechar()
       carregar()
-    } catch {
-      alert('Erro ao salvar. Verifique os dados.')
+    } catch (err) {
+      alert(mensagemErro(err))
     } finally {
       setSalvando(false)
     }
