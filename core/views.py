@@ -25,7 +25,7 @@ from .anexos import TIPOS_PERMITIDOS, validar_anexo
 from .doacao_publica import DoacaoPublicaSerializer, ativar_membro_interessado, registrar_doacao_publica
 from . import indicadores
 from .paginacao import filtrar_periodo
-from .portal import despesas_publicas
+from .portal import CATEGORIA_AGREGADA, despesas_publicas
 from .pix import mascarar
 from .throttles import AuthThrottle, DoacaoPublicaThrottle
 from .serializers import ApoiadorSerializer, CampanhaSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer, ConfiguracaoInstituicaoSerializer
@@ -409,30 +409,26 @@ class DespesaViewSet(viewsets.ModelViewSet):
             return Response({'erro': 'Esta despesa não faz parte de uma série recorrente.'}, status=400)
         return Response({'atualizadas': despesa.aplicar_valor_as_proximas()})
 
-    @action(detail=True, methods=['delete'], url_path='anexos/(?P<anexo_id>[^/.]+)')
-    def remover_anexo(self, request, pk=None, anexo_id=None):
-        try:
-            anexo = DespesaAnexo.objects.get(pk=anexo_id, despesa_id=pk)
+    @action(detail=True, methods=['patch', 'delete'], url_path=r'anexos/(?P<anexo_id>\d+)')
+    def anexo(self, request, pk=None, anexo_id=None):
+        """PATCH {publico: bool} marca o comprovante como público; DELETE remove o anexo e o arquivo."""
+        anexo = DespesaAnexo.objects.filter(pk=anexo_id, despesa_id=pk).first()
+        if anexo is None:
+            return Response({'erro': 'Anexo não encontrado.'}, status=404)
+        if request.method == 'DELETE':
             anexo.arquivo.delete(save=False)
             anexo.delete()
             return Response(status=204)
-        except DespesaAnexo.DoesNotExist:
-            return Response({'erro': 'Anexo não encontrado.'}, status=404)
+        publico = request.data.get('publico')
+        if not isinstance(publico, bool):
+            return Response({'publico': 'Informe true ou false.'}, status=400)
+        anexo.publico = publico
+        anexo.save(update_fields=['publico'])
+        return Response(DespesaAnexoSerializer(anexo).data)
 
     @action(detail=True, methods=['get'], url_path=r'anexos/(?P<anexo_id>\d+)/download')
     def baixar_anexo(self, request, pk=None, anexo_id=None):
-        anexo = DespesaAnexo.objects.filter(pk=anexo_id, despesa_id=pk).first()
-        if anexo is None or not anexo.arquivo.storage.exists(anexo.arquivo.name):
-            return Response({'erro': 'Anexo não encontrado.'}, status=404)
-        extensao = os.path.splitext(anexo.arquivo.name)[1].lower()
-        resposta = FileResponse(
-            anexo.arquivo.open('rb'),
-            as_attachment=True,
-            filename=anexo.nome_original or os.path.basename(anexo.arquivo.name),
-            content_type=TIPOS_PERMITIDOS.get(extensao, 'application/octet-stream'),
-        )
-        resposta['X-Content-Type-Options'] = 'nosniff'
-        return resposta
+        return _resposta_anexo(DespesaAnexo.objects.filter(pk=anexo_id, despesa_id=pk).first())
 
     @action(detail=False, methods=['get'], url_path='resumo')
     def resumo(self, request):
@@ -504,7 +500,7 @@ def painel_transparencia(request):
     gastos_mes_qs = indicadores.despesas_pagas_no_mes()
     a_pagar_mes = indicadores.despesas_a_pagar_no_mes().aggregate(total=Sum('valor'))['total'] or 0
     gastos_mes_total = gastos_mes_qs.aggregate(total=Sum('valor'))['total'] or 0
-    gastos_mes_lista = despesas_publicas(gastos_mes_qs)
+    gastos_mes_lista = despesas_publicas(gastos_mes_qs.prefetch_related('anexos'))
 
     return Response({
         'kpis': {
@@ -535,6 +531,36 @@ def _portal_desligado():
 
 
 RESPOSTA_PORTAL_DESLIGADO = {'erro': 'Portal indisponível.'}
+
+
+def _resposta_anexo(anexo):
+    """Download seguro: sempre como anexo, com tipo fixo pela extensão e nosniff."""
+    if anexo is None or not anexo.arquivo.storage.exists(anexo.arquivo.name):
+        return Response({'erro': 'Anexo não encontrado.'}, status=404)
+    extensao = os.path.splitext(anexo.arquivo.name)[1].lower()
+    resposta = FileResponse(
+        anexo.arquivo.open('rb'),
+        as_attachment=True,
+        filename=anexo.nome_original or os.path.basename(anexo.arquivo.name),
+        content_type=TIPOS_PERMITIDOS.get(extensao, 'application/octet-stream'),
+    )
+    resposta['X-Content-Type-Options'] = 'nosniff'
+    return resposta
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def comprovante_publico(request, despesa_id, anexo_id):
+    """Comprovante marcado como público de uma despesa paga (fora de Recursos Humanos)."""
+    if _portal_desligado():
+        return Response(RESPOSTA_PORTAL_DESLIGADO, status=404)
+    anexo = (
+        DespesaAnexo.objects
+        .filter(pk=anexo_id, despesa_id=despesa_id, publico=True, despesa__status='pago')
+        .exclude(despesa__categoria=CATEGORIA_AGREGADA)
+        .first()
+    )
+    return _resposta_anexo(anexo)
 
 
 @api_view(['GET'])

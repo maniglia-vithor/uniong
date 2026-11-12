@@ -13,7 +13,7 @@ import { mensagemErro } from '../utils/formatos'
 import {
   getDespesas, criarDespesa, atualizarDespesa, excluirDespesa,
   removerAnexoDespesa, baixarAnexoDespesa, getDespesasResumo, getDespesasPorCategoria,
-  encerrarSerieDespesa, aplicarValorProximasDespesa, getCampanhasOpcoes,
+  encerrarSerieDespesa, aplicarValorProximasDespesa, getCampanhasOpcoes, marcarAnexoPublico,
 } from '../services/api'
 
 const VAZIO = {
@@ -161,6 +161,16 @@ export default function Custos() {
 
   function removerNovoAnexo(idx) {
     setNovosAnexos((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  async function alternarPublico(anexo, publico) {
+    try {
+      const { data } = await marcarAnexoPublico(editando.id, anexo.id, publico)
+      setEditando((prev) => ({ ...prev, anexos: prev.anexos.map((a) => (a.id === anexo.id ? data : a)) }))
+      carregar()
+    } catch (err) {
+      alert(mensagemErro(err, 'Não foi possível alterar o comprovante.'))
+    }
   }
 
   async function removerAnexoExistente(anexoId) {
@@ -492,8 +502,18 @@ export default function Custos() {
                         <Paperclip size={11} className="flex-shrink-0" />
                         {a.nome_original}
                       </button>
+                      <label className="flex items-center gap-1 text-[11px] text-[var(--text-secondary)] flex-shrink-0" title="Permitir download no portal de transparência">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(a.publico)}
+                          disabled={form.categoria === 'recursos_humanos'}
+                          onChange={(e) => alternarPublico(a, e.target.checked)}
+                        />
+                        Público no portal
+                      </label>
                       <button
                         type="button"
+                        aria-label={`Remover ${a.nome_original}`}
                         onClick={() => removerAnexoExistente(a.id)}
                         className="text-slate-300 hover:text-red-500 transition-colors flex-shrink-0"
                       >

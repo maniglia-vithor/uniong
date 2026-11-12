@@ -15,6 +15,7 @@ import axios from 'axios'
 import BarraProgresso from '../components/BarraProgresso'
 import QrCodePix, { qrComoArquivo } from '../components/QrCodePix'
 import PrestacaoContas from '../components/PrestacaoContas'
+import ListaDespesasPublicas from '../components/ListaDespesasPublicas'
 import { mensagemErro } from '../utils/formatos'
 import { useAuth } from '../context/AuthContext'
 import logoUniONG from '../assets/Gemini_Generated_Image_g792fng792fng792.jpg'
@@ -208,32 +209,11 @@ function GastosModal({ lista, total, onFechar }) {
   const mesAtual = HOJE.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
   return (
     <Overlay titulo={`Gastos do Mês — ${mesAtual}`} onFechar={onFechar} largura="max-w-xl">
-      {lista.length === 0 ? (
-        <p className="text-center py-8 text-[var(--text-muted)] text-sm">Nenhum gasto registrado neste mês.</p>
-      ) : (
-        <>
-          <table className="w-full text-sm mb-4">
-            <thead>
-              <tr className="border-b border-[var(--border)]">
-                <th className="text-left text-xs font-medium text-[var(--text-muted)] py-2">Descrição</th>
-                <th className="text-left text-xs font-medium text-[var(--text-muted)] py-2">Categoria</th>
-                <th className="text-right text-xs font-medium text-[var(--text-muted)] py-2">Valor</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border-subtle)]">
-              {lista.map((g, i) => (
-                <tr key={i} className="hover:bg-[var(--bg-hover)]">
-                  <td className="py-2.5 text-[var(--text-primary)] font-medium pr-4">{g.descricao}</td>
-                  <td className="py-2.5 text-[var(--text-secondary)]">{g.categoria}</td>
-                  <td className="py-2.5 text-right font-semibold text-[var(--text-primary)]">{formatBRL(g.valor)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="flex justify-end pt-2 border-t border-[var(--border)]">
-            <span className="text-sm font-bold text-[var(--text-primary)]">Total: {formatBRL(total)}</span>
-          </div>
-        </>
+      <ListaDespesasPublicas lista={lista} vazio="Nenhum gasto pago neste mês." />
+      {lista.length > 0 && (
+        <div className="flex justify-end pt-3 mt-3 border-t border-[var(--border)]">
+          <span className="text-sm font-bold text-[var(--text-primary)]">Total: {formatBRL(total)}</span>
+        </div>
       )}
     </Overlay>
   )

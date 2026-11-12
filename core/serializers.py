@@ -112,7 +112,8 @@ class DespesaAnexoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DespesaAnexo
-        fields = ['id', 'nome_original', 'url', 'enviado_em']
+        fields = ['id', 'nome_original', 'url', 'enviado_em', 'publico']
+        read_only_fields = ['publico']
 
     def get_url(self, obj):
         return f'/api/despesas/{obj.despesa_id}/anexos/{obj.id}/download/'

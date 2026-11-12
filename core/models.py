@@ -296,6 +296,8 @@ class DespesaAnexo(models.Model):
     arquivo = models.FileField(upload_to=caminho_anexo, storage=armazenamento_privado)
     nome_original = models.CharField(max_length=255, blank=True)
     enviado_em = models.DateTimeField(auto_now_add=True)
+    # Marcado pelo administrador: o comprovante pode ser baixado no portal de transparência.
+    publico = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = 'Anexo de Despesa'
