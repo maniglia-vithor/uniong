@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Download, HandCoins, Megaphone, Users, CheckCircle, AlertCircle } from 'lucide-react'
+import { Download, HandCoins, Megaphone, Users, CheckCircle, AlertCircle, Receipt, Scale } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import CampoData from '../components/CampoData'
 import { downloadRelatorio } from '../services/api'
 
@@ -29,7 +30,20 @@ const RELATORIOS = [
     icone: Users,
     cor: '#0891b2',
     arquivo: 'relatorio_membros.csv',
-    status: [['ativo', 'Ativos'], ['inativo', 'Inativos']],
+    status: [['ativo', 'Ativos'], ['inativo', 'Inativos'], ['interessado', 'Interessados']],
+  },
+  {
+    tipo: 'despesas',
+    titulo: 'Relatório de Despesas',
+    descricao: 'Despesas com categoria, campanha, valor, vencimento, pagamento e status. O período se aplica ao vencimento.',
+    icone: Receipt,
+    cor: '#dc2626',
+    arquivo: 'relatorio_despesas.csv',
+    status: [['pendente', 'Pendentes'], ['atrasado', 'Atrasadas'], ['pago', 'Pagas'], ['cancelado', 'Canceladas']],
+    categorias: [
+      ['administrativo', 'Administrativo'], ['recursos_humanos', 'Recursos Humanos'], ['projetos', 'Projetos'],
+      ['captacao', 'Captação de Recursos'], ['outros', 'Outros'],
+    ],
   },
 ]
 
@@ -37,6 +51,20 @@ export default function Relatorios() {
   const [estados, setEstados] = useState({})
   const [periodo, setPeriodo] = useState({ data_inicio: '', data_fim: '' })
   const [status, setStatus] = useState({})
+  const [categoria, setCategoria] = useState('')
+  const [formato, setFormato] = useState('imprimir')
+  const navigate = useNavigate()
+
+  function abrirPrestacaoContas() {
+    const params = new URLSearchParams()
+    if (periodo.data_inicio) params.set('data_inicio', periodo.data_inicio)
+    if (periodo.data_fim) params.set('data_fim', periodo.data_fim)
+    if (formato === 'csv') {
+      handleDownload('despesas', 'relatorio_despesas.csv')
+      return
+    }
+    navigate(`/admin/relatorios/prestacao-contas?${params}`)
+  }
 
   async function handleDownload(tipo, arquivo) {
     setEstados((e) => ({ ...e, [tipo]: 'carregando' }))
@@ -44,6 +72,7 @@ export default function Relatorios() {
     if (periodo.data_inicio) params.data_inicio = periodo.data_inicio
     if (periodo.data_fim) params.data_fim = periodo.data_fim
     if (status[tipo]) params.status = status[tipo]
+    if (tipo === 'despesas' && categoria) params.categoria = categoria
     try {
       const { data } = await downloadRelatorio(tipo, params)
       const url = URL.createObjectURL(data)
@@ -90,8 +119,30 @@ export default function Relatorios() {
         </div>
       </fieldset>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {RELATORIOS.map(({ tipo, titulo, descricao, icone: Icone, cor, arquivo, status: opcoes }) => {
+      <section className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm p-6 flex flex-col md:flex-row md:items-end gap-4">
+        <div className="flex items-start gap-3 flex-1">
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#16a34a22' }} aria-hidden="true">
+            <Scale size={22} style={{ color: '#16a34a' }} />
+          </div>
+          <div>
+            <h3 className="font-semibold text-[var(--text-primary)]">Prestação de contas</h3>
+            <p className="text-sm text-[var(--text-secondary)]">Receitas por campanha, despesas por categoria, saldo e lista de despesas pagas no período escolhido acima (padrão: ano atual).</p>
+          </div>
+        </div>
+        <label className="text-xs font-medium text-[var(--text-secondary)]">
+          Formato
+          <select value={formato} onChange={(e) => setFormato(e.target.value)} className="mt-1 block w-full md:w-56 text-sm border border-[var(--border)] rounded-lg px-3 py-2 bg-[var(--bg-input)] text-[var(--text-primary)]">
+            <option value="imprimir">Relatório para imprimir / PDF</option>
+            <option value="csv">Planilha de despesas (CSV)</option>
+          </select>
+        </label>
+        <button onClick={abrirPrestacaoContas} className="px-4 py-2.5 rounded-lg text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: '#16a34a' }}>
+          Gerar
+        </button>
+      </section>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        {RELATORIOS.map(({ tipo, titulo, descricao, icone: Icone, cor, arquivo, status: opcoes, categorias }) => {
           const estado = estados[tipo]
           const carregando = estado === 'carregando'
           return (
@@ -116,6 +167,20 @@ export default function Relatorios() {
                   {opcoes.map(([valor, rotulo]) => <option key={valor} value={valor}>{rotulo}</option>)}
                 </select>
               </label>
+
+              {categorias && (
+                <label className="text-xs font-medium text-[var(--text-secondary)]">
+                  Categoria
+                  <select
+                    value={categoria}
+                    onChange={(e) => setCategoria(e.target.value)}
+                    className="mt-1 w-full text-sm border border-[var(--border)] rounded-lg px-3 py-2 bg-[var(--bg-input)] text-[var(--text-primary)] outline-none focus:border-teal-500"
+                  >
+                    <option value="">Todas</option>
+                    {categorias.map(([valor, rotulo]) => <option key={valor} value={valor}>{rotulo}</option>)}
+                  </select>
+                </label>
+              )}
 
               {estado === 'erro' && (
                 <div className="flex items-center gap-2 text-xs text-red-500" role="alert">

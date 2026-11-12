@@ -107,3 +107,9 @@
   }
   [data-theme="dark"] .react-datepicker__day:hover { background-color: #1e3a4a; color: #7dd3f0; }
 }
+
+/* Impressão (relatório de prestação de contas) */
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff !important; }
+}

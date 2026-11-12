@@ -1,7 +1,9 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from .relatorios import relatorio_apoiadores, relatorio_campanhas, relatorio_doacoes
+from .relatorios import (
+    relatorio_apoiadores, relatorio_campanhas, relatorio_despesas, relatorio_doacoes, relatorio_prestacao_contas,
+)
 from .views import (
     ApoiadorViewSet, CampanhaViewSet, DoacaoViewSet, DashboardViewSet,
     ComunicadoViewSet, NotificacaoViewSet, DespesaViewSet,
@@ -28,4 +30,6 @@ urlpatterns = router.urls + [
     path('relatorios/doacoes/', relatorio_doacoes, name='relatorio_doacoes'),
     path('relatorios/campanhas/', relatorio_campanhas, name='relatorio_campanhas'),
     path('relatorios/apoiadores/', relatorio_apoiadores, name='relatorio_apoiadores'),
+    path('relatorios/despesas/', relatorio_despesas, name='relatorio_despesas'),
+    path('relatorios/prestacao-contas/', relatorio_prestacao_contas, name='relatorio_prestacao_contas'),
 ]

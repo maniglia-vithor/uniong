@@ -1,13 +1,18 @@
 """Relatórios CSV: delimitador ';', BOM UTF-8, decimal com vírgula, datas dd/mm/aaaa."""
 import csv
+from datetime import date
 from decimal import Decimal
 
 from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse
+from django.utils import timezone
 from rest_framework.decorators import api_view
+from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
 
-from .models import Apoiador, Campanha, Doacao
+from . import indicadores
+from .models import Apoiador, Campanha, Despesa, Doacao
 from .paginacao import filtrar_periodo
 
 INICIOS_PERIGOSOS = ('=', '+', '-', '@', '\t', '\r')
@@ -66,6 +71,83 @@ def relatorio_campanhas(request):
             data_br(c.data_inicio), data_br(c.data_fim),
         ])
     return resposta
+
+
+@api_view(['GET'])
+def relatorio_despesas(request):
+    qs = Despesa.objects.select_related('campanha').order_by('-data_vencimento', '-id')
+    status = request.query_params.get('status')
+    if status == 'atrasado':
+        qs = qs.filter(status='pendente', data_vencimento__lt=indicadores.hoje())
+    elif status:
+        qs = qs.filter(status=status)
+    categoria = request.query_params.get('categoria')
+    if categoria:
+        qs = qs.filter(categoria=categoria)
+    qs = filtrar_periodo(qs, request, 'data_vencimento')
+    resposta, csv_out = _resposta('relatorio_despesas.csv')
+    csv_out.writerow(['ID', 'Descrição', 'Categoria', 'Campanha', 'Valor (R$)', 'Vencimento', 'Pagamento', 'Status'])
+    for d in qs:
+        status_txt = 'Atrasado' if d.status_efetivo() == 'atrasado' else d.get_status_display()
+        csv_out.writerow([
+            d.id, texto(d.descricao), d.get_categoria_display(), texto(d.campanha.titulo if d.campanha else ''),
+            moeda(d.valor), data_br(d.data_vencimento), data_br(d.data_pagamento), status_txt,
+        ])
+    return resposta
+
+
+@api_view(['GET'])
+def relatorio_prestacao_contas(request):
+    """Dados para o relatório imprimível de prestação de contas de um período (padrão: ano atual)."""
+    hoje = indicadores.hoje()
+    inicio = _data(request, 'data_inicio') or date(hoje.year, 1, 1)
+    fim = _data(request, 'data_fim') or date(hoje.year, 12, 31)
+    if fim < inicio:
+        raise ValidationError({'data_fim': 'O fim do período não pode ser anterior ao início.'})
+
+    doacoes = Doacao.objects.filter(status='confirmada', data__gte=inicio, data__lte=fim)
+    receitas = [
+        {'campanha': d['campanha__titulo'] or 'Doações gerais (sem campanha)', 'total': float(d['total'])}
+        for d in doacoes.values('campanha__titulo').annotate(total=Sum('valor')).order_by('-total')
+    ]
+    pagas = Despesa.objects.filter(status='pago', data_pagamento__gte=inicio, data_pagamento__lte=fim)
+    rotulos = dict(Despesa.CATEGORIA_CHOICES)
+    por_categoria = [
+        {'categoria': rotulos.get(d['categoria'], d['categoria']), 'total': float(d['total'])}
+        for d in pagas.values('categoria').annotate(total=Sum('valor')).order_by('-total')
+    ]
+    total_receitas = indicadores.receitas_confirmadas(inicio, fim)
+    total_despesas = indicadores.despesas_pagas(inicio, fim)
+    return Response({
+        'data_inicio': inicio.isoformat(),
+        'data_fim': fim.isoformat(),
+        'gerado_em': timezone.localtime().isoformat(),
+        'total_receitas': float(total_receitas),
+        'total_despesas': float(total_despesas),
+        'saldo': float(total_receitas - total_despesas),
+        'receitas_por_campanha': receitas,
+        'despesas_por_categoria': por_categoria,
+        'despesas_pagas': [
+            {
+                'descricao': d.descricao,
+                'categoria': d.get_categoria_display(),
+                'campanha': d.campanha.titulo if d.campanha else None,
+                'valor': float(d.valor),
+                'data_pagamento': d.data_pagamento.isoformat(),
+            }
+            for d in pagas.select_related('campanha').order_by('data_pagamento', 'id')
+        ],
+    })
+
+
+def _data(request, nome):
+    valor = request.query_params.get(nome)
+    if not valor:
+        return None
+    try:
+        return date.fromisoformat(valor)
+    except ValueError:
+        raise ValidationError({nome: 'Data inválida. Use o formato AAAA-MM-DD.'})
 
 
 @api_view(['GET'])
