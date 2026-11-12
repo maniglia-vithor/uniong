@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import {
   HeartHandshake, DollarSign, Megaphone, Users, TrendingUp,
   Receipt, ShieldOff, ArrowLeft, X, ExternalLink, Share2,
-  CheckCircle,
+  CheckCircle, Plus,
 } from 'lucide-react'
 import { FaWhatsapp, FaInstagram, FaFacebook, FaLinkedin, FaTiktok } from 'react-icons/fa'
 import { MdEmail } from 'react-icons/md'
@@ -367,10 +367,10 @@ export default function Transparencia() {
         {role === 'membro' && (
           <button
             onClick={voltarParaAdmin}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border"
-            style={{ color: '#7c3aed', borderColor: '#7c3aed40', backgroundColor: '#7c3aed10' }}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90"
+            style={{ backgroundColor: '#0f4c5c' }}
           >
-            <ArrowLeft size={12} />
+            <ArrowLeft size={15} />
             Voltar ao Painel
           </button>
         )}
@@ -389,10 +389,10 @@ export default function Transparencia() {
           </div>
           <button
             onClick={() => setDonationModal(true)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90 whitespace-nowrap flex-shrink-0"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90 whitespace-nowrap flex-shrink-0"
             style={{ backgroundColor: '#0f4c5c' }}
           >
-            <HeartHandshake size={16} />
+            <Plus size={15} />
             Realizar doação
           </button>
         </div>
