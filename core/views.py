@@ -240,6 +240,11 @@ class DashboardViewSet(viewsets.ViewSet):
     def grafico_mensal(self, request):
         return Response(indicadores.serie_mensal_doacoes())
 
+    @action(detail=False, methods=['get'], url_path='fluxo-mensal')
+    def fluxo_mensal(self, request):
+        """Receitas × despesas dos últimos 12 meses, com saldo do mês e saldo acumulado."""
+        return Response(indicadores.fluxo_mensal())
+
     @action(detail=False, methods=['get'], url_path='doacoes-recentes')
     def doacoes_recentes(self, request):
         doacoes = Doacao.objects.select_related('apoiador', 'campanha').order_by('-data', '-id')[:10]
@@ -530,6 +535,21 @@ def _portal_desligado():
 
 
 RESPOSTA_PORTAL_DESLIGADO = {'erro': 'Portal indisponível.'}
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def prestacao_contas_publica(request):
+    """Prestação de contas agregada de um ano (?ano=AAAA; padrão: ano atual)."""
+    if _portal_desligado():
+        return Response(RESPOSTA_PORTAL_DESLIGADO, status=404)
+    try:
+        ano = int(request.query_params.get('ano') or indicadores.hoje().year)
+    except ValueError:
+        return Response({'ano': 'Ano inválido.'}, status=400)
+    if not 2000 <= ano <= 2100:
+        return Response({'ano': 'Ano inválido.'}, status=400)
+    return Response(indicadores.prestacao_de_contas(ano))
 
 
 @api_view(['GET', 'PATCH'])

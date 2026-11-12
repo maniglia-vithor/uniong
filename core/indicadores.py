@@ -134,6 +134,12 @@ def resumo_painel(referencia=None):
         'doacoes_mes': _kpi(float(doacoes_mes), variacao(doacoes_mes, doacoes_mes_anterior)),
         'apoiadores_ativos': _kpi(membros, variacao(membros, membros_antes)),
         'campanhas_ativas': _kpi(campanhas, variacao(campanhas, campanhas_antes)),
+        'saldo_mes': _kpi(
+            float(saldo(inicio_mes, limites_mes(referencia)[1])),
+            None,
+            receitas_mes=float(doacoes_mes),
+            despesas_mes=float(despesas_pagas(inicio_mes, limites_mes(referencia)[1])),
+        ),
     }
 
 
@@ -175,6 +181,98 @@ def serie_mensal_doacoes(meses=12, referencia=None):
             'total': float(_soma(doacoes_do_mes(mes))),
         })
     return serie
+
+
+# ── Receitas, despesas e saldo por período ──────────────────────────────────
+NOMES_MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+
+def limites_ano(ano):
+    return date(ano, 1, 1), date(ano, 12, 31)
+
+
+def receitas_confirmadas(inicio=None, fim=None):
+    """Soma das doações confirmadas com data no período (limites inclusivos; None = sem limite)."""
+    qs = doacoes_confirmadas()
+    if inicio:
+        qs = qs.filter(data__gte=inicio)
+    if fim:
+        qs = qs.filter(data__lte=fim)
+    return _soma(qs)
+
+
+def despesas_pagas(inicio=None, fim=None):
+    """Soma das despesas pagas com data de pagamento no período."""
+    qs = Despesa.objects.filter(status='pago')
+    if inicio:
+        qs = qs.filter(data_pagamento__gte=inicio)
+    if fim:
+        qs = qs.filter(data_pagamento__lte=fim)
+    return _soma(qs)
+
+
+def saldo(inicio=None, fim=None):
+    return receitas_confirmadas(inicio, fim) - despesas_pagas(inicio, fim)
+
+
+def fluxo_mensal(meses=12, referencia=None, ano=None):
+    """Receitas, despesas, saldo do mês e saldo acumulado (desde o início) para cada mês.
+
+    Com `ano`, devolve os 12 meses daquele ano; senão, os `meses` últimos até a referência.
+    """
+    if ano is not None:
+        primeiros = [date(ano, m, 1) for m in range(1, 13)]
+    else:
+        referencia = referencia or hoje()
+        primeiros = [referencia.replace(day=1) - relativedelta(months=i) for i in range(meses - 1, -1, -1)]
+    serie = []
+    for inicio in primeiros:
+        _, fim = limites_mes(inicio)
+        receitas = receitas_confirmadas(inicio, fim)
+        despesas = despesas_pagas(inicio, fim)
+        serie.append({
+            'mes': f"{NOMES_MESES[inicio.month - 1]}/{inicio.strftime('%y')}",
+            'isoMes': inicio.strftime('%Y-%m'),
+            'receitas': float(receitas),
+            'despesas': float(despesas),
+            'saldo': float(receitas - despesas),
+            'saldo_acumulado': float(saldo(fim=fim)),
+        })
+    return serie
+
+
+def anos_com_movimento():
+    anos = set(Doacao.objects.filter(status='confirmada').dates('data', 'year').values_list('data__year', flat=True))
+    anos |= set(
+        Despesa.objects.filter(status='pago', data_pagamento__isnull=False)
+        .dates('data_pagamento', 'year').values_list('data_pagamento__year', flat=True)
+    )
+    anos.add(hoje().year)
+    return sorted(anos, reverse=True)
+
+
+def prestacao_de_contas(ano):
+    """Dados agregados (sem nomes) para a prestação de contas pública de um ano."""
+    inicio, fim = limites_ano(ano)
+    rotulos = dict(Despesa.CATEGORIA_CHOICES)
+    por_categoria = (
+        Despesa.objects.filter(status='pago', data_pagamento__gte=inicio, data_pagamento__lte=fim)
+        .values('categoria').annotate(total=Sum('valor')).order_by('-total')
+    )
+    recebido = receitas_confirmadas(inicio, fim)
+    gasto = despesas_pagas(inicio, fim)
+    return {
+        'ano': ano,
+        'anos_disponiveis': anos_com_movimento(),
+        'total_recebido': float(recebido),
+        'total_gasto': float(gasto),
+        'saldo': float(recebido - gasto),
+        'gasto_por_categoria': [
+            {'categoria': d['categoria'], 'label': rotulos.get(d['categoria'], d['categoria']), 'total': float(d['total'])}
+            for d in por_categoria
+        ],
+        'evolucao_mensal': fluxo_mensal(ano=ano),
+    }
 
 
 def mes_do_parametro(valor):

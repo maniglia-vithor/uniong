@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
-import { DollarSign, CalendarDays, Users, Megaphone } from 'lucide-react'
+import { DollarSign, CalendarDays, Users, Megaphone, Scale } from 'lucide-react'
+import GraficoFluxo from '../components/GraficoFluxo'
 import KpiCard from '../components/KpiCard'
 import KpiDetailPanel from '../components/KpiDetailPanel'
 import BarraProgresso from '../components/BarraProgresso'
 import BadgeStatus from '../components/BadgeStatus'
 import {
   getDashboardResumo, getGraficoMensal, getDoacoesRecentes,
-  getTopApoiadores, getCampanhasAtivas,
+  getTopApoiadores, getCampanhasAtivas, getFluxoMensal,
 } from '../services/api'
 
 function formatBRL(value) {
@@ -58,6 +59,7 @@ export default function Dashboard() {
   const [doacoes, setDoacoes] = useState([])
   const [topApoiadores, setTopApoiadores] = useState([])
   const [campanhas, setCampanhas] = useState([])
+  const [fluxo, setFluxo] = useState([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
   const [painelKpi, setPainelKpi] = useState(null)
@@ -69,8 +71,10 @@ export default function Dashboard() {
       getDoacoesRecentes(),
       getTopApoiadores(),
       getCampanhasAtivas(),
+      getFluxoMensal(),
     ])
-      .then(([r, g, d, t, c]) => {
+      .then(([r, g, d, t, c, f]) => {
+        setFluxo(f.data)
         setResumo(r.data)
         setGrafico(g.data)
         setDoacoes(d.data)
@@ -143,11 +147,26 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         {kpis.map((kpi) => (
           <KpiCard key={kpi.titulo} {...kpi} onClick={() => setPainelKpi(kpi.id)} />
         ))}
+        <KpiCard
+          titulo="Saldo do Mês"
+          valor={formatBRL(resumo.saldo_mes.value)}
+          trend_percentage={null}
+          trend_direction={resumo.saldo_mes.value >= 0 ? 'positive' : 'negative'}
+          rotuloTendencia={`Receitas ${formatBRL(resumo.saldo_mes.receitas_mes)} − despesas pagas ${formatBRL(resumo.saldo_mes.despesas_mes)}`}
+          icone={Scale}
+          cor="#16a34a"
+        />
       </div>
+
+      <GraficoFluxo
+        dados={fluxo}
+        titulo="Receitas × despesas (últimos 12 meses)"
+        descricao="Doações confirmadas e despesas pagas por mês; a linha mostra o saldo acumulado desde o início."
+      />
 
       <KpiDetailPanel kpi={painelKpi} onClose={() => setPainelKpi(null)} />
 

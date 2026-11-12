@@ -56,6 +56,7 @@ api.interceptors.response.use(
 // Dashboard
 export const getDashboardResumo    = () => api.get('/dashboard/resumo/')
 export const getGraficoMensal      = () => api.get('/dashboard/grafico-mensal/')
+export const getFluxoMensal        = () => api.get('/dashboard/fluxo-mensal/')
 export const getDoacoesRecentes    = () => api.get('/dashboard/doacoes-recentes/')
 export const getTopApoiadores      = () => api.get('/dashboard/top-apoiadores/')
 export const getCampanhasAtivas    = () => api.get('/dashboard/campanhas-ativas/')

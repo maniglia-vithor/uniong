@@ -14,6 +14,7 @@ import {
 import axios from 'axios'
 import BarraProgresso from '../components/BarraProgresso'
 import QrCodePix, { qrComoArquivo } from '../components/QrCodePix'
+import PrestacaoContas from '../components/PrestacaoContas'
 import { mensagemErro } from '../utils/formatos'
 import { useAuth } from '../context/AuthContext'
 import logoUniONG from '../assets/Gemini_Generated_Image_g792fng792fng792.jpg'
@@ -646,6 +647,8 @@ export default function Transparencia() {
                 )}
               </div>
             )}
+
+            <PrestacaoContas />
 
             <Comunicados lista={dados.comunicados ?? []} />
 
