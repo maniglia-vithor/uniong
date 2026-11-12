@@ -26,13 +26,16 @@ function crc16(payload) {
   return crc.toString(16).toUpperCase().padStart(4, '0')
 }
 
-export function gerarPayloadPix({ chave, nome, cidade, txid = '***' }) {
+export function gerarPayloadPix({ chave, nome, cidade, txid = '***', valor = null }) {
   const id = txid.replace(/[^A-Za-z0-9]/g, '').slice(0, 25) || '***'
+  const valorNumero = Number(valor)
+  const campoValor = valor !== null && valor !== '' && valorNumero > 0 ? campo('54', valorNumero.toFixed(2)) : ''
   const payload =
     campo('00', '01') +
     campo('26', campo('00', 'br.gov.bcb.pix') + campo('01', chave.trim())) +
     campo('52', '0000') +
     campo('53', '986') +
+    campoValor +
     campo('58', 'BR') +
     campo('59', normalizar(nome, 25) || 'UNIONG') +
     campo('60', normalizar(cidade, 15) || 'SAO PAULO') +

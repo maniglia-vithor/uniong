@@ -14,6 +14,8 @@ import {
 } from 'recharts'
 import axios from 'axios'
 import BarraProgresso from '../components/BarraProgresso'
+import QrCodePix from '../components/QrCodePix'
+import { mensagemErro } from '../utils/formatos'
 import { useAuth } from '../context/AuthContext'
 import logoUniONG from '../assets/Gemini_Generated_Image_g792fng792fng792.jpg'
 
@@ -84,29 +86,34 @@ function Overlay({ titulo, onFechar, children, largura = 'max-w-lg' }) {
 }
 
 /* ─── Donation Modal ─────────────────────────────────────────────────────── */
-function DonationModal({ campanhas, onFechar }) {
-  const [form, setForm] = useState({ nome: '', email: '', celular: '', campaign_id: '', valor: '' })
+function DonationModal({ campanhas, pix, onFechar }) {
+  const [form, setForm] = useState({ nome: '', email: '', celular: '', campaign_id: '', valor: '', consentimento: false, site: '' })
   const [salvando, setSalvando] = useState(false)
-  const [sucesso, setSucesso] = useState(false)
+  const [registro, setRegistro] = useState(null)
   const [erro, setErro] = useState(null)
 
-  function onChange(e) { setForm(f => ({ ...f, [e.target.name]: e.target.value })) }
+  function onChange(e) {
+    const { name, value, type, checked } = e.target
+    setForm(f => ({ ...f, [name]: type === 'checkbox' ? checked : value }))
+  }
 
   async function onSubmit(e) {
     e.preventDefault()
     setSalvando(true)
     setErro(null)
     try {
-      await axios.post('/api/public/doacoes/', {
+      const { data } = await axios.post('/api/public/doacoes/', {
         nome: form.nome,
         email: form.email,
         celular: form.celular,
         campaign_id: form.campaign_id || null,
-        valor: form.valor || 0,
+        valor: form.valor,
+        consentimento: form.consentimento,
+        site: form.site,
       })
-      setSucesso(true)
+      setRegistro(data)
     } catch (err) {
-      setErro(err?.response?.data?.erro || 'Erro ao registrar doação. Tente novamente.')
+      setErro(mensagemErro(err, 'Erro ao registrar doação. Tente novamente.'))
     } finally {
       setSalvando(false)
     }
@@ -114,15 +121,25 @@ function DonationModal({ campanhas, onFechar }) {
 
   const inputCls = 'w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg bg-[var(--bg-input)] text-[var(--text-primary)] outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100'
 
-  if (sucesso) {
+  if (registro) {
     return (
-      <Overlay titulo="Doação Registrada!" onFechar={onFechar}>
-        <div className="flex flex-col items-center gap-4 py-6 text-center">
-          <CheckCircle size={48} className="text-emerald-500" />
+      <Overlay titulo="Intenção de doação registrada" onFechar={onFechar}>
+        <div className="flex flex-col items-center gap-4 py-2 text-center">
+          <CheckCircle size={44} className="text-emerald-500" aria-hidden="true" />
           <h3 className="text-lg font-bold text-[var(--text-primary)]">Obrigado pela sua contribuição!</h3>
           <p className="text-sm text-[var(--text-secondary)] max-w-sm">
-            Sua intenção de doação foi registrada com sucesso. Nossa equipe entrará em contato para confirmar o pagamento.
+            Para concluir, pague o PIX abaixo. A equipe confirma a doação assim que o valor aparecer no extrato.
           </p>
+          {registro.id && (
+            <div className="w-full text-left">
+              <QrCodePix
+                pix={pix}
+                txid={registro.txid}
+                valor={registro.valor}
+                descricao={`PIX de ${formatBRL(registro.valor)} — identificação ${registro.txid}.`}
+              />
+            </div>
+          )}
           <button onClick={onFechar} className="mt-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ backgroundColor: '#0f4c5c' }}>
             Fechar
           </button>
@@ -154,10 +171,22 @@ function DonationModal({ campanhas, onFechar }) {
           <input name="celular" value={form.celular} onChange={onChange} placeholder="(11) 99999-9999" className={inputCls} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Valor (R$)</label>
-          <input name="valor" type="number" min="1" step="0.01" value={form.valor} onChange={onChange} placeholder="50,00" className={inputCls} />
+          <label htmlFor="doacao-valor" className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Valor (R$) *</label>
+          <input id="doacao-valor" name="valor" type="number" min="1" max="100000" step="0.01" value={form.valor} onChange={onChange} required placeholder="50,00" className={inputCls} />
         </div>
-        {erro && <p className="text-xs text-red-500">{erro}</p>}
+        {/* Campo isca para robôs: oculto para pessoas e leitores de tela. */}
+        <div aria-hidden="true" style={{ position: 'absolute', left: '-10000px', width: 1, height: 1, overflow: 'hidden' }}>
+          <label htmlFor="doacao-site">Site</label>
+          <input id="doacao-site" name="site" value={form.site} onChange={onChange} tabIndex={-1} autoComplete="off" />
+        </div>
+        <label className="flex items-start gap-2 text-xs text-[var(--text-secondary)]">
+          <input type="checkbox" name="consentimento" checked={form.consentimento} onChange={onChange} required className="mt-0.5" />
+          <span>
+            Li e concordo com a{' '}
+            <Link to="/privacidade" target="_blank" className="underline" style={{ color: '#0f4c5c' }}>política de privacidade</Link>.
+          </span>
+        </label>
+        {erro && <p className="text-xs text-red-500" role="alert">{erro}</p>}
         <button
           type="submit"
           disabled={salvando}
@@ -661,7 +690,7 @@ export default function Transparencia() {
 
       {/* Modals */}
       {donationModal && (
-        <DonationModal campanhas={dados?.campanhas ?? []} onFechar={() => setDonationModal(false)} />
+        <DonationModal campanhas={dados?.campanhas ?? []} pix={dados?.pix} onFechar={() => setDonationModal(false)} />
       )}
       {gastosModal && dados && (
         <GastosModal

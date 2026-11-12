@@ -9,6 +9,8 @@ const config = {
   atrasado:   { label: 'Atrasado',   cls: 'bg-rose-500/10   text-rose-600   border border-rose-500/20   dark:bg-rose-500/15   dark:text-rose-400   dark:border-rose-500/30'   },
   ativo:      { label: 'Ativo',      cls: 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30' },
   inativo:    { label: 'Inativo',    cls: 'bg-rose-500/10   text-rose-600   border border-rose-500/20   dark:bg-rose-500/15   dark:text-rose-400   dark:border-rose-500/30'   },
+  interessado:{ label: 'Interessado', cls: 'bg-violet-500/10 text-violet-600 border border-violet-500/20 dark:bg-violet-500/15 dark:text-violet-400 dark:border-violet-500/30' },
+  cancelado:  { label: 'Cancelado',  cls: 'bg-slate-500/10  text-slate-500  border border-slate-500/20  dark:bg-slate-500/15  dark:text-slate-400  dark:border-slate-500/30'  },
 }
 
 export default function BadgeStatus({ status }) {

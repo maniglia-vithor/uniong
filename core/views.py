@@ -21,7 +21,7 @@ from django.db import transaction
 
 from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoPix, LogAlteracao
 from .anexos import TIPOS_PERMITIDOS, validar_anexo
-from .normalizacao import normalizar_email
+from .doacao_publica import DoacaoPublicaSerializer, ativar_membro_interessado, registrar_doacao_publica
 from . import indicadores
 from .paginacao import filtrar_periodo
 from .pix import mascarar
@@ -170,8 +170,12 @@ class DoacaoViewSet(viewsets.ModelViewSet):
             'quantidade_confirmadas': confirmadas['quantidade'],
         })
 
+    def perform_update(self, serializer):
+        ativar_membro_interessado(serializer.save())
+
     def perform_create(self, serializer):
         doacao = serializer.save()
+        ativar_membro_interessado(doacao)
         actor = self.request.user.get_full_name() or self.request.user.username
         valor = f'R$ {doacao.valor:.2f}'.replace('.', ',')
         campanha_txt = f' para a campanha {doacao.campanha.titulo}' if doacao.campanha else ''
@@ -547,42 +551,29 @@ def configuracao_pix(request):
 @permission_classes([AllowAny])
 @throttle_classes([DoacaoPublicaThrottle])
 def public_doacao(request):
-    """Endpoint público para registrar intenção de doação."""
-    nome = request.data.get('nome', '').strip()
-    email = normalizar_email(request.data.get('email', ''))
-    celular = request.data.get('celular', '').strip()
-    campaign_id = request.data.get('campaign_id')
-    valor = request.data.get('valor', 0)
+    """Registra uma intenção de doação feita pelo portal público."""
+    mensagem = 'Intenção de doação registrada! Faça o PIX e aguarde a confirmação da equipe.'
+    if (request.data.get('site') or '').strip():
+        return Response({'mensagem': mensagem, 'id': None}, status=201)
 
-    if not nome or not email:
-        return Response({'erro': 'Nome e e-mail são obrigatórios.'}, status=400)
+    serializer = DoacaoPublicaSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    doacao = registrar_doacao_publica(serializer.validated_data)
 
-    apoiador, _ = Apoiador.objects.get_or_create(
-        email=email,
-        defaults={'nome': nome, 'celular': celular or None, 'status': 'ativo'},
+    valor_txt = f'R$ {doacao.valor:.2f}'.replace('.', ',')
+    campanha_txt = f' para a campanha {doacao.campanha.titulo}' if doacao.campanha else ''
+    nome = doacao.apoiador.nome
+    _notificar_admins(
+        mensagem=f'Nova intenção de doação de {nome} — {valor_txt}{campanha_txt}.'[:300],
+        tipo='doacao',
+        actor_name=nome[:150],
+        action_text=f'registrou pelo portal uma intenção de doação de {valor_txt}{campanha_txt}'[:200],
+        target_type='doacao',
+        target_id=doacao.id,
     )
-    if celular and not apoiador.celular:
-        apoiador.celular = celular
-        apoiador.save(update_fields=['celular'])
-
-    campanha = None
-    if campaign_id:
-        try:
-            campanha = Campanha.objects.get(pk=campaign_id)
-        except Campanha.DoesNotExist:
-            pass
-
-    try:
-        valor_decimal = float(valor) if valor else 0
-    except (ValueError, TypeError):
-        valor_decimal = 0
-
-    Doacao.objects.create(
-        apoiador=apoiador,
-        campanha=campanha,
-        valor=max(valor_decimal, 0.01),
-        data=indicadores.hoje(),
-        status='pendente',
-    )
-
-    return Response({'mensagem': 'Doação registrada com sucesso! Aguarde confirmação.'}, status=201)
+    return Response({
+        'mensagem': mensagem,
+        'id': doacao.id,
+        'valor': f'{doacao.valor:.2f}',
+        'txid': f'DOA{doacao.id}',
+    }, status=201)

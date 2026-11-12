@@ -23,7 +23,7 @@ class ThrottlingTests(APITestCase):
 
     def test_doacao_publica_bloqueia_apos_5_por_minuto(self):
         campanha = criar_campanha()
-        dados = {'nome': 'Ana', 'email': 'ana@exemplo.org', 'campaign_id': campanha.id, 'valor': '10'}
+        dados = {'nome': 'Ana', 'email': 'ana@exemplo.org', 'campaign_id': campanha.id, 'valor': '10', 'consentimento': True}
         for _ in range(5):
             self.assertEqual(self.client.post('/api/public/doacoes/', dados, format='json').status_code, 201)
         self.assertEqual(self.client.post('/api/public/doacoes/', dados, format='json').status_code, 429)

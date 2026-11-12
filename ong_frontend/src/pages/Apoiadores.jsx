@@ -100,6 +100,7 @@ export default function Apoiadores() {
           <option value="">Todos os status</option>
           <option value="ativo">Ativos</option>
           <option value="inativo">Inativos</option>
+          <option value="interessado">Interessados (portal)</option>
         </select>
       </div>
 
@@ -178,6 +179,7 @@ export default function Apoiadores() {
               <Select name="status" value={form.status} onChange={onChange}>
                 <option value="ativo">Ativo</option>
                 <option value="inativo">Inativo</option>
+                <option value="interessado">Interessado</option>
               </Select>
             </Campo>
             <div className="flex gap-3 pt-2">

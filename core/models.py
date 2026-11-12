@@ -13,13 +13,15 @@ class Apoiador(models.Model):
     STATUS_CHOICES = [
         ('ativo', 'Ativo'),
         ('inativo', 'Inativo'),
+        # Criado pelo portal público; vira "ativo" quando a primeira doação é confirmada.
+        ('interessado', 'Interessado'),
     ]
 
     nome = models.CharField(max_length=150)
     email = models.EmailField(unique=True)
     celular = models.CharField(max_length=20, null=True, blank=True)
     data_cadastro = models.DateField(auto_now_add=True)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='ativo')
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='ativo')
 
     class Meta:
         verbose_name = 'Apoiador'
@@ -129,9 +131,16 @@ class Doacao(models.Model):
     campanha = models.ForeignKey(
         Campanha, on_delete=models.PROTECT, null=True, blank=True, related_name='doacoes'
     )
+    ORIGEM_CHOICES = [
+        ('painel', 'Painel'),
+        ('portal', 'Portal público'),
+    ]
+
     valor = models.DecimalField(max_digits=10, decimal_places=2)
     data = models.DateField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='confirmada')
+    origem = models.CharField(max_length=10, choices=ORIGEM_CHOICES, default='painel')
+    consentimento_em = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'Doação'

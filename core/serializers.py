@@ -148,8 +148,9 @@ class DoacaoSerializer(serializers.ModelSerializer):
         model = Doacao
         fields = [
             'id', 'apoiador', 'apoiador_nome', 'campanha', 'campanha_titulo',
-            'valor', 'data', 'status',
+            'valor', 'data', 'status', 'origem', 'consentimento_em',
         ]
+        read_only_fields = ['origem', 'consentimento_em']
 
     def validate_valor(self, value):
         return _positivo(value, 'O valor deve ser maior que zero.')
