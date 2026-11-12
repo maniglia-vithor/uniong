@@ -115,6 +115,25 @@ function EditDoacao({ record, apoiadores, campanhas, onSaved, onCancel }) {
 }
 
 // ── Detalhe Campanha ────────────────────────────────────────
+function DespesasDaCampanha({ id }) {
+  const [despesas, setDespesas] = useState(null)
+  useEffect(() => {
+    api.get(`/campanhas/${id}/despesas/`).then((r) => setDespesas(r.data)).catch(() => setDespesas([]))
+  }, [id])
+  if (despesas === null) return <p className="text-xs text-[var(--text-muted)]">Carregando despesas…</p>
+  if (despesas.length === 0) return <p className="text-xs text-[var(--text-muted)]">Nenhuma despesa paga vinculada.</p>
+  return (
+    <ul className="divide-y divide-[var(--border-subtle)] border border-[var(--border)] rounded-lg">
+      {despesas.map((d) => (
+        <li key={d.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+          <span className="truncate text-[var(--text-primary)]">{d.descricao}</span>
+          <span className="flex-shrink-0 text-[var(--text-secondary)]">{formatBRL(d.valor)} · {formatData(d.data_pagamento)}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function DetalheCampanha({ record, onEdit }) {
   return (
     <div className="space-y-5">
@@ -131,9 +150,16 @@ function DetalheCampanha({ record, onEdit }) {
         <p className="text-xs text-[var(--text-muted)] mt-1">Meta: {formatBRL(record.meta_valor)}</p>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <InfoBox label="Status" value={<BadgeStatus status={record.status} />} />
+        <InfoBox label="Arrecadado" value={formatBRL(record.valor_arrecadado)} destaque />
+        <InfoBox label="Gasto" value={formatBRL(record.valor_gasto)} />
+        <InfoBox label="Saldo da campanha" value={formatBRL(record.saldo)} destaque />
+        <InfoBox label="Status" value={<BadgeStatus status={record.status_efetivo ?? record.status} />} />
         <InfoBox label="Início" value={formatData(record.data_inicio)} />
         <InfoBox label="Encerramento" value={formatData(record.data_fim)} />
+      </div>
+      <div className="space-y-2">
+        <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">Despesas pagas da campanha</p>
+        <DespesasDaCampanha id={record.id} />
       </div>
       <button onClick={onEdit}
         className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity"

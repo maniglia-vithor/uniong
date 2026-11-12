@@ -5,7 +5,7 @@ from dateutil.relativedelta import relativedelta
 
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.db.models import Q, Sum, Value
+from django.db.models import OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
@@ -35,15 +35,25 @@ class Apoiador(models.Model):
         return self.nome
 
 
+def _soma_por_campanha(modelo, **filtros):
+    """Subconsulta: soma de `valor` do modelo vinculado à campanha externa (evita JOIN que duplica somas)."""
+    subconsulta = (
+        modelo.objects.filter(campanha=OuterRef('pk'), **filtros)
+        .order_by().values('campanha').annotate(total=Sum('valor')).values('total')
+    )
+    return Coalesce(
+        Subquery(subconsulta, output_field=models.DecimalField(max_digits=14, decimal_places=2)),
+        Value(Decimal('0')),
+        output_field=models.DecimalField(max_digits=14, decimal_places=2),
+    )
+
+
 class CampanhaQuerySet(models.QuerySet):
     def com_arrecadado(self):
-        """Anota `arrecadado`: soma das doações confirmadas da campanha."""
+        """Anota `arrecadado` (doações confirmadas) e `gasto` (despesas pagas vinculadas)."""
         return self.annotate(
-            arrecadado=Coalesce(
-                Sum('doacoes__valor', filter=Q(doacoes__status='confirmada')),
-                Value(Decimal('0')),
-                output_field=models.DecimalField(max_digits=14, decimal_places=2),
-            )
+            arrecadado=_soma_por_campanha(Doacao, status='confirmada'),
+            gasto=_soma_por_campanha(Despesa, status='pago'),
         )
 
 
@@ -86,6 +96,18 @@ class Campanha(models.Model):
     @property
     def meta_atingida(self):
         return bool(self.meta_valor) and self.valor_arrecadado >= self.meta_valor
+
+    @property
+    def valor_gasto(self):
+        if hasattr(self, 'gasto'):
+            return self.gasto
+        if self.pk is None:
+            return Decimal('0')
+        return self.despesas.filter(status='pago').aggregate(total=Sum('valor'))['total'] or Decimal('0')
+
+    @property
+    def saldo(self):
+        return self.valor_arrecadado - self.valor_gasto
 
     def __str__(self):
         return self.titulo
@@ -177,6 +199,9 @@ class Despesa(models.Model):
     descricao = models.CharField(max_length=200)
     # Texto exibido no portal; vazio → o portal mostra só a categoria.
     descricao_publica = models.CharField(max_length=200, blank=True, default='')
+    campanha = models.ForeignKey(
+        'Campanha', on_delete=models.PROTECT, null=True, blank=True, related_name='despesas'
+    )
     valor = models.DecimalField(max_digits=12, decimal_places=2)
     data_vencimento = models.DateField()
     data_pagamento = models.DateField(null=True, blank=True)

@@ -70,12 +70,14 @@ class CampanhaSerializer(serializers.ModelSerializer):
     valor_arrecadado = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     percentual_progresso = serializers.ReadOnlyField()
     meta_atingida = serializers.ReadOnlyField()
+    valor_gasto = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+    saldo = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
 
     class Meta:
         model = Campanha
         fields = [
             'id', 'titulo', 'meta_valor', 'valor_arrecadado', 'percentual_progresso',
-            'meta_atingida', 'status', 'data_inicio', 'data_fim', 'descricao',
+            'meta_atingida', 'valor_gasto', 'saldo', 'status', 'data_inicio', 'data_fim', 'descricao',
         ]
 
     def validate_meta_valor(self, value):
@@ -123,11 +125,12 @@ class DespesaSerializer(serializers.ModelSerializer):
         source='get_recurrence_period_display', read_only=True, default=None
     )
     anexos = DespesaAnexoSerializer(many=True, read_only=True)
+    campanha_titulo = serializers.CharField(source='campanha.titulo', read_only=True, default=None)
 
     class Meta:
         model = Despesa
         fields = [
-            'id', 'descricao', 'descricao_publica', 'valor', 'data_vencimento', 'data_pagamento',
+            'id', 'descricao', 'descricao_publica', 'campanha', 'campanha_titulo', 'valor', 'data_vencimento', 'data_pagamento',
             'categoria', 'categoria_display', 'status', 'status_efetivo',
             'is_fixed', 'recurrence_period', 'recurrence_period_display', 'anexos',
             'serie_id', 'data_ancora', 'numero_ocorrencia', 'recorrencia_fim',

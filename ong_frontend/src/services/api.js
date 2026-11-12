@@ -76,7 +76,8 @@ export const excluirApoiador       = (id) => api.delete(`/apoiadores/${id}/`)
 
 // Campanhas
 export const getCampanhas          = (params) => api.get('/campanhas/', { params })
-export const getCampanhasOpcoes    = () => api.get('/campanhas/opcoes/')
+export const getCampanhasOpcoes    = (params) => api.get('/campanhas/opcoes/', { params })
+export const getDespesasDaCampanha = (id) => api.get(`/campanhas/${id}/despesas/`)
 export const criarCampanha         = (data) => api.post('/campanhas/', data)
 export const atualizarCampanha     = (id, data) => api.put(`/campanhas/${id}/`, data)
 export const excluirCampanha       = (id) => api.delete(`/campanhas/${id}/`)

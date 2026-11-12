@@ -13,11 +13,11 @@ import { mensagemErro } from '../utils/formatos'
 import {
   getDespesas, criarDespesa, atualizarDespesa, excluirDespesa,
   removerAnexoDespesa, baixarAnexoDespesa, getDespesasResumo, getDespesasPorCategoria,
-  encerrarSerieDespesa, aplicarValorProximasDespesa,
+  encerrarSerieDespesa, aplicarValorProximasDespesa, getCampanhasOpcoes,
 } from '../services/api'
 
 const VAZIO = {
-  descricao: '', descricao_publica: '', valor: '', data_vencimento: '', data_pagamento: '',
+  descricao: '', descricao_publica: '', campanha: '', valor: '', data_vencimento: '', data_pagamento: '',
   categoria: 'outros', status: 'pendente', is_fixed: false, recurrence_period: 'mensal', recorrencia_fim: '',
 }
 
@@ -67,6 +67,7 @@ function KpiCusto({ titulo, valor, subtitulo, icone: Icone, cor }) {
 export default function Custos() {
   const lista = useListaPaginada(getDespesas)
   const [resumo, setResumo] = useState(null)
+  const [campanhasOpcoes, setCampanhasOpcoes] = useState([])
   const [grafico, setGrafico] = useState([])
   const [modal, setModal] = useState(false)
   const [editando, setEditando] = useState(null)
@@ -87,6 +88,10 @@ export default function Custos() {
 
   useEffect(() => { carregarResumo() }, [carregarResumo])
 
+  useEffect(() => {
+    getCampanhasOpcoes({ incluir_encerradas: 1 }).then(({ data }) => setCampanhasOpcoes(data)).catch(() => {})
+  }, [])
+
   function carregar() {
     lista.recarregar()
     carregarResumo()
@@ -104,6 +109,7 @@ export default function Custos() {
     setForm({
       descricao: item.descricao,
       descricao_publica: item.descricao_publica || '',
+      campanha: item.campanha || '',
       valor: item.valor,
       data_vencimento: item.data_vencimento,
       data_pagamento: item.data_pagamento || '',
@@ -169,6 +175,7 @@ export default function Custos() {
     const fd = new FormData()
     fd.append('descricao', form.descricao)
     fd.append('descricao_publica', form.descricao_publica)
+    fd.append('campanha', form.campanha || '')
     fd.append('valor', form.valor)
     fd.append('data_vencimento', form.data_vencimento)
     if (form.data_pagamento) fd.append('data_pagamento', form.data_pagamento)
@@ -367,6 +374,14 @@ export default function Custos() {
             <Campo label="Descrição pública (opcional)">
               <Input name="descricao_publica" value={form.descricao_publica} onChange={onChange} maxLength={200}
                 placeholder="O que aparece no portal. Vazio: só a categoria" />
+            </Campo>
+            <Campo label="Campanha (opcional)">
+              <Select name="campanha" value={form.campanha} onChange={onChange}>
+                <option value="">Sem campanha vinculada</option>
+                {campanhasOpcoes.map((c) => (
+                  <option key={c.id} value={c.id}>{c.titulo}{c.status === 'encerrada' ? ' (encerrada)' : ''}</option>
+                ))}
+              </Select>
             </Campo>
             {form.categoria === 'recursos_humanos' && (
               <p className="text-[11px] text-[var(--text-muted)] -mt-2">Despesas de Recursos Humanos aparecem no portal somadas numa única linha.</p>

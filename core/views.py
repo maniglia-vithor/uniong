@@ -102,7 +102,7 @@ class ApoiadorViewSet(ExclusaoProtegidaMixin, viewsets.ModelViewSet):
 class CampanhaViewSet(ExclusaoProtegidaMixin, viewsets.ModelViewSet):
     serializer_class = CampanhaSerializer
     mensagem_exclusao_protegida = (
-        'Não é possível excluir: existem doações vinculadas a esta campanha. Encerre a campanha em vez de excluí-la.'
+        'Não é possível excluir: existem doações ou despesas vinculadas a esta campanha. Encerre a campanha em vez de excluí-la.'
     )
     search_fields = ['titulo']
     ordering_fields = ['titulo', 'meta_valor', 'arrecadado', 'progresso', 'data_inicio', 'data_fim', 'status']
@@ -123,9 +123,19 @@ class CampanhaViewSet(ExclusaoProtegidaMixin, viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], pagination_class=None, filter_backends=[])
     def opcoes(self, request):
-        """Lista leve para seleção: campanhas ativas (id e título), sem paginação."""
-        dados = Campanha.objects.filter(status='ativa').order_by('titulo').values('id', 'titulo')
-        return Response(list(dados))
+        """Lista leve para seleção (id, título e status), sem paginação. Padrão: só ativas;
+        ?incluir_encerradas=1 traz todas (usado para vincular despesas)."""
+        qs = Campanha.objects.all()
+        if request.query_params.get('incluir_encerradas') != '1':
+            qs = qs.filter(status='ativa')
+        return Response(list(qs.order_by('titulo').values('id', 'titulo', 'status')))
+
+    @action(detail=True, methods=['get'], pagination_class=None, filter_backends=[])
+    def despesas(self, request, pk=None):
+        """Despesas pagas vinculadas à campanha (prestação de contas da campanha)."""
+        campanha = self.get_object()
+        despesas = campanha.despesas.filter(status='pago').order_by('-data_pagamento', '-id')
+        return Response(DespesaSerializer(despesas, many=True, context={'request': request}).data)
 
     def perform_create(self, serializer):
         campanha = serializer.save()
@@ -316,7 +326,7 @@ class DespesaViewSet(viewsets.ModelViewSet):
     ordering = ['-data_vencimento', '-id']
 
     def get_queryset(self):
-        qs = Despesa.objects.prefetch_related('anexos')
+        qs = Despesa.objects.select_related('campanha').prefetch_related('anexos')
         status = self.request.query_params.get('status')
         categoria = self.request.query_params.get('categoria')
         if status == 'atrasado':
