@@ -631,9 +631,8 @@ def painel_transparencia(request):
     ]
 
     gastos_mes_qs = Despesa.objects.filter(
-        status='pago',
         data_vencimento__gte=inicio_mes,
-        data_vencimento__lte=hoje,
+        data_vencimento__lt=inicio_mes + relativedelta(months=1),
     )
     gastos_mes_total = gastos_mes_qs.aggregate(total=Sum('valor'))['total'] or 0
     gastos_mes_lista = [

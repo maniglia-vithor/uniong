@@ -172,12 +172,9 @@ function DonationModal({ campanhas, onFechar }) {
 function GastosModal({ lista, total, onFechar }) {
   const mesAtual = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
   return (
-    <Overlay titulo={`Gastos Confirmados — ${mesAtual}`} onFechar={onFechar} largura="max-w-xl">
-      <p className="text-xs text-[var(--text-muted)] mb-4">
-        Despesas com status <strong>Pago</strong> com vencimento no mês atual.
-      </p>
+    <Overlay titulo={`Gastos do Mês — ${mesAtual}`} onFechar={onFechar} largura="max-w-xl">
       {lista.length === 0 ? (
-        <p className="text-center py-8 text-[var(--text-muted)] text-sm">Nenhum gasto confirmado neste mês.</p>
+        <p className="text-center py-8 text-[var(--text-muted)] text-sm">Nenhum gasto registrado neste mês.</p>
       ) : (
         <>
           <table className="w-full text-sm mb-4">
@@ -434,7 +431,7 @@ export default function Transparencia() {
               <KpiCard
                 label="Gastos do Mês"
                 valor={formatBRL(dados.kpis.gastos_mes)}
-                desc="despesas pagas no mês"
+                desc="despesas do mês atual"
                 icone={Receipt}
                 cor="#f97316"
                 onClick={() => setGastosModal(true)}
