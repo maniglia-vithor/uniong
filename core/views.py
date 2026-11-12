@@ -630,20 +630,6 @@ def painel_transparencia(request):
         for d in doacoes_recentes
     ]
 
-    distribuicao = [
-        {
-            'nome': d['campanha__titulo'] or 'Sem campanha',
-            'valor': float(d['total']),
-        }
-        for d in (
-            Doacao.objects.filter(status='confirmada')
-            .values('campanha__titulo')
-            .annotate(total=Sum('valor'))
-            .order_by('-total')
-        )
-        if d['total']
-    ]
-
     gastos_mes_qs = Despesa.objects.filter(
         data_vencimento__gte=inicio_mes,
         data_vencimento__lt=inicio_mes + relativedelta(months=1),
@@ -669,7 +655,6 @@ def painel_transparencia(request):
         'campanhas': campanhas_data,
         'doacoes_recentes': doacoes_data,
         'gastos_mes_lista': gastos_mes_lista,
-        'distribuicao': distribuicao,
     })
 
 

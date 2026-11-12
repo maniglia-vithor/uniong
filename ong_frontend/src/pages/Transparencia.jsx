@@ -353,11 +353,11 @@ export default function Transparencia() {
     meta: Number(c.meta_valor),
   })) ?? []
 
-  const dadosPie = dados?.distribuicao?.map((d, i) => ({
-    name: d.nome.length > 22 ? d.nome.slice(0, 20) + '…' : d.nome,
-    value: d.valor,
-    fill: d.nome === 'Sem campanha' ? '#94a3b8' : CORES_PIE[i % CORES_PIE.length],
-  })) ?? []
+  const dadosPie = dados?.campanhas?.map((c, i) => ({
+    name: c.titulo.length > 22 ? c.titulo.slice(0, 20) + '…' : c.titulo,
+    value: Number(c.valor_arrecadado),
+    fill: CORES_PIE[i % CORES_PIE.length],
+  })).filter(c => c.value > 0) ?? []
 
   const chartHeight = Math.max(220, dadosGraficoCampanhas.length * 55)
 
