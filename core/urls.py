@@ -6,7 +6,7 @@ from .relatorios import (
 )
 from .views import (
     ApoiadorViewSet, CampanhaViewSet, DoacaoViewSet, DashboardViewSet,
-    ComunicadoViewSet, NotificacaoViewSet, DespesaViewSet,
+    ComunicadoViewSet, NotificacaoViewSet, DespesaViewSet, HistoricoViewSet,
     painel_transparencia, public_doacao, configuracao_pix, configuracao_instituicao, google_login, prestacao_contas_publica, comprovante_publico,
 )
 
@@ -18,6 +18,7 @@ router.register(r'dashboard', DashboardViewSet, basename='dashboard')
 router.register(r'comunicados', ComunicadoViewSet, basename='comunicado')
 router.register(r'notificacoes', NotificacaoViewSet, basename='notificacao')
 router.register(r'despesas', DespesaViewSet, basename='despesa')
+router.register(r'historico', HistoricoViewSet, basename='historico')
 
 urlpatterns = router.urls + [
     path('public/transparencia/', painel_transparencia, name='painel_transparencia'),

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Megaphone, HandCoins, Users,
-  MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X, Settings,
+  MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X, Settings, History,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -18,6 +18,7 @@ const navItems = [
   { to: '/admin/comunicacao', label: 'Comunicação', icon: MessageSquare },
   { to: '/admin/custos', label: 'Custos', icon: Receipt },
   { to: '/admin/relatorios', label: 'Relatórios', icon: BarChart3 },
+  { to: '/admin/historico', label: 'Histórico', icon: History, soSuperusuario: true },
 ]
 
 const titulos = {
@@ -29,6 +30,7 @@ const titulos = {
   '/admin/custos': { titulo: 'Custos', sub: 'Gestão de despesas e transparência financeira' },
   '/admin/relatorios': { titulo: 'Relatórios', sub: 'Análises e exportações' },
   '/admin/configuracoes': { titulo: 'Configurações', sub: 'Preferências e gerenciamento do sistema' },
+  '/admin/historico': { titulo: 'Histórico', sub: 'Trilha de auditoria das alterações' },
 }
 
 const tipoBadge = {
@@ -159,7 +161,7 @@ export default function Layout() {
 
           {/* Nav */}
           <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-            {navItems.map(({ to, label, icon: Icon, end }) => (
+            {navItems.filter((item) => !item.soSuperusuario || usuario?.is_superuser).map(({ to, label, icon: Icon, end }) => (
               <NavLink
                 key={to}
                 to={to}

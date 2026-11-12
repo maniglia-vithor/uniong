@@ -1,9 +1,23 @@
 from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import serializers
-from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoInstituicao, ConfiguracaoPix
+from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa, DespesaAnexo, ConfiguracaoInstituicao, ConfiguracaoPix, LogAlteracao
 from .normalizacao import normalizar_celular, normalizar_email
 from .pix import normalizar_chave_pix
+
+
+class LogAlteracaoSerializer(serializers.ModelSerializer):
+    usuario_nome = serializers.SerializerMethodField()
+    acao_display = serializers.CharField(source='get_acao_display', read_only=True)
+
+    class Meta:
+        model = LogAlteracao
+        fields = ['id', 'data', 'usuario', 'usuario_nome', 'acao', 'acao_display', 'modelo', 'objeto_id', 'campo', 'antes', 'depois']
+
+    def get_usuario_nome(self, obj):
+        if obj.usuario is None:
+            return 'Sistema'
+        return obj.usuario.get_full_name() or obj.usuario.username
 
 
 class ConfiguracaoInstituicaoSerializer(serializers.ModelSerializer):

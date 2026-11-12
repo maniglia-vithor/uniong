@@ -13,7 +13,7 @@ from django.db.models import Case, Count, DecimalField, F, ProtectedError, Q, Su
 from django.db.models.functions import Coalesce
 from django.http import FileResponse
 from rest_framework import viewsets
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, BasePermission
 from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -24,11 +24,12 @@ from .models import Apoiador, Campanha, Doacao, Comunicado, Notificacao, Despesa
 from .anexos import TIPOS_PERMITIDOS, validar_anexo
 from .doacao_publica import DoacaoPublicaSerializer, ativar_membro_interessado, registrar_doacao_publica
 from . import indicadores
+from .auditoria import AuditoriaMixin, registrar as registrar_auditoria
 from .paginacao import filtrar_periodo
 from .portal import CATEGORIA_AGREGADA, despesas_publicas
 from .pix import mascarar
 from .throttles import AuthThrottle, DoacaoPublicaThrottle
-from .serializers import ApoiadorSerializer, CampanhaSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer, ConfiguracaoInstituicaoSerializer
+from .serializers import ApoiadorSerializer, CampanhaSerializer, DoacaoSerializer, ComunicadoSerializer, NotificacaoSerializer, DespesaSerializer, DespesaAnexoSerializer, ConfiguracaoPixSerializer, ConfiguracaoInstituicaoSerializer, LogAlteracaoSerializer
 
 
 def _notificar_admins(mensagem, tipo, actor_name='', action_text='', target_type='', target_id=None):
@@ -60,7 +61,7 @@ class ExclusaoProtegidaMixin:
             return Response({'erro': self.mensagem_exclusao_protegida}, status=400)
 
 
-class ApoiadorViewSet(ExclusaoProtegidaMixin, viewsets.ModelViewSet):
+class ApoiadorViewSet(AuditoriaMixin, ExclusaoProtegidaMixin, viewsets.ModelViewSet):
     serializer_class = ApoiadorSerializer
     mensagem_exclusao_protegida = 'Não é possível excluir: este membro possui doações vinculadas.'
     search_fields = ['nome', 'email']
@@ -99,7 +100,7 @@ class ApoiadorViewSet(ExclusaoProtegidaMixin, viewsets.ModelViewSet):
         )
 
 
-class CampanhaViewSet(ExclusaoProtegidaMixin, viewsets.ModelViewSet):
+class CampanhaViewSet(AuditoriaMixin, ExclusaoProtegidaMixin, viewsets.ModelViewSet):
     serializer_class = CampanhaSerializer
     mensagem_exclusao_protegida = (
         'Não é possível excluir: existem doações ou despesas vinculadas a esta campanha. Encerre a campanha em vez de excluí-la.'
@@ -152,7 +153,7 @@ class CampanhaViewSet(ExclusaoProtegidaMixin, viewsets.ModelViewSet):
         )
 
 
-class DoacaoViewSet(viewsets.ModelViewSet):
+class DoacaoViewSet(AuditoriaMixin, viewsets.ModelViewSet):
     serializer_class = DoacaoSerializer
     search_fields = ['apoiador__nome', 'campanha__titulo']
     ordering_fields = ['apoiador__nome', 'campanha__titulo', 'valor', 'data', 'status']
@@ -198,6 +199,7 @@ class DoacaoViewSet(viewsets.ModelViewSet):
         for doacao in doacoes:
             doacao.status = novo_status
             doacao.save(update_fields=['status'])
+            registrar_auditoria(request.user, doacao, 'edicao', 'status', 'pendente', novo_status)
             ativar_membro_interessado(doacao)
         return Response({'atualizadas': len(doacoes), 'ignoradas': len(set(ids)) - len(doacoes)})
 
@@ -324,7 +326,7 @@ class DashboardViewSet(viewsets.ViewSet):
         ])
 
 
-class DespesaViewSet(viewsets.ModelViewSet):
+class DespesaViewSet(AuditoriaMixin, viewsets.ModelViewSet):
     serializer_class = DespesaSerializer
     search_fields = ['descricao']
     ordering_fields = ['descricao', 'categoria', 'data_vencimento', 'data_pagamento', 'valor', 'status']
@@ -437,6 +439,31 @@ class DespesaViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='por-categoria')
     def por_categoria(self, request):
         return Response(indicadores.gastos_por_categoria())
+
+class SomenteSuperusuario(BasePermission):
+    message = 'Apenas superusuários podem consultar o histórico.'
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_active and request.user.is_superuser)
+
+
+class HistoricoViewSet(viewsets.ReadOnlyModelViewSet):
+    """Trilha de auditoria: ?modelo=&usuario=&objeto_id=&acao=&data_inicio=&data_fim=."""
+
+    serializer_class = LogAlteracaoSerializer
+    permission_classes = [SomenteSuperusuario]
+    search_fields = ['campo', 'antes', 'depois']
+    ordering_fields = ['data', 'modelo', 'acao']
+    ordering = ['-data', '-id']
+
+    def get_queryset(self):
+        qs = LogAlteracao.objects.select_related('usuario')
+        for param, campo in [('modelo', 'modelo'), ('usuario', 'usuario_id'), ('objeto_id', 'objeto_id'), ('acao', 'acao')]:
+            valor = self.request.query_params.get(param)
+            if valor:
+                qs = qs.filter(**{campo: valor})
+        return filtrar_periodo(qs, self.request, 'data__date')
+
 
 class ComunicadoViewSet(viewsets.ModelViewSet):
     queryset = Comunicado.objects.all()

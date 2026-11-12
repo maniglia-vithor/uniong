@@ -317,9 +317,16 @@ class DespesaAnexo(models.Model):
 class LogAlteracao(models.Model):
     """Registro de auditoria: quem alterou qual campo de qual registro."""
 
+    ACAO_CHOICES = [
+        ('criacao', 'Criação'),
+        ('edicao', 'Edição'),
+        ('exclusao', 'Exclusão'),
+    ]
+
     usuario = models.ForeignKey(
         get_user_model(), on_delete=models.SET_NULL, null=True, blank=True, related_name='alteracoes'
     )
+    acao = models.CharField(max_length=10, choices=ACAO_CHOICES, default='edicao')
     data = models.DateTimeField(auto_now_add=True)
     modelo = models.CharField(max_length=50)
     objeto_id = models.PositiveIntegerField(null=True, blank=True)

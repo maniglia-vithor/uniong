@@ -12,6 +12,7 @@ import Comunicacao from './pages/Comunicacao'
 import Custos from './pages/Custos'
 import Relatorios from './pages/Relatorios'
 import Configuracoes from './pages/Configuracoes'
+import Historico from './pages/Historico'
 import Transparencia from './pages/Transparencia'
 import Privacidade from './pages/Privacidade'
 import PrestacaoContasImpressao from './pages/PrestacaoContasImpressao'
@@ -49,6 +50,7 @@ export default function App() {
               <Route path="custos" element={<Custos />} />
               <Route path="relatorios" element={<Relatorios />} />
               <Route path="configuracoes" element={<Configuracoes />} />
+              <Route path="historico" element={<Historico />} />
             </Route>
           </Route>
 

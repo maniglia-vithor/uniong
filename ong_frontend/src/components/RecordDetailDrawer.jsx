@@ -6,6 +6,8 @@ import BadgeStatus from './BadgeStatus'
 import BarraProgresso from './BarraProgresso'
 import { Campo, Input, Select } from './CampoForm'
 import CampoData from './CampoData'
+import { useAuth } from '../context/AuthContext'
+import { formatarMomento } from '../utils/formatos'
 
 function formatBRL(v) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v ?? 0)
@@ -367,6 +369,35 @@ function InfoBox({ label, value, destaque }) {
   )
 }
 
+const modeloMap = { doacao: 'Doacao', campanha: 'Campanha', apoiador: 'Apoiador', despesa: 'Despesa' }
+
+function HistoricoRegistro({ tipo, id }) {
+  const [logs, setLogs] = useState(null)
+  useEffect(() => {
+    api.get('/historico/', { params: { modelo: modeloMap[tipo], objeto_id: id, page_size: 100 } })
+      .then((r) => setLogs(r.data.results ?? r.data))
+      .catch(() => setLogs([]))
+  }, [tipo, id])
+  if (logs === null) return <p className="text-xs text-[var(--text-muted)]">Carregando histórico…</p>
+  if (logs.length === 0) return <p className="text-xs text-[var(--text-muted)]">Nenhuma alteração registrada.</p>
+  return (
+    <ol className="space-y-3">
+      {logs.map((l) => (
+        <li key={l.id} className="border-l-2 border-[var(--border)] pl-3">
+          <p className="text-xs text-[var(--text-muted)]">{formatarMomento(l.data)} · {l.usuario_nome} · {l.acao_display}</p>
+          {l.campo !== '*' ? (
+            <p className="text-sm text-[var(--text-primary)]">
+              <strong>{l.campo}</strong>: <span className="text-[var(--text-muted)] line-through">{l.antes || '—'}</span> → {l.depois || '—'}
+            </p>
+          ) : (
+            <p className="text-xs text-[var(--text-secondary)] break-words">{l.depois || l.antes}</p>
+          )}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
 const endpointMap = { doacao: 'doacoes', campanha: 'campanhas', apoiador: 'apoiadores', despesa: 'despesas' }
 const tituloMap = { doacao: 'Doação', campanha: 'Campanha', apoiador: 'Membro', despesa: 'Despesa' }
 const corMap = { doacao: '#22c55e', campanha: '#f97316', apoiador: '#3b82f6', despesa: '#dc2626' }
@@ -380,9 +411,12 @@ export default function RecordDetailDrawer({ target, onClose, onRefresh }) {
   const [editando, setEditando] = useState(false)
   const [apoiadores, setApoiadores] = useState([])
   const [campanhas, setCampanhas] = useState([])
+  const [aba, setAba] = useState('detalhes')
+  const { usuario } = useAuth()
 
   useEffect(() => {
     if (!target) return
+    setAba('detalhes')
     const ep = endpointMap[target.type]
     if (!ep) return
     setCarregando(true)
@@ -461,9 +495,28 @@ export default function RecordDetailDrawer({ target, onClose, onRefresh }) {
           </button>
         </div>
 
+        {usuario?.is_superuser && !editando && (
+          <div role="tablist" className="flex gap-1 px-6 pt-3 border-b border-[var(--border)] flex-shrink-0">
+            {[['detalhes', 'Detalhes'], ['historico', 'Histórico']].map(([id, rotulo]) => (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={aba === id}
+                onClick={() => setAba(id)}
+                className="px-3 py-2 text-xs font-semibold border-b-2 -mb-px"
+                style={{ borderColor: aba === id ? '#0f4c5c' : 'transparent', color: aba === id ? '#0f4c5c' : 'var(--text-muted)' }}
+              >
+                {rotulo}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
-          {carregando ? (
+          {aba === 'historico' ? (
+            <HistoricoRegistro tipo={target.type} id={target.id} />
+          ) : carregando ? (
             <div className="flex justify-center py-16">
               <div className="w-8 h-8 border-4 border-[var(--border)] rounded-full animate-spin" style={{ borderTopColor: '#0f4c5c' }} />
             </div>

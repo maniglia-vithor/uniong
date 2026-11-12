@@ -27,3 +27,17 @@ export function mensagemErro(err, padrao = 'Erro ao salvar. Verifique os dados.'
   }
   return padrao
 }
+
+export const NOMES_MODELOS = {
+  Apoiador: 'Membro',
+  Campanha: 'Campanha',
+  Doacao: 'Doação',
+  Despesa: 'Despesa',
+  ConfiguracaoPix: 'Chave PIX',
+  ConfiguracaoInstituicao: 'Instituição',
+}
+
+export function formatarMomento(iso) {
+  const d = new Date(iso)
+  return `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+}

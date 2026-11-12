@@ -105,6 +105,9 @@ export const encerrarSerieDespesa    = (id, recorrencia_fim) => api.post(`/despe
 export const aplicarValorProximasDespesa = (id) => api.post(`/despesas/${id}/aplicar-valor-proximas/`)
 export const getDespesasPorCategoria = () => api.get('/despesas/por-categoria/')
 
+// Histórico (auditoria, só superusuário)
+export const getHistorico           = (params) => api.get('/historico/', { params })
+
 // Comunicados
 export const getComunicados        = (params) => api.get('/comunicados/', { params })
 export const criarComunicado       = (data) => api.post('/comunicados/', data)
