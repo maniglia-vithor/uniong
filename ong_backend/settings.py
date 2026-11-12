@@ -158,6 +158,10 @@ STATIC_ROOT = config('STATIC_ROOT', default=str(BASE_DIR / 'staticfiles'))
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Backups (python manage.py backup): pasta e quantos arquivos manter.
+BACKUP_DIR = config('BACKUP_DIR', default=str(BASE_DIR / 'backups'))
+BACKUP_MANTER = config('BACKUP_MANTER', default=7, cast=int)
+
 # Anexos de despesas: fora de MEDIA_ROOT, servidos só pela API autenticada.
 PRIVATE_MEDIA_ROOT = config('PRIVATE_MEDIA_ROOT', default=str(BASE_DIR / 'privado'))
 
