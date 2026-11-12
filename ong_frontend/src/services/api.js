@@ -98,6 +98,8 @@ export const excluirDespesa          = (id) => api.delete(`/despesas/${id}/`)
 export const removerAnexoDespesa     = (despesaId, anexoId) => api.delete(`/despesas/${despesaId}/anexos/${anexoId}/`)
 export const baixarAnexoDespesa      = (despesaId, anexoId) => api.get(`/despesas/${despesaId}/anexos/${anexoId}/download/`, { responseType: 'blob' })
 export const getDespesasResumo       = () => api.get('/despesas/resumo/')
+export const encerrarSerieDespesa    = (id, recorrencia_fim) => api.post(`/despesas/${id}/encerrar-serie/`, recorrencia_fim ? { recorrencia_fim } : {})
+export const aplicarValorProximasDespesa = (id) => api.post(`/despesas/${id}/aplicar-valor-proximas/`)
 export const getDespesasPorCategoria = () => api.get('/despesas/por-categoria/')
 
 // Comunicados

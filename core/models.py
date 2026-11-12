@@ -1,4 +1,7 @@
+import uuid
 from decimal import Decimal
+
+from dateutil.relativedelta import relativedelta
 
 from django.contrib.auth import get_user_model
 from django.db import models
@@ -163,6 +166,7 @@ class Despesa(models.Model):
     STATUS_CHOICES = [
         ('pendente', 'Pendente'),
         ('pago', 'Pago'),
+        ('cancelado', 'Cancelado'),
     ]
     RECORRENCIA_CHOICES = [
         ('mensal', 'Mensal'),
@@ -180,11 +184,27 @@ class Despesa(models.Model):
     recurrence_period = models.CharField(
         max_length=10, choices=RECORRENCIA_CHOICES, null=True, blank=True
     )
+    # Série de despesas fixas: cada ocorrência é calculada a partir da data-âncora (não da anterior).
+    serie_id = models.UUIDField(null=True, blank=True, db_index=True)
+    data_ancora = models.DateField(null=True, blank=True)
+    numero_ocorrencia = models.PositiveIntegerField(default=0)
+    recorrencia_fim = models.DateField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'Despesa'
         verbose_name_plural = 'Despesas'
         ordering = ['-data_vencimento']
+        constraints = [
+            # Despesas avulsas têm serie_id nulo; NULL não conflita em restrição única.
+            models.UniqueConstraint(fields=['serie_id', 'numero_ocorrencia'], name='ocorrencia_unica_por_serie'),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.is_fixed and self.recurrence_period and self.serie_id is None:
+            self.serie_id = uuid.uuid4()
+            self.data_ancora = self.data_vencimento
+            self.numero_ocorrencia = 0
+        super().save(*args, **kwargs)
 
     def status_efetivo(self):
         """Retorna 'atrasado' se pendente e vencida, independente do campo salvo."""
@@ -192,39 +212,51 @@ class Despesa(models.Model):
             return 'atrasado'
         return self.status
 
-    def _proxima_data_vencimento(self):
-        from dateutil.relativedelta import relativedelta
-        if self.recurrence_period == 'mensal':
-            return self.data_vencimento + relativedelta(months=1)
-        if self.recurrence_period == 'semanal':
-            from datetime import timedelta
-            return self.data_vencimento + timedelta(weeks=1)
-        if self.recurrence_period == 'anual':
-            return self.data_vencimento + relativedelta(years=1)
-        return None
+    PASSOS_RECORRENCIA = {'mensal': 'months', 'semanal': 'weeks', 'anual': 'years'}
+
+    def data_da_ocorrencia(self, numero):
+        """Vencimento da n-ésima ocorrência: âncora + n períodos (31/01 → 28/02 → 31/03)."""
+        passo = self.PASSOS_RECORRENCIA.get(self.recurrence_period)
+        if passo is None or self.data_ancora is None:
+            return None
+        return self.data_ancora + relativedelta(**{passo: numero})
 
     def gerar_proxima_recorrencia(self):
-        """Cria a próxima despesa recorrente se ainda não existir."""
-        if not self.is_fixed or not self.recurrence_period:
-            return
-        proxima = self._proxima_data_vencimento()
-        if proxima is None:
-            return
-        ja_existe = Despesa.objects.filter(
+        """Cria a próxima ocorrência da série (só se ainda não existir e não passar do fim). Devolve a criada ou None."""
+        if not self.is_fixed or not self.recurrence_period or self.serie_id is None:
+            return None
+        numero = self.numero_ocorrencia + 1
+        vencimento = self.data_da_ocorrencia(numero)
+        if vencimento is None or (self.recorrencia_fim and vencimento > self.recorrencia_fim):
+            return None
+        if Despesa.objects.filter(serie_id=self.serie_id, numero_ocorrencia=numero).exists():
+            return None
+        return Despesa.objects.create(
             descricao=self.descricao,
+            valor=self.valor,
+            categoria=self.categoria,
+            data_vencimento=vencimento,
+            status='pendente',
             is_fixed=True,
-            data_vencimento=proxima,
-        ).exists()
-        if not ja_existe:
-            Despesa.objects.create(
-                descricao=self.descricao,
-                valor=self.valor,
-                categoria=self.categoria,
-                data_vencimento=proxima,
-                status='pendente',
-                is_fixed=True,
-                recurrence_period=self.recurrence_period,
-            )
+            recurrence_period=self.recurrence_period,
+            serie_id=self.serie_id,
+            data_ancora=self.data_ancora,
+            numero_ocorrencia=numero,
+            recorrencia_fim=self.recorrencia_fim,
+        )
+
+    def encerrar_serie(self, fim):
+        """Define o fim da série e apaga as ocorrências pendentes que vencem depois dele. Devolve quantas apagou."""
+        serie = Despesa.objects.filter(serie_id=self.serie_id)
+        serie.update(recorrencia_fim=fim)
+        apagadas, _ = serie.filter(status='pendente', data_vencimento__gt=fim).delete()
+        return apagadas
+
+    def aplicar_valor_as_proximas(self):
+        """Copia o valor desta ocorrência para as ocorrências pendentes seguintes da série."""
+        return Despesa.objects.filter(
+            serie_id=self.serie_id, numero_ocorrencia__gt=self.numero_ocorrencia, status='pendente',
+        ).update(valor=self.valor)
 
     def __str__(self):
         return f'{self.descricao} — R$ {self.valor}'

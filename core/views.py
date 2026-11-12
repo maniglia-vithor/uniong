@@ -1,4 +1,5 @@
 import os
+from datetime import date
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -348,9 +349,6 @@ class DespesaViewSet(viewsets.ModelViewSet):
         despesa = serializer.save()
         if arquivos:
             self._salvar_anexos(despesa, arquivos)
-        # Gera primeira recorrência ao criar despesa fixa
-        if despesa.is_fixed and despesa.recurrence_period:
-            despesa.gerar_proxima_recorrencia()
         actor = self.request.user.get_full_name() or self.request.user.username
         valor = f'R$ {despesa.valor:.2f}'.replace('.', ',')
         tipo_txt = 'fixa' if despesa.is_fixed else 'variável'
@@ -369,10 +367,31 @@ class DespesaViewSet(viewsets.ModelViewSet):
         despesa = serializer.save()
         if arquivos:
             self._salvar_anexos(despesa, arquivos)
-        # Gera próxima recorrência quando marcada como paga
-        if (status_anterior != 'pago' and despesa.status == 'pago'
-                and despesa.is_fixed and despesa.recurrence_period):
+        # A próxima ocorrência da série só nasce quando a atual é paga.
+        if status_anterior != 'pago' and despesa.status == 'pago':
             despesa.gerar_proxima_recorrencia()
+
+    @action(detail=True, methods=['post'], url_path='encerrar-serie')
+    def encerrar_serie(self, request, pk=None):
+        """Define o fim da série (padrão: vencimento desta ocorrência) e apaga as pendentes posteriores."""
+        despesa = self.get_object()
+        if despesa.serie_id is None:
+            return Response({'erro': 'Esta despesa não faz parte de uma série recorrente.'}, status=400)
+        fim = despesa.data_vencimento
+        if request.data.get('recorrencia_fim'):
+            try:
+                fim = date.fromisoformat(request.data['recorrencia_fim'])
+            except (TypeError, ValueError):
+                return Response({'recorrencia_fim': 'Data inválida. Use AAAA-MM-DD.'}, status=400)
+        apagadas = despesa.encerrar_serie(fim)
+        return Response({'recorrencia_fim': fim.isoformat(), 'ocorrencias_apagadas': apagadas})
+
+    @action(detail=True, methods=['post'], url_path='aplicar-valor-proximas')
+    def aplicar_valor_proximas(self, request, pk=None):
+        despesa = self.get_object()
+        if despesa.serie_id is None:
+            return Response({'erro': 'Esta despesa não faz parte de uma série recorrente.'}, status=400)
+        return Response({'atualizadas': despesa.aplicar_valor_as_proximas()})
 
     @action(detail=True, methods=['delete'], url_path='anexos/(?P<anexo_id>[^/.]+)')
     def remover_anexo(self, request, pk=None, anexo_id=None):

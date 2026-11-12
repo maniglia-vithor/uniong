@@ -124,7 +124,9 @@ class DespesaSerializer(serializers.ModelSerializer):
             'id', 'descricao', 'valor', 'data_vencimento', 'data_pagamento',
             'categoria', 'categoria_display', 'status', 'status_efetivo',
             'is_fixed', 'recurrence_period', 'recurrence_period_display', 'anexos',
+            'serie_id', 'data_ancora', 'numero_ocorrencia', 'recorrencia_fim',
         ]
+        read_only_fields = ['serie_id', 'data_ancora', 'numero_ocorrencia']
 
     def get_status_efetivo(self, obj):
         return obj.status_efetivo()
@@ -134,9 +136,15 @@ class DespesaSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         status = attrs.get('status', getattr(self.instance, 'status', None))
+        status_anterior = getattr(self.instance, 'status', None)
         pagamento = attrs.get('data_pagamento', getattr(self.instance, 'data_pagamento', None))
         if status == 'pago' and not pagamento:
             attrs['data_pagamento'] = timezone.localdate()
+        if status_anterior == 'pago' and status != 'pago':
+            # Voltar de "pago" não apaga nada, mas a data de pagamento deixa de valer.
+            attrs['data_pagamento'] = None
+        if attrs.get('is_fixed') is False:
+            attrs['recurrence_period'] = None
         return attrs
 
 

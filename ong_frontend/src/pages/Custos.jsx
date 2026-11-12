@@ -9,14 +9,16 @@ import TabelaVazia from '../components/TabelaVazia'
 import Paginacao from '../components/Paginacao'
 import { CabecalhoOrdenavel, CampoBusca } from '../components/CabecalhoOrdenavel'
 import useListaPaginada from '../hooks/useListaPaginada'
+import { mensagemErro } from '../utils/formatos'
 import {
   getDespesas, criarDespesa, atualizarDespesa, excluirDespesa,
   removerAnexoDespesa, baixarAnexoDespesa, getDespesasResumo, getDespesasPorCategoria,
+  encerrarSerieDespesa, aplicarValorProximasDespesa,
 } from '../services/api'
 
 const VAZIO = {
   descricao: '', valor: '', data_vencimento: '', data_pagamento: '',
-  categoria: 'outros', status: 'pendente', is_fixed: false, recurrence_period: 'mensal',
+  categoria: 'outros', status: 'pendente', is_fixed: false, recurrence_period: 'mensal', recorrencia_fim: '',
 }
 
 const CATEGORIAS = [
@@ -108,9 +110,33 @@ export default function Custos() {
       status: item.status,
       is_fixed: item.is_fixed ?? false,
       recurrence_period: item.recurrence_period || 'mensal',
+      recorrencia_fim: item.recorrencia_fim || '',
     })
     setNovosAnexos([])
     setModal(true)
+  }
+
+  async function onEncerrarSerie() {
+    if (!confirm('Encerrar a série nesta ocorrência? As ocorrências pendentes seguintes serão apagadas.')) return
+    try {
+      const { data } = await encerrarSerieDespesa(editando.id)
+      alert(`Série encerrada. ${data.ocorrencias_apagadas} ocorrência(s) futura(s) apagada(s).`)
+      fechar()
+      carregar()
+    } catch (err) {
+      alert(mensagemErro(err, 'Não foi possível encerrar a série.'))
+    }
+  }
+
+  async function onAplicarValor() {
+    if (!confirm('Aplicar o valor salvo desta despesa às próximas ocorrências pendentes da série?')) return
+    try {
+      const { data } = await aplicarValorProximasDespesa(editando.id)
+      alert(`${data.atualizadas} ocorrência(s) atualizada(s). Salve antes se alterou o valor agora.`)
+      carregar()
+    } catch (err) {
+      alert(mensagemErro(err, 'Não foi possível aplicar o valor.'))
+    }
   }
 
   function fechar() { setModal(false); setEditando(null); setNovosAnexos([]) }
@@ -148,6 +174,7 @@ export default function Custos() {
     fd.append('status', form.status)
     fd.append('is_fixed', form.is_fixed ? 'true' : 'false')
     if (form.is_fixed) fd.append('recurrence_period', form.recurrence_period)
+    if (form.is_fixed) fd.append('recorrencia_fim', form.recorrencia_fim || '')
     novosAnexos.forEach((f) => fd.append('anexos', f))
     try {
       if (editando) await atualizarDespesa(editando.id, fd)
@@ -156,7 +183,7 @@ export default function Custos() {
       carregar()
     } catch (err) {
       const erros = err.response?.data?.anexos
-      alert(Array.isArray(erros) ? erros.join('\n') : 'Erro ao salvar. Verifique os dados.')
+      alert(Array.isArray(erros) ? erros.join('\n') : mensagemErro(err))
     }
     finally { setSalvando(false) }
   }
@@ -357,6 +384,7 @@ export default function Custos() {
                 <Select name="status" value={form.status} onChange={onChange}>
                   <option value="pendente">Pendente</option>
                   <option value="pago">Pago</option>
+                  <option value="cancelado">Cancelado (fora dos totais)</option>
                 </Select>
               </Campo>
             </div>
@@ -399,10 +427,26 @@ export default function Custos() {
                       <option value="anual">Anual</option>
                     </Select>
                   </Campo>
+                  <div className="mt-3">
+                    <Campo label="Repetir até (opcional)">
+                      <CampoData name="recorrencia_fim" value={form.recorrencia_fim} onChange={onChange} />
+                    </Campo>
+                  </div>
                   <p className="text-xs text-[var(--text-muted)] mt-2 flex items-center gap-1">
-                    <RefreshCw size={11} />
-                    A próxima despesa será gerada automaticamente ao marcar esta como paga.
+                    <RefreshCw size={11} aria-hidden="true" />
+                    A próxima ocorrência é criada ao marcar esta como paga, sempre a partir da data da primeira
+                    {editando?.numero_ocorrencia ? ` (ocorrência nº ${editando.numero_ocorrencia + 1} da série)` : ''}.
                   </p>
+                  {editando?.serie_id && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <button type="button" onClick={onAplicarValor} className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
+                        Aplicar valor às próximas
+                      </button>
+                      <button type="button" onClick={onEncerrarSerie} className="px-3 py-1.5 rounded-lg text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50">
+                        Encerrar série
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
