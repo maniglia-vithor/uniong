@@ -30,7 +30,7 @@ function formatData(iso) {
 }
 
 export default function Apoiadores() {
-  const { openDrawer, isAdmin } = useOutletContext() ?? {}
+  const { openDrawer } = useOutletContext() ?? {}
   const [lista, setLista] = useState([])
   const [carregando, setCarregando] = useState(true)
   const [modal, setModal] = useState(false)
@@ -141,14 +141,14 @@ export default function Apoiadores() {
           <h1 className="text-lg font-bold text-[var(--text-primary)]">Membros</h1>
           <p className="text-xs text-[var(--text-muted)]">Gerencie os membros da organização</p>
         </div>
-        {isAdmin && <button
+        <button
           onClick={abrirNovo}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90"
           style={{ backgroundColor: '#0f4c5c' }}
         >
           <UserPlus size={15} />
           Novo Membro
-        </button>}
+        </button>
       </div>
 
       <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border)]">
@@ -192,14 +192,14 @@ export default function Apoiadores() {
                     <td className="px-5 py-3 text-right font-semibold text-[var(--text-primary)]">{formatBRL(a.total_doado)}</td>
                     <td className="px-5 py-3"><BadgeStatus status={a.status} /></td>
                     <td className="px-5 py-3">
-                      {isAdmin && <div className="flex items-center gap-2 justify-end" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 justify-end" onClick={e => e.stopPropagation()}>
                         <button onClick={() => abrirEdicao(a)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-600 transition-colors">
                           <Pencil size={14} />
                         </button>
                         <button onClick={() => onExcluir(a.id, a.nome)} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
                           <Trash2 size={14} />
                         </button>
-                      </div>}
+                      </div>
                     </td>
                   </tr>
                 ))

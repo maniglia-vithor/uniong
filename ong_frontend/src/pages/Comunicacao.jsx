@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { useRole } from '../context/RoleContext'
 import { Pencil, Trash2, Plus, Megaphone, Globe, Users } from 'lucide-react'
 import Modal from '../components/Modal'
 import { Campo, Input, Select, BotaoSubmit, BotaoCancelar } from '../components/CampoForm'
@@ -19,7 +18,6 @@ function PublicoIcon({ tipo }) {
 }
 
 export default function Comunicacao() {
-  const { isAdmin } = useRole()
   const [lista, setLista] = useState([])
   const [carregando, setCarregando] = useState(true)
   const [modal, setModal] = useState(false)
@@ -70,13 +68,13 @@ export default function Comunicacao() {
           <h1 className="text-lg font-bold text-[var(--text-primary)]">Comunicação</h1>
           <p className="text-xs text-[var(--text-muted)]">Gerencie comunicados e publicações da organização</p>
         </div>
-        {isAdmin && <button
+        <button
           onClick={abrirNovo}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity"
           style={{ backgroundColor: '#0f4c5c' }}
         >
           <Plus size={15} /> Novo Comunicado
-        </button>}
+        </button>
       </div>
 
       {erro && <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-600">{erro}</div>}
@@ -89,9 +87,9 @@ export default function Comunicacao() {
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] shadow-sm flex flex-col items-center justify-center py-16 gap-3">
           <Megaphone size={32} className="text-[var(--text-muted)]" />
           <p className="text-[var(--text-muted)] text-sm">Nenhum comunicado publicado ainda.</p>
-          {isAdmin && <button onClick={abrirNovo} className="text-xs font-medium px-3 py-1.5 rounded-lg text-white" style={{ backgroundColor: '#0f4c5c' }}>
+          <button onClick={abrirNovo} className="text-xs font-medium px-3 py-1.5 rounded-lg text-white" style={{ backgroundColor: '#0f4c5c' }}>
             Criar primeiro comunicado
-          </button>}
+          </button>
         </div>
       ) : (
         <div className="space-y-3">
@@ -109,12 +107,12 @@ export default function Comunicacao() {
                   <p className="text-sm text-[var(--text-secondary)] whitespace-pre-line leading-relaxed">{c.conteudo}</p>
                 </div>
                 <div className="flex gap-1 flex-shrink-0">
-                  {isAdmin && <button onClick={() => abrirEdicao(c)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-700 transition-colors">
+                  <button onClick={() => abrirEdicao(c)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-700 transition-colors">
                     <Pencil size={14} />
-                  </button>}
-                  {isAdmin && <button onClick={() => onExcluir(c.id, c.titulo)} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
+                  </button>
+                  <button onClick={() => onExcluir(c.id, c.titulo)} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
                     <Trash2 size={14} />
-                  </button>}
+                  </button>
                 </div>
               </div>
             </div>

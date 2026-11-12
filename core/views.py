@@ -1,4 +1,4 @@
-﻿import csv
+import csv
 from datetime import date
 
 from django.conf import settings
@@ -11,7 +11,7 @@ from dateutil.relativedelta import relativedelta
 from django.db.models import Sum, Q
 from django.http import HttpResponse
 from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import AllowAny
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 
@@ -40,7 +40,6 @@ def _notificar_admins(mensagem, tipo, actor_name='', action_text='', target_type
 class ApoiadorViewSet(viewsets.ModelViewSet):
     queryset = Apoiador.objects.all()
     serializer_class = ApoiadorSerializer
-    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -65,7 +64,6 @@ class ApoiadorViewSet(viewsets.ModelViewSet):
 class CampanhaViewSet(viewsets.ModelViewSet):
     queryset = Campanha.objects.all()
     serializer_class = CampanhaSerializer
-    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -92,7 +90,6 @@ class CampanhaViewSet(viewsets.ModelViewSet):
 class DoacaoViewSet(viewsets.ModelViewSet):
     queryset = Doacao.objects.select_related('apoiador', 'campanha').all()
     serializer_class = DoacaoSerializer
-    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -124,7 +121,6 @@ class DoacaoViewSet(viewsets.ModelViewSet):
 
 class NotificacaoViewSet(viewsets.ModelViewSet):
     serializer_class = NotificacaoSerializer
-    permission_classes = [IsAuthenticated]
     http_method_names = ['get', 'patch', 'delete', 'head', 'options']
 
     def get_queryset(self):
@@ -137,7 +133,6 @@ class NotificacaoViewSet(viewsets.ModelViewSet):
 
 
 class DashboardViewSet(viewsets.ViewSet):
-    permission_classes = [IsAuthenticated]
 
     @action(detail=False, methods=['get'], url_path='resumo')
     def resumo(self, request):
@@ -365,7 +360,6 @@ class DashboardViewSet(viewsets.ViewSet):
 class DespesaViewSet(viewsets.ModelViewSet):
     queryset = Despesa.objects.prefetch_related('anexos').all()
     serializer_class = DespesaSerializer
-    permission_classes = [IsAuthenticated]
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
@@ -489,7 +483,6 @@ class DespesaViewSet(viewsets.ModelViewSet):
 class ComunicadoViewSet(viewsets.ModelViewSet):
     queryset = Comunicado.objects.all()
     serializer_class = ComunicadoSerializer
-    permission_classes = [IsAuthenticated]
 
 
 def _csv_response(filename):
@@ -500,7 +493,6 @@ def _csv_response(filename):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
 def relatorio_doacoes(request):
     response = _csv_response('relatorio_doacoes.csv')
     writer = csv.writer(response)
@@ -518,7 +510,6 @@ def relatorio_doacoes(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
 def relatorio_campanhas(request):
     response = _csv_response('relatorio_campanhas.csv')
     writer = csv.writer(response)
@@ -538,7 +529,6 @@ def relatorio_campanhas(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
 def relatorio_apoiadores(request):
     response = _csv_response('relatorio_apoiadores.csv')
     writer = csv.writer(response)
@@ -679,7 +669,6 @@ def painel_transparencia(request):
 
 
 @api_view(['GET', 'PUT'])
-@permission_classes([IsAuthenticated])
 def configuracao_pix(request):
     config = ConfiguracaoPix.obter()
     if request.method == 'PUT':

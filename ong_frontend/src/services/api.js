@@ -15,7 +15,8 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config
-    if (error.response?.status === 401 && !original._retry) {
+    const rotaDeAuth = original?.url?.startsWith('/auth/')
+    if (error.response?.status === 401 && !original._retry && !rotaDeAuth) {
       original._retry = true
       const refresh = localStorage.getItem('ong_refresh')
       if (refresh) {
@@ -26,10 +27,9 @@ api.interceptors.response.use(
           return api(original)
         } catch { /* refresh expirado */ }
       }
-      localStorage.removeItem('ong_usuario')
       localStorage.removeItem('ong_access')
       localStorage.removeItem('ong_refresh')
-      window.location.href = '/login'
+      if (window.location.pathname.startsWith('/admin')) window.location.href = '/login'
     }
     return Promise.reject(error)
   }

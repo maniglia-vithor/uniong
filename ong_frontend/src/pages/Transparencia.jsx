@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   HeartHandshake, DollarSign, Megaphone, Users, TrendingUp,
   Receipt, ShieldOff, ArrowLeft, X, ExternalLink, Share2,
@@ -14,7 +14,7 @@ import {
 } from 'recharts'
 import axios from 'axios'
 import BarraProgresso from '../components/BarraProgresso'
-import { useRole } from '../context/RoleContext'
+import { useAuth } from '../context/AuthContext'
 import logoUniONG from '../assets/Gemini_Generated_Image_g792fng792fng792.jpg'
 
 const BASE_URL = typeof window !== 'undefined' ? window.location.origin : ''
@@ -430,8 +430,7 @@ function Comunicados({ lista }) {
 
 /* ─── Main Page ─────────────────────────────────────────────────────────── */
 export default function Transparencia() {
-  const { role, switchRole } = useRole()
-  const navigate = useNavigate()
+  const { autenticado } = useAuth()
   const [dados, setDados] = useState(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
@@ -445,11 +444,6 @@ export default function Transparencia() {
       .catch(() => setErro('Não foi possível carregar os dados. Verifique a conexão com o servidor.'))
       .finally(() => setCarregando(false))
   }, [])
-
-  function voltarParaAdmin() {
-    switchRole('admin')
-    navigate('/admin')
-  }
 
   const dadosGraficoCampanhas = dados?.campanhas?.map(c => ({
     name: c.titulo.length > 22 ? c.titulo.slice(0, 20) + '…' : c.titulo,
@@ -468,15 +462,15 @@ export default function Transparencia() {
   return (
     <div className="min-h-screen bg-[var(--bg-page)]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-        {role === 'membro' && (
-          <button
-            onClick={voltarParaAdmin}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90"
+        {autenticado && (
+          <Link
+            to="/admin"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90"
             style={{ backgroundColor: '#0f4c5c' }}
           >
             <ArrowLeft size={15} />
             Voltar ao Painel
-          </button>
+          </Link>
         )}
 
         {/* Hero Banner */}

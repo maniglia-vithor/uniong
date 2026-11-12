@@ -31,7 +31,7 @@ function SortIcon({ dir }) {
 }
 
 export default function Doacoes() {
-  const { openDrawer, isAdmin } = useOutletContext() ?? {}
+  const { openDrawer } = useOutletContext() ?? {}
   const [lista, setLista] = useState([])
   const [apoiadores, setApoiadores] = useState([])
   const [campanhas, setCampanhas] = useState([])
@@ -154,13 +154,13 @@ export default function Doacoes() {
             <span className="font-semibold" style={{ color: '#0f4c5c' }}>{formatBRL(totalFiltrado)}</span>
           </p>
         </div>
-        {isAdmin && <button
+        <button
           onClick={abrirNovo}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity"
           style={{ backgroundColor: '#0f4c5c' }}
         >
           <Plus size={15} /> Registrar Doação
-        </button>}
+        </button>
       </div>
 
       {erro && (
@@ -205,14 +205,14 @@ export default function Doacoes() {
                     <td className="px-5 py-3 text-[var(--text-secondary)]">{formatData(d.data)}</td>
                     <td className="px-5 py-3"><BadgeStatus status={d.status} /></td>
                     <td className="px-5 py-3">
-                      {isAdmin && <div className="flex items-center gap-2 justify-end" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 justify-end" onClick={e => e.stopPropagation()}>
                         <button onClick={() => abrirEdicao(d)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-teal-600 transition-colors">
                           <Pencil size={14} />
                         </button>
                         <button onClick={() => onExcluir(d.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors">
                           <Trash2 size={14} />
                         </button>
-                      </div>}
+                      </div>
                     </td>
                   </tr>
                 ))

@@ -3,10 +3,8 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Megaphone, HandCoins, Users,
   MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X, Settings,
-  ChevronUp, ShieldCheck, Eye,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { useRole } from '../context/RoleContext'
 
 import api from '../services/api'
 import logoIcon from '../assets/Gemini_Generated_Image_g792fng792fng792.jpg'
@@ -62,10 +60,7 @@ function avatarCor(nome = '') {
 export default function Layout() {
   const { pathname } = useLocation()
   const { usuario, logout } = useAuth()
-  const { role, isAdmin, switchRole } = useRole()
   const navigate = useNavigate()
-  const [switcherAberto, setSwitcherAberto] = useState(false)
-  const switcherRef = useRef(null)
   const paginaAtual = titulos[pathname] || titulos['/admin']
 
   const [notificacoes, setNotificacoes] = useState([])
@@ -94,9 +89,6 @@ export default function Layout() {
     function handleClickFora(e) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setAberto(false)
-      }
-      if (switcherRef.current && !switcherRef.current.contains(e.target)) {
-        setSwitcherAberto(false)
       }
     }
     document.addEventListener('mousedown', handleClickFora)
@@ -188,73 +180,19 @@ export default function Layout() {
             ))}
           </nav>
 
-          {/* User + Role Switcher */}
-          <div className="px-4 py-4 border-t border-white/10 space-y-1" ref={switcherRef}>
-            {/* Switcher trigger */}
-            <div className="relative">
-              <button
-                onClick={() => setSwitcherAberto(v => !v)}
-                className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/10 transition-colors group"
+          {/* Usuário logado */}
+          <div className="px-4 py-4 border-t border-white/10 space-y-1">
+            <div className="flex items-center gap-3 px-2 py-2">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                style={{ backgroundColor: '#f97316' }}
               >
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 transition-colors"
-                  style={{ backgroundColor: isAdmin ? '#f97316' : '#7c3aed' }}
-                >
-                  {isAdmin
-                    ? (usuario?.username?.[0]?.toUpperCase() ?? 'A')
-                    : <Eye size={14} />}
-                </div>
-                <div className="flex-1 min-w-0 text-left">
-                  <p className="text-white text-xs font-medium truncate">
-                    {isAdmin ? (usuario?.username ?? 'admin') : 'membro'}
-                  </p>
-                  <p className="text-white/40 text-xs">
-                    {isAdmin ? 'Administrador' : 'Membro da ONG'}
-                  </p>
-                </div>
-                <ChevronUp
-                  size={14}
-                  className="text-white/40 transition-transform flex-shrink-0"
-                  style={{ transform: switcherAberto ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                />
-              </button>
-
-              {/* Dropdown de papéis */}
-              {switcherAberto && (
-                <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden z-50">
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-2.5 pb-1">
-                    Visualizar como
-                  </p>
-                  {[
-                    { id: 'admin',  label: usuario?.username ?? 'admin', sub: 'Administrador — acesso total', Icon: ShieldCheck, cor: '#f97316' },
-                    { id: 'membro', label: 'membro',                     sub: 'Membro — somente leitura',    Icon: Eye,          cor: '#7c3aed' },
-                  ].map(({ id, label, sub, Icon, cor }) => (
-                    <button
-                      key={id}
-                      onClick={() => {
-                        switchRole(id)
-                        setSwitcherAberto(false)
-                        navigate(id === 'membro' ? '/transparencia' : '/admin')
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 transition-colors"
-                    >
-                      <div
-                        className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: `${cor}18` }}
-                      >
-                        <Icon size={13} style={{ color: cor }} />
-                      </div>
-                      <div className="flex-1 min-w-0 text-left">
-                        <p className="text-xs font-semibold text-slate-800 truncate">{label}</p>
-                        <p className="text-[10px] text-slate-400">{sub}</p>
-                      </div>
-                      {role === id && (
-                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: cor }} />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
+                {iniciais(usuario?.nome || usuario?.username || '?')}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-xs font-medium truncate">{usuario?.nome || usuario?.username}</p>
+                <p className="text-white/40 text-xs">{usuario?.is_superuser ? 'Administrador' : 'Equipe'}</p>
+              </div>
             </div>
 
             <button
@@ -276,9 +214,7 @@ export default function Layout() {
               <p className="text-xs text-[var(--text-muted)]">{paginaAtual.sub}</p>
             </div>
 
-            {/* Settings (admin only) + Bell */}
             <div className="flex items-center gap-1">
-            {isAdmin && (
               <button
                 onClick={() => navigate('/admin/configuracoes')}
                 className="p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
@@ -286,7 +222,6 @@ export default function Layout() {
               >
                 <Settings size={18} className="text-[var(--text-muted)]" />
               </button>
-            )}
 
             {/* Bell */}
             <div className="relative" ref={dropdownRef}>
@@ -452,17 +387,9 @@ export default function Layout() {
             </div>
           </header>
 
-          {/* Faixa modo membro */}
-          {!isAdmin && (
-            <div className="flex items-center gap-2 px-6 py-2 text-xs font-medium flex-shrink-0" style={{ backgroundColor: '#7c3aed18', color: '#7c3aed', borderBottom: '1px solid #7c3aed30' }}>
-              <Eye size={13} />
-              Visualizando como <strong>Membro</strong> — modo somente leitura. Alterne no canto inferior esquerdo.
-            </div>
-          )}
-
           {/* Content */}
           <main className="flex-1 overflow-y-auto p-6 bg-[var(--bg-page)]">
-            <Outlet context={{ openDrawer: setDrawerTarget, isAdmin }} />
+            <Outlet context={{ openDrawer: setDrawerTarget }} />
           </main>
         </div>
       </div>
