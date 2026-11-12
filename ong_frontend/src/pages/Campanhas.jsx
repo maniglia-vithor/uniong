@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Pencil, Trash2, Plus } from 'lucide-react'
+import { useEffect, useState, useMemo } from 'react'
+import { Pencil, Trash2, Plus, ArrowUpDown } from 'lucide-react'
 import { useOutletContext } from 'react-router-dom'
 import Modal from '../components/Modal'
 import { Campo, Input, Select, BotaoSubmit, BotaoCancelar } from '../components/CampoForm'
@@ -23,6 +23,23 @@ export default function Campanhas() {
   const [editando, setEditando] = useState(null)
   const [form, setForm] = useState(VAZIO)
   const [salvando, setSalvando] = useState(false)
+  const [sortKey, setSortKey] = useState('data_inicio_desc')
+
+  const listaOrdenada = useMemo(() => {
+    return [...lista].sort((a, b) => {
+      switch (sortKey) {
+        case 'titulo_asc': return a.titulo.localeCompare(b.titulo, 'pt-BR')
+        case 'titulo_desc': return b.titulo.localeCompare(a.titulo, 'pt-BR')
+        case 'meta_asc': return a.meta_valor - b.meta_valor
+        case 'meta_desc': return b.meta_valor - a.meta_valor
+        case 'progresso_asc': return a.percentual_progresso - b.percentual_progresso
+        case 'progresso_desc': return b.percentual_progresso - a.percentual_progresso
+        case 'data_inicio_asc': return a.data_inicio.localeCompare(b.data_inicio)
+        case 'data_inicio_desc': return b.data_inicio.localeCompare(a.data_inicio)
+        default: return 0
+      }
+    })
+  }, [lista, sortKey])
 
   const carregar = () => {
     setCarregando(true)
@@ -94,13 +111,32 @@ export default function Campanhas() {
           <h1 className="text-lg font-bold text-[var(--text-primary)]">Campanhas</h1>
           <p className="text-xs text-[var(--text-muted)]">Gerencie as campanhas de arrecadação</p>
         </div>
-        {isAdmin && <button
-          onClick={abrirNovo}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity"
-          style={{ backgroundColor: '#0f4c5c' }}
-        >
-          <Plus size={15} /> Nova Campanha
-        </button>}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+            <ArrowUpDown size={13} />
+            <select
+              value={sortKey}
+              onChange={e => setSortKey(e.target.value)}
+              className="text-xs border border-[var(--border)] rounded-lg px-2 py-1.5 bg-[var(--bg-card)] text-[var(--text-secondary)] outline-none focus:border-teal-500 cursor-pointer"
+            >
+              <option value="data_inicio_desc">Mais recentes</option>
+              <option value="data_inicio_asc">Mais antigas</option>
+              <option value="titulo_asc">Título A→Z</option>
+              <option value="titulo_desc">Título Z→A</option>
+              <option value="meta_desc">Maior meta</option>
+              <option value="meta_asc">Menor meta</option>
+              <option value="progresso_desc">Maior progresso</option>
+              <option value="progresso_asc">Menor progresso</option>
+            </select>
+          </div>
+          {isAdmin && <button
+            onClick={abrirNovo}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: '#0f4c5c' }}
+          >
+            <Plus size={15} /> Nova Campanha
+          </button>}
+        </div>
       </div>
 
       {erro && (
@@ -113,7 +149,7 @@ export default function Campanhas() {
         </div>
       ) : !erro && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {lista.map((c, i) => (
+          {listaOrdenada.map((c, i) => (
             <div
               key={c.id}
               className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border)] p-5 flex flex-col gap-3 cursor-pointer hover:shadow-md transition-shadow"

@@ -10,6 +10,7 @@ class Apoiador(models.Model):
 
     nome = models.CharField(max_length=150)
     email = models.EmailField(unique=True)
+    celular = models.CharField(max_length=20, null=True, blank=True)
     data_cadastro = models.DateField(auto_now_add=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='ativo')
 

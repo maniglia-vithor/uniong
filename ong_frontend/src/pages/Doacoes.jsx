@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Pencil, Trash2, Plus } from 'lucide-react'
+import { useEffect, useState, useMemo } from 'react'
+import { Pencil, Trash2, Plus, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { useOutletContext } from 'react-router-dom'
 import Modal from '../components/Modal'
 import { Campo, Input, Select, BotaoSubmit, BotaoCancelar } from '../components/CampoForm'
@@ -24,6 +24,12 @@ function iniciais(nome) {
   return nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 }
 
+function SortIcon({ dir }) {
+  if (dir === 'asc') return <ChevronUp size={12} className="inline-block ml-1" />
+  if (dir === 'desc') return <ChevronDown size={12} className="inline-block ml-1" />
+  return <ChevronsUpDown size={12} className="inline-block ml-1 opacity-30" />
+}
+
 export default function Doacoes() {
   const { openDrawer, isAdmin } = useOutletContext() ?? {}
   const [lista, setLista] = useState([])
@@ -35,6 +41,42 @@ export default function Doacoes() {
   const [editando, setEditando] = useState(null)
   const [form, setForm] = useState(VAZIO)
   const [salvando, setSalvando] = useState(false)
+  const [sortCol, setSortCol] = useState(null)
+  const [sortDir, setSortDir] = useState('asc')
+
+  function handleSort(col) {
+    if (sortCol === col) {
+      if (sortDir === 'asc') setSortDir('desc')
+      else { setSortCol(null); setSortDir('asc') }
+    } else { setSortCol(col); setSortDir('asc') }
+  }
+
+  const TIPO_COL = {
+    apoiador_nome: 'texto', campanha_titulo: 'texto',
+    valor: 'numero', data: 'data', status: 'texto',
+  }
+
+  const listaOrdenada = useMemo(() => {
+    if (!sortCol) return lista
+    return [...lista].sort((a, b) => {
+      let va = a[sortCol]; let vb = b[sortCol]
+      if (va == null) va = TIPO_COL[sortCol] === 'numero' ? -Infinity : ''
+      if (vb == null) vb = TIPO_COL[sortCol] === 'numero' ? -Infinity : ''
+      const cmp = TIPO_COL[sortCol] === 'numero'
+        ? va - vb
+        : String(va).localeCompare(String(vb), 'pt-BR')
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [lista, sortCol, sortDir])
+
+  const colHeader = (key, label, align = 'left') => (
+    <th
+      onClick={() => handleSort(key)}
+      className={`text-${align} text-xs font-medium text-[var(--text-muted)] px-5 py-3 cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors whitespace-nowrap`}
+    >
+      {label}<SortIcon dir={sortCol === key ? sortDir : null} />
+    </th>
+  )
 
   const carregar = () => {
     setCarregando(true)
@@ -130,11 +172,11 @@ export default function Doacoes() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--border)]">
-                <th className="text-left text-xs font-medium text-[var(--text-muted)] px-5 py-3">Doador</th>
-                <th className="text-left text-xs font-medium text-[var(--text-muted)] px-5 py-3">Campanha</th>
-                <th className="text-right text-xs font-medium text-[var(--text-muted)] px-5 py-3">Valor</th>
-                <th className="text-left text-xs font-medium text-[var(--text-muted)] px-5 py-3">Data</th>
-                <th className="text-left text-xs font-medium text-[var(--text-muted)] px-5 py-3">Status</th>
+                {colHeader('apoiador_nome', 'Doador')}
+                {colHeader('campanha_titulo', 'Campanha')}
+                {colHeader('valor', 'Valor', 'right')}
+                {colHeader('data', 'Data')}
+                {colHeader('status', 'Status')}
                 <th className="px-5 py-3" />
               </tr>
             </thead>
@@ -144,7 +186,7 @@ export default function Doacoes() {
               ) : lista.length === 0 ? (
                 <TabelaVazia />
               ) : (
-                lista.map((d) => (
+                listaOrdenada.map((d) => (
                   <tr
                     key={d.id}
                     className="hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"

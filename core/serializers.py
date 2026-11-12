@@ -8,7 +8,7 @@ class ApoiadorSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Apoiador
-        fields = ['id', 'nome', 'email', 'data_cadastro', 'status', 'total_doado']
+        fields = ['id', 'nome', 'email', 'celular', 'data_cadastro', 'status', 'total_doado']
 
     def get_total_doado(self, obj):
         total = obj.doacoes.filter(status='confirmada').aggregate(total=Sum('valor'))['total']
