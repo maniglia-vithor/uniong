@@ -247,78 +247,82 @@ function CampanhaModal({ campanha, onFechar }) {
   }
 
   const redes = [
-    { label: 'WhatsApp', Icon: FaWhatsapp, cor: '#25d366', onClick: () => abrirPopup(`https://wa.me/?text=${tc}`) },
-    { label: 'Instagram', Icon: FaInstagram, cor: '#e1306c', onClick: () => compartilharSemUrl('Instagram', 'https://www.instagram.com/') },
-    { label: 'Facebook', Icon: FaFacebook, cor: '#1877f2', onClick: () => abrirPopup(`https://www.facebook.com/sharer/sharer.php?u=${u}&quote=${t}`) },
-    { label: 'LinkedIn', Icon: FaLinkedin, cor: '#0a66c2', onClick: () => abrirPopup(`https://www.linkedin.com/sharing/share-offsite/?url=${u}`) },
-    { label: 'E-mail', Icon: MdEmail, cor: '#ea4335', onClick: () => { window.location.href = `mailto:?subject=${encodeURIComponent(`Apoie a campanha: ${campanha.titulo}`)}&body=${tc}` } },
-    { label: 'TikTok', Icon: FaTiktok, cor: '#ff0050', onClick: () => compartilharSemUrl('TikTok', 'https://www.tiktok.com/') },
+    { label: 'WhatsApp', Icon: FaWhatsapp, onClick: () => abrirPopup(`https://wa.me/?text=${tc}`) },
+    { label: 'Instagram', Icon: FaInstagram, onClick: () => compartilharSemUrl('Instagram', 'https://www.instagram.com/') },
+    { label: 'Facebook', Icon: FaFacebook, onClick: () => abrirPopup(`https://www.facebook.com/sharer/sharer.php?u=${u}&quote=${t}`) },
+    { label: 'LinkedIn', Icon: FaLinkedin, onClick: () => abrirPopup(`https://www.linkedin.com/sharing/share-offsite/?url=${u}`) },
+    { label: 'E-mail', Icon: MdEmail, onClick: () => { window.location.href = `mailto:?subject=${encodeURIComponent(`Apoie a campanha: ${campanha.titulo}`)}&body=${tc}` } },
+    { label: 'TikTok', Icon: FaTiktok, onClick: () => compartilharSemUrl('TikTok', 'https://www.tiktok.com/') },
   ]
 
   return (
     <Overlay titulo={campanha.titulo} onFechar={onFechar} largura="max-w-lg">
-      {/* Progress */}
-      <div className="mb-5">
-        <div className="flex justify-between mb-1.5 text-sm">
-          <span className="text-[var(--text-muted)]">Progresso</span>
-          <span className="font-bold" style={{ color: '#0f4c5c' }}>{campanha.percentual_progresso}%</span>
-        </div>
-        <BarraProgresso percentual={campanha.percentual_progresso} cor="#0f4c5c" />
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 mb-5">
-        {[
-          { label: 'Arrecadado', valor: formatBRL(campanha.valor_arrecadado), cor: '#0f4c5c' },
-          { label: 'Meta', valor: formatBRL(campanha.meta_valor), cor: '#f97316' },
-          { label: 'Início', valor: formatData(campanha.data_inicio), cor: '#0891b2' },
-          { label: 'Encerramento', valor: campanha.data_fim ? formatData(campanha.data_fim) : 'Em aberto', cor: '#7c3aed' },
-        ].map(item => (
-          <div key={item.label} className="bg-[var(--bg-card-alt)] rounded-xl p-3 border border-[var(--border)]">
-            <p className="text-xs text-[var(--text-muted)] mb-0.5">{item.label}</p>
-            <p className="font-bold text-sm text-[var(--text-primary)]" style={{ color: item.cor }}>{item.valor}</p>
+      <div className="space-y-6">
+        {/* Progresso */}
+        <div>
+          <div className="flex justify-between mb-1.5 text-xs">
+            <span className="text-[var(--text-muted)]">Progresso</span>
+            <span className="font-semibold text-[var(--text-primary)]">{campanha.percentual_progresso}%</span>
           </div>
-        ))}
-      </div>
-
-      {/* PIX QR Code */}
-      <div className="bg-[var(--bg-card-alt)] rounded-xl border border-[var(--border)] p-4 mb-5 flex flex-col items-center gap-3">
-        <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">PIX — Doe agora</p>
-        <img
-          src={qrUrl}
-          alt="QR Code PIX"
-          className="w-[160px] h-[160px] rounded-xl border border-[var(--border)]"
-          onError={e => { e.target.style.display = 'none' }}
-        />
-        <p className="text-[10px] text-center text-[var(--text-muted)] max-w-xs">
-          Escaneie o QR Code com o app do seu banco para realizar uma doação via PIX para esta campanha.
-        </p>
-      </div>
-
-      {/* Share */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <Share2 size={14} className="text-[var(--text-muted)]" />
-          <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">Compartilhar campanha</p>
+          <BarraProgresso percentual={campanha.percentual_progresso} cor="#0f4c5c" />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {redes.map(({ label, Icon, cor, onClick }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={onClick}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-            >
-              <Icon size={18} style={{ color: cor }} className="flex-shrink-0" />
-              {label}
-            </button>
+
+        {/* Detalhes */}
+        <dl className="grid grid-cols-2 border border-[var(--border)] rounded-lg divide-x divide-y divide-[var(--border)] overflow-hidden">
+          {[
+            { label: 'Arrecadado', valor: formatBRL(campanha.valor_arrecadado) },
+            { label: 'Meta', valor: formatBRL(campanha.meta_valor) },
+            { label: 'Início', valor: formatData(campanha.data_inicio) },
+            { label: 'Encerramento', valor: campanha.data_fim ? formatData(campanha.data_fim) : 'Em aberto' },
+          ].map(item => (
+            <div key={item.label} className="px-4 py-3">
+              <dt className="text-xs text-[var(--text-muted)]">{item.label}</dt>
+              <dd className="text-sm font-semibold text-[var(--text-primary)] mt-0.5">{item.valor}</dd>
+            </div>
           ))}
+        </dl>
+
+        {/* PIX */}
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Doar via PIX</h3>
+          <div className="flex items-center gap-4 border border-[var(--border)] rounded-lg p-4">
+            <img
+              src={qrUrl}
+              alt="QR Code PIX"
+              className="w-[120px] h-[120px] rounded-md border border-[var(--border)] bg-white flex-shrink-0"
+              onError={e => { e.target.style.display = 'none' }}
+            />
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+              Escaneie o QR Code com o aplicativo do seu banco para realizar uma doação via PIX para esta campanha.
+            </p>
+          </div>
         </div>
-        {aviso && (
-          <p className="mt-3 text-xs text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
-            {aviso}
-          </p>
-        )}
+
+        {/* Compartilhar */}
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3 flex items-center gap-2">
+            <Share2 size={14} className="text-[var(--text-muted)]" />
+            Compartilhar campanha
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {redes.map(({ label, Icon, onClick }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={onClick}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                <Icon size={15} className="flex-shrink-0" />
+                {label}
+              </button>
+            ))}
+          </div>
+          {aviso && (
+            <p className="mt-3 text-xs text-[var(--text-secondary)] bg-[var(--bg-card-alt)] border border-[var(--border)] rounded-lg px-3 py-2">
+              {aviso}
+            </p>
+          )}
+        </div>
       </div>
     </Overlay>
   )
