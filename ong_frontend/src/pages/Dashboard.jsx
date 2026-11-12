@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
-import { DollarSign, CalendarDays, Users, Megaphone, Scale } from 'lucide-react'
+import { DollarSign, CalendarDays, Users, Megaphone, Scale, HandHeart, Clock } from 'lucide-react'
 import GraficoFluxo from '../components/GraficoFluxo'
 import KpiCard from '../components/KpiCard'
 import KpiDetailPanel from '../components/KpiDetailPanel'
@@ -147,7 +147,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {kpis.map((kpi) => (
           <KpiCard key={kpi.titulo} {...kpi} onClick={() => setPainelKpi(kpi.id)} />
         ))}
@@ -160,6 +160,26 @@ export default function Dashboard() {
           icone={Scale}
           cor="#16a34a"
         />
+        {resumo.voluntarios_ativos && (
+          <>
+            <KpiCard
+              titulo="Voluntários Ativos"
+              valor={resumo.voluntarios_ativos.value}
+              trend_percentage={null}
+              rotuloTendencia="Cadastros com situação Ativo"
+              icone={HandHeart}
+              cor="#db2777"
+            />
+            <KpiCard
+              titulo="Horas de Voluntariado no Mês"
+              valor={`${Number(resumo.horas_voluntariado_mes.value).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} h`}
+              trend_percentage={null}
+              rotuloTendencia="Horas registradas nas atividades do mês"
+              icone={Clock}
+              cor="#0891b2"
+            />
+          </>
+        )}
       </div>
 
       <GraficoFluxo

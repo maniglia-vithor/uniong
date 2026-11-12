@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   HeartHandshake, DollarSign, Megaphone, Users, TrendingUp,
   Receipt, ShieldOff, ArrowLeft, X, ExternalLink,
-  CheckCircle, Plus,
+  CheckCircle, Plus, HandHeart,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -447,6 +447,17 @@ export default function Transparencia() {
                 onClick={() => setGastosModal(true)}
               />
             </div>
+            {dados.kpis.horas_voluntariado > 0 && (
+              <p className="flex items-center gap-2 text-sm text-[var(--text-secondary)] -mt-4">
+                <HandHeart size={16} aria-hidden="true" style={{ color: '#db2777' }} />
+                <span>
+                  <strong className="text-[var(--text-primary)]">
+                    {Number(dados.kpis.horas_voluntariado).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} horas
+                  </strong>{' '}
+                  de trabalho voluntário registradas pela nossa comunidade.
+                </span>
+              </p>
+            )}
 
             {/* Campanhas em Andamento */}
             <section>

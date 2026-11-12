@@ -9,7 +9,7 @@ from dateutil.relativedelta import relativedelta
 from django.db.models import Sum
 from django.utils import timezone
 
-from .models import Apoiador, Campanha, Despesa, Doacao
+from .models import Apoiador, Campanha, Despesa, Doacao, InscricaoAtividade, Voluntario
 
 
 def hoje():
@@ -102,6 +102,21 @@ def _kpi(valor, pct, **extra):
     return {'value': valor, 'trend_percentage': pct, 'trend_direction': _direcao(pct), **extra}
 
 
+# ── Voluntariado ────────────────────────────────────────────────────────────
+def voluntarios_ativos():
+    return Voluntario.objects.filter(status='ativo')
+
+
+def horas_voluntariado(inicio=None, fim=None):
+    """Soma das horas registradas nas inscrições de atividades com data no período (None = sem limite)."""
+    qs = InscricaoAtividade.objects.all()
+    if inicio is not None:
+        qs = qs.filter(atividade__data__gte=inicio)
+    if fim is not None:
+        qs = qs.filter(atividade__data__lte=fim)
+    return _soma(qs, 'horas')
+
+
 def resumo_painel(referencia=None):
     """KPIs do painel com tendências.
 
@@ -136,6 +151,8 @@ def resumo_painel(referencia=None):
         'doacoes_mes': _kpi(float(doacoes_mes), variacao(doacoes_mes, doacoes_mes_anterior)),
         'apoiadores_ativos': _kpi(membros, variacao(membros, membros_antes)),
         'campanhas_ativas': _kpi(campanhas, variacao(campanhas, campanhas_antes)),
+        'voluntarios_ativos': _kpi(voluntarios_ativos().count(), None),
+        'horas_voluntariado_mes': _kpi(float(horas_voluntariado(inicio_mes, limites_mes(referencia)[1])), None),
         'saldo_mes': _kpi(
             float(saldo(inicio_mes, limites_mes(referencia)[1])),
             None,

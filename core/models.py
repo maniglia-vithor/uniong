@@ -449,6 +449,66 @@ class DespesaAnexo(models.Model):
         return f'Anexo de {self.despesa}'
 
 
+class Voluntario(models.Model):
+    STATUS_CHOICES = [('ativo', 'Ativo'), ('inativo', 'Inativo')]
+
+    # Opcional: o voluntário pode também ser membro (doador) da organização.
+    apoiador = models.ForeignKey(
+        Apoiador, on_delete=models.SET_NULL, null=True, blank=True, related_name='voluntarios'
+    )
+    nome = models.CharField(max_length=150)
+    email = models.EmailField(blank=True, default='')
+    telefone = models.CharField(max_length=20, blank=True, default='')
+    areas_interesse = models.CharField(max_length=255, blank=True, default='')
+    disponibilidade = models.CharField(max_length=255, blank=True, default='')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='ativo')
+    criado_em = models.DateField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Voluntário'
+        verbose_name_plural = 'Voluntários'
+        ordering = ['nome']
+
+    def __str__(self):
+        return self.nome
+
+
+class Atividade(models.Model):
+    titulo = models.CharField(max_length=200)
+    data = models.DateField()
+    local = models.CharField(max_length=200, blank=True, default='')
+    descricao = models.TextField(blank=True, default='')
+    vagas = models.PositiveIntegerField(default=10)
+    voluntarios = models.ManyToManyField(Voluntario, through='InscricaoAtividade', related_name='atividades')
+
+    class Meta:
+        verbose_name = 'Atividade'
+        verbose_name_plural = 'Atividades'
+        ordering = ['-data', '-id']
+
+    def __str__(self):
+        return f'{self.titulo} ({self.data:%d/%m/%Y})'
+
+
+class InscricaoAtividade(models.Model):
+    atividade = models.ForeignKey(Atividade, on_delete=models.CASCADE, related_name='inscricoes')
+    voluntario = models.ForeignKey(Voluntario, on_delete=models.PROTECT, related_name='inscricoes')
+    # Horas efetivamente trabalhadas, registradas depois da atividade.
+    horas = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    inscrito_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Inscrição em atividade'
+        verbose_name_plural = 'Inscrições em atividades'
+        ordering = ['voluntario__nome']
+        constraints = [
+            models.UniqueConstraint(fields=['atividade', 'voluntario'], name='inscricao_unica_por_atividade'),
+        ]
+
+    def __str__(self):
+        return f'{self.voluntario} em {self.atividade}'
+
+
 class LogAlteracao(models.Model):
     """Registro de auditoria: quem alterou qual campo de qual registro."""
 

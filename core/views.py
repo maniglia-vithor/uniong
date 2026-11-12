@@ -680,6 +680,8 @@ def painel_transparencia(request):
             'campanhas_ativas': campanhas.count(),
             'gastos_mes': float(gastos_mes_total),
             'a_pagar_mes': float(a_pagar_mes),
+            # Agregado, sem identificar voluntários.
+            'horas_voluntariado': float(indicadores.horas_voluntariado()),
         },
         'campanhas': campanhas_data,
         'gastos_mes_lista': gastos_mes_lista,

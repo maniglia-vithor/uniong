@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .campanhas_publicas import campanha_publica, imagem_campanha
 from .comunicados import descadastrar
 from .equipe import EquipeViewSet
+from .voluntarios import AtividadeViewSet, VoluntarioViewSet
 from .relatorios import (
     relatorio_apoiadores, relatorio_campanhas, relatorio_despesas, relatorio_doacoes, relatorio_prestacao_contas,
 )
@@ -24,6 +25,8 @@ router.register(r'notificacoes', NotificacaoViewSet, basename='notificacao')
 router.register(r'despesas', DespesaViewSet, basename='despesa')
 router.register(r'historico', HistoricoViewSet, basename='historico')
 router.register(r'equipe', EquipeViewSet, basename='equipe')
+router.register(r'voluntarios', VoluntarioViewSet, basename='voluntario')
+router.register(r'atividades', AtividadeViewSet, basename='atividade')
 
 urlpatterns = router.urls + [
     path('public/transparencia/', painel_transparencia, name='painel_transparencia'),

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Megaphone, HandCoins, Users,
-  MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X, Settings, History, UserCog,
+  MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X, Settings, History, UserCog, HandHeart,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -18,6 +18,7 @@ const navItems = [
   { to: '/admin/apoiadores', label: 'Membros', icon: Users },
   { to: '/admin/comunicacao', label: 'Comunicação', icon: MessageSquare },
   { to: '/admin/custos', label: 'Custos', icon: Receipt },
+  { to: '/admin/voluntarios', label: 'Voluntários', icon: HandHeart },
   { to: '/admin/relatorios', label: 'Relatórios', icon: BarChart3 },
   { to: '/admin/equipe', label: 'Equipe', icon: UserCog, soSuperusuario: true },
   { to: '/admin/historico', label: 'Histórico', icon: History, soSuperusuario: true },
@@ -34,6 +35,7 @@ const titulos = {
   '/admin/configuracoes': { titulo: 'Configurações', sub: 'Preferências e gerenciamento do sistema' },
   '/admin/historico': { titulo: 'Histórico', sub: 'Trilha de auditoria das alterações' },
   '/admin/equipe': { titulo: 'Equipe', sub: 'Acessos ao painel' },
+  '/admin/voluntarios': { titulo: 'Voluntários', sub: 'Atividades e horas de voluntariado' },
 }
 
 const tipoBadge = {

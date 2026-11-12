@@ -14,6 +14,7 @@ import Relatorios from './pages/Relatorios'
 import Configuracoes from './pages/Configuracoes'
 import Historico from './pages/Historico'
 import Equipe from './pages/Equipe'
+import Voluntarios from './pages/Voluntarios'
 import DefinirSenha from './pages/DefinirSenha'
 import RecuperarSenha from './pages/RecuperarSenha'
 import Descadastrar from './pages/Descadastrar'
@@ -60,6 +61,7 @@ export default function App() {
               <Route path="apoiadores" element={<Apoiadores />} />
               <Route path="comunicacao" element={<Comunicacao />} />
               <Route path="custos" element={<Custos />} />
+              <Route path="voluntarios" element={<Voluntarios />} />
               <Route path="relatorios" element={<Relatorios />} />
               <Route path="configuracoes" element={<Configuracoes />} />
               <Route path="historico" element={<Historico />} />
