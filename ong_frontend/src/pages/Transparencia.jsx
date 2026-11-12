@@ -371,8 +371,8 @@ export default function Transparencia() {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90"
             style={{ backgroundColor: '#0f4c5c' }}
           >
-            <ArrowLeft size={15} />
-            Voltar ao Painel
+            <ArrowLeft size={15} aria-hidden="true" />
+            Voltar à visão de administrador
           </Link>
         )}
 

@@ -272,3 +272,9 @@ Decisões tomadas:
   - não há geração antecipada de ocorrências futuras de despesas;
   - não existe mais a lista de “doações recentes anonimizadas” no portal;
   - a prestação de contas é HTML imprimível, não PDF gerado no servidor.
+
+## Extra — Alternância de visão para a apresentação ✅
+Branch `fase-8-visao-membro` (a partir de `fase-7-artigo`), a pedido do autor, para a demonstração na banca.
+- [x] Controle “Administrador | Membro” no topo do painel. “Membro” abre o portal público (`/transparencia`), que é o que um membro vê. No portal, quem está logado vê o botão “Voltar à visão de administrador”.
+
+Decisão: é só um atalho de navegação, sem papel simulado nem mudança de permissões. Por isso não reverte a decisão do CLAUDE.md que removeu o seletor simulado de perfil: membros continuam sem login, e o papel exibido continua vindo do backend.

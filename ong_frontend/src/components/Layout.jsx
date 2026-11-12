@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Megaphone, HandCoins, Users,
-  MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X, Settings, History, UserCog, HandHeart, Menu,
+  MessageSquare, Receipt, BarChart3, Bell, LogOut, Check, X, Settings, History, UserCog, HandHeart, Menu, ShieldCheck, Eye,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -259,6 +259,27 @@ export default function Layout() {
             </div>
 
             <div className="flex items-center gap-1">
+              {/* Troca de visão para demonstração: "Membro" abre o portal público (o que um membro vê). */}
+              <div role="group" aria-label="Alternar visão" className="flex items-center rounded-lg border border-[var(--border)] p-0.5 mr-1 text-xs font-semibold">
+                <span
+                  aria-current="true"
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-white"
+                  style={{ backgroundColor: '#0f4c5c' }}
+                >
+                  <ShieldCheck size={13} aria-hidden="true" />
+                  <span className="hidden sm:inline">Administrador</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => navigate('/transparencia')}
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                  aria-label="Ir para a visão de membro (portal de transparência)"
+                  title="Ver o sistema como um membro vê (portal de transparência)"
+                >
+                  <Eye size={13} aria-hidden="true" />
+                  <span className="hidden sm:inline">Membro</span>
+                </button>
+              </div>
               <button
                 onClick={() => navigate('/admin/configuracoes')}
                 className="p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
