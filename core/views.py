@@ -630,13 +630,74 @@ def painel_transparencia(request):
         for d in doacoes_recentes
     ]
 
+    gastos_mes_qs = Despesa.objects.filter(
+        status='pago',
+        data_vencimento__gte=inicio_mes,
+        data_vencimento__lte=hoje,
+    )
+    gastos_mes_total = gastos_mes_qs.aggregate(total=Sum('valor'))['total'] or 0
+    gastos_mes_lista = [
+        {
+            'descricao': d.descricao,
+            'categoria': d.get_categoria_display(),
+            'valor': float(d.valor),
+        }
+        for d in gastos_mes_qs.order_by('-valor')
+    ]
+
     return Response({
         'kpis': {
             'total_arrecadado': float(total_arrecadado),
             'doacoes_mes': float(doacoes_mes),
             'apoiadores_ativos': apoiadores_ativos,
             'campanhas_ativas': campanhas.count(),
+            'gastos_mes': float(gastos_mes_total),
         },
         'campanhas': campanhas_data,
         'doacoes_recentes': doacoes_data,
+        'gastos_mes_lista': gastos_mes_lista,
     })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def public_doacao(request):
+    """Endpoint público para registrar intenção de doação."""
+    nome = request.data.get('nome', '').strip()
+    email = request.data.get('email', '').strip()
+    celular = request.data.get('celular', '').strip()
+    campaign_id = request.data.get('campaign_id')
+    valor = request.data.get('valor', 0)
+
+    if not nome or not email:
+        return Response({'erro': 'Nome e e-mail são obrigatórios.'}, status=400)
+
+    apoiador, _ = Apoiador.objects.get_or_create(
+        email=email,
+        defaults={'nome': nome, 'celular': celular or None, 'status': 'ativo'},
+    )
+    if celular and not apoiador.celular:
+        apoiador.celular = celular
+        apoiador.save(update_fields=['celular'])
+
+    campanha = None
+    if campaign_id:
+        try:
+            campanha = Campanha.objects.get(pk=campaign_id)
+        except Campanha.DoesNotExist:
+            pass
+
+    try:
+        valor_decimal = float(valor) if valor else 0
+    except (ValueError, TypeError):
+        valor_decimal = 0
+
+    Doacao.objects.create(
+        apoiador=apoiador,
+        campanha=campanha,
+        valor=max(valor_decimal, 0.01),
+        data=date.today(),
+        status='pendente',
+    )
+
+    return Response({'mensagem': 'Doação registrada com sucesso! Aguarde confirmação.'}, status=201)

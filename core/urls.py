@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     ApoiadorViewSet, CampanhaViewSet, DoacaoViewSet, DashboardViewSet,
     ComunicadoViewSet, NotificacaoViewSet, DespesaViewSet,
-    painel_transparencia, google_login,
+    painel_transparencia, public_doacao, google_login,
     relatorio_doacoes, relatorio_campanhas, relatorio_apoiadores,
 )
 
@@ -18,6 +18,7 @@ router.register(r'despesas', DespesaViewSet, basename='despesa')
 
 urlpatterns = router.urls + [
     path('public/transparencia/', painel_transparencia, name='painel_transparencia'),
+    path('public/doacoes/', public_doacao, name='public_doacao'),
     path('auth/google/', google_login, name='google_login'),
     path('relatorios/doacoes/', relatorio_doacoes, name='relatorio_doacoes'),
     path('relatorios/campanhas/', relatorio_campanhas, name='relatorio_campanhas'),

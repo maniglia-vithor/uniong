@@ -9,7 +9,7 @@ import { useAuth } from '../context/AuthContext'
 import { useRole } from '../context/RoleContext'
 
 import api from '../services/api'
-import logoIcon from '../assets/logo-icon-uniong.png.jpg'
+import logoIcon from '../assets/Gemini_Generated_Image_g792fng792fng792.jpg'
 import RecordDetailDrawer from './RecordDetailDrawer'
 
 const navItems = [

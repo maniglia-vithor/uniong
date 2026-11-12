@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   HeartHandshake, DollarSign, Megaphone, Users, TrendingUp,
-  Receipt, ShieldOff, ShieldCheck, ExternalLink, ArrowLeft,
+  Receipt, ShieldOff, ArrowLeft, X, ExternalLink, Share2,
+  Camera, Mail, Globe, Briefcase, MessageCircle, CheckCircle,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -11,6 +12,9 @@ import {
 import axios from 'axios'
 import BarraProgresso from '../components/BarraProgresso'
 import { useRole } from '../context/RoleContext'
+import logoUniONG from '../assets/Gemini_Generated_Image_g792fng792fng792.jpg'
+
+const BASE_URL = typeof window !== 'undefined' ? window.location.origin : ''
 
 function formatBRL(v) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v ?? 0)
@@ -25,66 +29,340 @@ function formatData(iso) {
 const CORES_CAMPANHA = ['#0f4c5c', '#f97316', '#0891b2', '#7c3aed']
 const CORES_PIE = ['#0f4c5c', '#f97316', '#0891b2', '#7c3aed', '#10b981', '#ec4899']
 
-function KpiCard({ label, valor, desc, icone: Icon, cor }) {
+/* ─── KPI Card ─────────────────────────────────────────────────────────── */
+function KpiCard({ label, valor, desc, icone: Icon, cor, onClick }) {
+  const base = 'bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-5 flex items-center gap-4'
+  const interactive = onClick ? ' cursor-pointer hover:shadow-md hover:border-[var(--text-muted)] transition-all' : ''
   return (
-    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-5 flex items-center gap-4">
-      <div
-        className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: `${cor}22` }}
-      >
+    <div className={base + interactive} onClick={onClick}>
+      <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${cor}22` }}>
         <Icon size={22} style={{ color: cor }} />
       </div>
-      <div>
+      <div className="min-w-0">
         <p className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">{label}</p>
-        <p className="text-2xl font-bold text-[var(--text-primary)] leading-tight">{valor}</p>
+        <p className="text-2xl font-bold text-[var(--text-primary)] leading-tight truncate">{valor}</p>
         <p className="text-xs text-[var(--text-muted)]">{desc}</p>
+      </div>
+      {onClick && (
+        <div className="ml-auto flex-shrink-0">
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${cor}18`, color: cor }}>
+            Ver detalhes
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ─── Overlay Modal ─────────────────────────────────────────────────────── */
+function Overlay({ titulo, onFechar, children, largura = 'max-w-lg' }) {
+  useEffect(() => {
+    const fn = (e) => { if (e.key === 'Escape') onFechar() }
+    document.addEventListener('keydown', fn)
+    return () => document.removeEventListener('keydown', fn)
+  }, [onFechar])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+      <div className={`bg-[var(--bg-card)] rounded-2xl shadow-2xl border border-[var(--border)] w-full ${largura} max-h-[90vh] flex flex-col`}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] flex-shrink-0">
+          <h2 className="font-bold text-[var(--text-primary)] text-base">{titulo}</h2>
+          <button onClick={onFechar} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)]">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="overflow-y-auto flex-1 px-6 py-5">
+          {children}
+        </div>
       </div>
     </div>
   )
 }
 
+/* ─── Donation Modal ─────────────────────────────────────────────────────── */
+function DonationModal({ campanhas, onFechar }) {
+  const [form, setForm] = useState({ nome: '', email: '', celular: '', campaign_id: '', valor: '' })
+  const [salvando, setSalvando] = useState(false)
+  const [sucesso, setSucesso] = useState(false)
+  const [erro, setErro] = useState(null)
+
+  function onChange(e) { setForm(f => ({ ...f, [e.target.name]: e.target.value })) }
+
+  async function onSubmit(e) {
+    e.preventDefault()
+    setSalvando(true)
+    setErro(null)
+    try {
+      await axios.post('/api/public/doacoes/', {
+        nome: form.nome,
+        email: form.email,
+        celular: form.celular,
+        campaign_id: form.campaign_id || null,
+        valor: form.valor || 0,
+      })
+      setSucesso(true)
+    } catch (err) {
+      setErro(err?.response?.data?.erro || 'Erro ao registrar doação. Tente novamente.')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const inputCls = 'w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg bg-[var(--bg-input)] text-[var(--text-primary)] outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100'
+
+  if (sucesso) {
+    return (
+      <Overlay titulo="Doação Registrada!" onFechar={onFechar}>
+        <div className="flex flex-col items-center gap-4 py-6 text-center">
+          <CheckCircle size={48} className="text-emerald-500" />
+          <h3 className="text-lg font-bold text-[var(--text-primary)]">Obrigado pela sua contribuição!</h3>
+          <p className="text-sm text-[var(--text-secondary)] max-w-sm">
+            Sua intenção de doação foi registrada com sucesso. Nossa equipe entrará em contato para confirmar o pagamento.
+          </p>
+          <button onClick={onFechar} className="mt-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ backgroundColor: '#0f4c5c' }}>
+            Fechar
+          </button>
+        </div>
+      </Overlay>
+    )
+  }
+
+  return (
+    <Overlay titulo="Realizar Doação" onFechar={onFechar}>
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div>
+          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Campanha</label>
+          <select name="campaign_id" value={form.campaign_id} onChange={onChange} className={inputCls}>
+            <option value="">Doação geral (sem campanha)</option>
+            {campanhas.map(c => <option key={c.id} value={c.id}>{c.titulo}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Nome completo *</label>
+          <input name="nome" value={form.nome} onChange={onChange} required placeholder="Maria da Silva" className={inputCls} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">E-mail *</label>
+          <input name="email" type="email" value={form.email} onChange={onChange} required placeholder="maria@email.com" className={inputCls} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Celular</label>
+          <input name="celular" value={form.celular} onChange={onChange} placeholder="(11) 99999-9999" className={inputCls} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Valor (R$)</label>
+          <input name="valor" type="number" min="1" step="0.01" value={form.valor} onChange={onChange} placeholder="50,00" className={inputCls} />
+        </div>
+        {erro && <p className="text-xs text-red-500">{erro}</p>}
+        <button
+          type="submit"
+          disabled={salvando}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60 transition-opacity hover:opacity-90"
+          style={{ backgroundColor: '#0f4c5c' }}
+        >
+          {salvando ? 'Registrando…' : 'Confirmar Doação'}
+        </button>
+      </form>
+    </Overlay>
+  )
+}
+
+/* ─── Expenses Modal ─────────────────────────────────────────────────────── */
+function GastosModal({ lista, total, onFechar }) {
+  const mesAtual = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
+  return (
+    <Overlay titulo={`Gastos Confirmados — ${mesAtual}`} onFechar={onFechar} largura="max-w-xl">
+      <p className="text-xs text-[var(--text-muted)] mb-4">
+        Despesas com status <strong>Pago</strong> com vencimento no mês atual.
+      </p>
+      {lista.length === 0 ? (
+        <p className="text-center py-8 text-[var(--text-muted)] text-sm">Nenhum gasto confirmado neste mês.</p>
+      ) : (
+        <>
+          <table className="w-full text-sm mb-4">
+            <thead>
+              <tr className="border-b border-[var(--border)]">
+                <th className="text-left text-xs font-medium text-[var(--text-muted)] py-2">Descrição</th>
+                <th className="text-left text-xs font-medium text-[var(--text-muted)] py-2">Categoria</th>
+                <th className="text-right text-xs font-medium text-[var(--text-muted)] py-2">Valor</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border-subtle)]">
+              {lista.map((g, i) => (
+                <tr key={i} className="hover:bg-[var(--bg-hover)]">
+                  <td className="py-2.5 text-[var(--text-primary)] font-medium pr-4">{g.descricao}</td>
+                  <td className="py-2.5 text-[var(--text-secondary)]">{g.categoria}</td>
+                  <td className="py-2.5 text-right font-semibold text-[var(--text-primary)]">{formatBRL(g.valor)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="flex justify-end pt-2 border-t border-[var(--border)]">
+            <span className="text-sm font-bold text-[var(--text-primary)]">Total: {formatBRL(total)}</span>
+          </div>
+        </>
+      )}
+    </Overlay>
+  )
+}
+
+/* ─── Campaign Detail Modal ──────────────────────────────────────────────── */
+function CampanhaModal({ campanha, onFechar }) {
+  const qrData = encodeURIComponent(`PIX:UniONG:${campanha.titulo}:${campanha.id}`)
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${qrData}&color=0f4c5c`
+
+  const shareText = encodeURIComponent(`Apoie a campanha "${campanha.titulo}" da UniONG! Meta: ${formatBRL(campanha.meta_valor)} — ${BASE_URL}/transparencia`)
+  const shareUrl = encodeURIComponent(`${BASE_URL}/transparencia`)
+
+  const shareLinks = [
+    {
+      label: 'WhatsApp',
+      icon: MessageCircle,
+      cor: '#25d366',
+      href: `https://wa.me/?text=${shareText}`,
+    },
+    {
+      label: 'Instagram',
+      icon: Camera,
+      cor: '#e1306c',
+      href: `https://instagram.com`,
+    },
+    {
+      label: 'Facebook',
+      icon: Globe,
+      cor: '#1877f2',
+      href: `https://www.facebook.com/sharer/sharer.php?u=${shareUrl}&quote=${shareText}`,
+    },
+    {
+      label: 'LinkedIn',
+      icon: Briefcase,
+      cor: '#0a66c2',
+      href: `https://www.linkedin.com/sharing/share-offsite/?url=${shareUrl}`,
+    },
+    {
+      label: 'E-mail',
+      icon: Mail,
+      cor: '#6b7280',
+      href: `mailto:?subject=${encodeURIComponent('Apoie esta campanha!')}&body=${shareText}`,
+    },
+    {
+      label: 'TikTok',
+      icon: ExternalLink,
+      cor: '#010101',
+      href: `https://www.tiktok.com`,
+    },
+  ]
+
+  return (
+    <Overlay titulo={campanha.titulo} onFechar={onFechar} largura="max-w-lg">
+      {/* Progress */}
+      <div className="mb-5">
+        <div className="flex justify-between mb-1.5 text-sm">
+          <span className="text-[var(--text-muted)]">Progresso</span>
+          <span className="font-bold" style={{ color: '#0f4c5c' }}>{campanha.percentual_progresso}%</span>
+        </div>
+        <BarraProgresso percentual={campanha.percentual_progresso} cor="#0f4c5c" />
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        {[
+          { label: 'Arrecadado', valor: formatBRL(campanha.valor_arrecadado), cor: '#0f4c5c' },
+          { label: 'Meta', valor: formatBRL(campanha.meta_valor), cor: '#f97316' },
+          { label: 'Início', valor: formatData(campanha.data_inicio), cor: '#0891b2' },
+          { label: 'Encerramento', valor: campanha.data_fim ? formatData(campanha.data_fim) : 'Em aberto', cor: '#7c3aed' },
+        ].map(item => (
+          <div key={item.label} className="bg-[var(--bg-card-alt)] rounded-xl p-3 border border-[var(--border)]">
+            <p className="text-xs text-[var(--text-muted)] mb-0.5">{item.label}</p>
+            <p className="font-bold text-sm text-[var(--text-primary)]" style={{ color: item.cor }}>{item.valor}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* PIX QR Code */}
+      <div className="bg-[var(--bg-card-alt)] rounded-xl border border-[var(--border)] p-4 mb-5 flex flex-col items-center gap-3">
+        <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">PIX — Doe agora</p>
+        <img
+          src={qrUrl}
+          alt="QR Code PIX"
+          className="w-[160px] h-[160px] rounded-xl border border-[var(--border)]"
+          onError={e => { e.target.style.display = 'none' }}
+        />
+        <p className="text-[10px] text-center text-[var(--text-muted)] max-w-xs">
+          Escaneie o QR Code com o app do seu banco para realizar uma doação via PIX para esta campanha.
+        </p>
+      </div>
+
+      {/* Share */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Share2 size={14} className="text-[var(--text-muted)]" />
+          <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">Compartilhar campanha</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {shareLinks.map(({ label, icon: Icon, cor, href }) => (
+            <a
+              key={label}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors hover:opacity-90"
+              style={{ borderColor: `${cor}40`, color: cor, backgroundColor: `${cor}0f` }}
+            >
+              <Icon size={13} />
+              {label}
+            </a>
+          ))}
+        </div>
+      </div>
+    </Overlay>
+  )
+}
+
+/* ─── Main Page ─────────────────────────────────────────────────────────── */
 export default function Transparencia() {
   const { role, switchRole } = useRole()
   const navigate = useNavigate()
   const [dados, setDados] = useState(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
+  const [donationModal, setDonationModal] = useState(false)
+  const [gastosModal, setGastosModal] = useState(false)
+  const [campanhaModal, setCampanhaModal] = useState(null)
+
+  useEffect(() => {
+    axios.get('/api/public/transparencia/')
+      .then(r => setDados(r.data))
+      .catch(() => setErro('Não foi possível carregar os dados. Verifique a conexão com o servidor.'))
+      .finally(() => setCarregando(false))
+  }, [])
 
   function voltarParaAdmin() {
     switchRole('admin')
     navigate('/admin')
   }
 
-  useEffect(() => {
-    axios.get('/api/public/transparencia/')
-      .then((r) => setDados(r.data))
-      .catch(() => setErro('Não foi possível carregar os dados. Verifique a conexão com o servidor.'))
-      .finally(() => setCarregando(false))
-  }, [])
-
-  const dadosGraficoMensal = dados?.doacoes_por_mes ?? []
-
   const dadosGraficoCampanhas = dados?.campanhas?.map(c => ({
-    name: c.titulo.length > 20 ? c.titulo.slice(0, 18) + '…' : c.titulo,
+    name: c.titulo.length > 22 ? c.titulo.slice(0, 20) + '…' : c.titulo,
     arrecadado: Number(c.valor_arrecadado),
     meta: Number(c.meta_valor),
   })) ?? []
 
   const dadosPie = dados?.campanhas?.map((c, i) => ({
-    name: c.titulo.length > 20 ? c.titulo.slice(0, 18) + '…' : c.titulo,
+    name: c.titulo.length > 22 ? c.titulo.slice(0, 20) + '…' : c.titulo,
     value: Number(c.valor_arrecadado),
     fill: CORES_PIE[i % CORES_PIE.length],
   })).filter(c => c.value > 0) ?? []
+
+  const chartHeight = Math.max(220, dadosGraficoCampanhas.length * 55)
 
   return (
     <div className="min-h-screen bg-[var(--bg-page)]">
       {/* Header */}
       <header className="bg-[var(--bg-card)] border-b border-[var(--border)] sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#0f4c5c' }}>
-              <HeartHandshake size={18} className="text-white" />
-            </div>
+            <img src={logoUniONG} alt="UniONG" className="w-9 h-9 rounded-xl object-cover flex-shrink-0" />
             <div>
               <p className="font-bold text-[var(--text-primary)] text-sm leading-tight">UniONG</p>
               <p className="text-xs text-[var(--text-muted)]">Portal de Transparência</p>
@@ -101,240 +379,219 @@ export default function Transparencia() {
                 Voltar ao Painel
               </button>
             )}
-            <Link
-              to="/login"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors border border-[var(--border)]"
+            <button
+              onClick={() => setDonationModal(true)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
+              style={{ backgroundColor: '#0f4c5c' }}
             >
-              <ShieldCheck size={13} />
-              Área Restrita
-            </Link>
+              <HeartHandshake size={14} />
+              Realizar doação
+            </button>
           </div>
         </div>
       </header>
 
-    <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
-      {/* Hero */}
-      <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-6 flex items-center gap-4">
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: '#0f4c5c' }}
-        >
-          <HeartHandshake size={26} className="text-white" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Portal de Transparência</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5 max-w-xl">
-            Acompanhe em tempo real o impacto das campanhas, o total arrecadado e como os recursos
-            estão sendo utilizados pela organização.
+      <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+        {/* Hero */}
+        <div className="text-center py-2">
+          <h1 className="text-3xl font-bold text-[var(--text-primary)]">Transparência em Números</h1>
+          <p className="text-[var(--text-secondary)] mt-2 text-sm max-w-xl mx-auto">
+            Acompanhe em tempo real o impacto das nossas campanhas, o total arrecadado
+            e como cada doação está sendo utilizada pela nossa comunidade.
           </p>
         </div>
-      </div>
 
-      {carregando && (
-        <div className="flex justify-center py-24">
-          <div
-            className="w-10 h-10 border-4 border-[var(--border)] rounded-full animate-spin"
-            style={{ borderTopColor: '#0f4c5c' }}
-          />
-        </div>
-      )}
-
-      {erro && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex items-center gap-3 text-red-600 text-sm">
-          <ShieldOff size={20} className="flex-shrink-0" />
-          {erro}
-        </div>
-      )}
-
-      {dados && (
-        <>
-          {/* KPIs */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <KpiCard
-              label="Total Arrecadado"
-              valor={formatBRL(dados.kpis.total_arrecadado)}
-              desc="em todas as campanhas"
-              icone={DollarSign}
-              cor="#0f4c5c"
-            />
-            <KpiCard
-              label="Campanhas Ativas"
-              valor={dados.kpis.campanhas_ativas}
-              desc="em andamento agora"
-              icone={Megaphone}
-              cor="#f97316"
-            />
-            <KpiCard
-              label="Membros Ativos"
-              valor={dados.kpis.apoiadores_ativos}
-              desc="pessoas engajadas"
-              icone={Users}
-              cor="#0891b2"
-            />
-            <KpiCard
-              label="Doações Registradas"
-              valor={dados.doacoes_recentes?.length ?? 0}
-              desc="nas últimas operações"
-              icone={TrendingUp}
-              cor="#7c3aed"
-            />
+        {carregando && (
+          <div className="flex justify-center py-24">
+            <div className="w-10 h-10 border-4 border-[var(--border)] rounded-full animate-spin" style={{ borderTopColor: '#0f4c5c' }} />
           </div>
+        )}
 
-          {/* Campanhas em Andamento */}
-          <section>
-            <h2 className="text-base font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-              <Megaphone size={16} style={{ color: '#f97316' }} />
-              Campanhas em Andamento
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {dados.campanhas.map((c, i) => {
-                const cor = CORES_CAMPANHA[i % CORES_CAMPANHA.length]
-                return (
-                  <div
-                    key={c.id}
-                    className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-5"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="font-semibold text-[var(--text-primary)] leading-snug pr-2">{c.titulo}</h3>
-                      <span className="text-lg font-bold flex-shrink-0" style={{ color: cor }}>
-                        {c.percentual_progresso}%
-                      </span>
-                    </div>
-                    <BarraProgresso percentual={c.percentual_progresso} cor={cor} />
-                    <div className="flex justify-between mt-3 text-sm">
-                      <div>
-                        <p className="text-xs text-[var(--text-muted)]">Arrecadado</p>
-                        <p className="font-bold text-[var(--text-primary)]">{formatBRL(c.valor_arrecadado)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-[var(--text-muted)]">Meta</p>
-                        <p className="font-semibold text-[var(--text-secondary)]">{formatBRL(c.meta_valor)}</p>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-              {dados.campanhas.length === 0 && (
-                <p className="col-span-2 text-center py-10 text-[var(--text-muted)] text-sm">
-                  Nenhuma campanha ativa no momento.
-                </p>
-              )}
+        {erro && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex items-center gap-3 text-red-600 text-sm">
+            <ShieldOff size={20} className="flex-shrink-0" />
+            {erro}
+          </div>
+        )}
+
+        {dados && (
+          <>
+            {/* KPIs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              <KpiCard
+                label="Total Arrecadado"
+                valor={formatBRL(dados.kpis.total_arrecadado)}
+                desc="todas as doações confirmadas"
+                icone={DollarSign}
+                cor="#0f4c5c"
+              />
+              <KpiCard
+                label="Doações do Mês"
+                valor={formatBRL(dados.kpis.doacoes_mes)}
+                desc={`desde 01/${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}`}
+                icone={TrendingUp}
+                cor="#0891b2"
+              />
+              <KpiCard
+                label="Membros Ativos"
+                valor={dados.kpis.apoiadores_ativos}
+                desc="com status Ativo"
+                icone={Users}
+                cor="#7c3aed"
+              />
+              <KpiCard
+                label="Gastos do Mês"
+                valor={formatBRL(dados.kpis.gastos_mes)}
+                desc="despesas pagas no mês"
+                icone={Receipt}
+                cor="#f97316"
+                onClick={() => setGastosModal(true)}
+              />
             </div>
-          </section>
 
-          {/* Gráficos */}
-          {dadosGraficoCampanhas.length > 0 && (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              {/* Bar: Arrecadado vs Meta */}
-              <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-5">
-                <h2 className="text-sm font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-                  <TrendingUp size={15} style={{ color: '#0f4c5c' }} />
-                  Arrecadado vs Meta por Campanha
-                </h2>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={dadosGraficoCampanhas} barGap={4}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
-                    <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
-                    <Tooltip
-                      formatter={(v) => formatBRL(v)}
-                      contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
-                    />
-                    <Bar dataKey="arrecadado" name="Arrecadado" fill="#0f4c5c" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="meta" name="Meta" fill="#f97316" opacity={0.5} radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+            {/* Campanhas em Andamento */}
+            <section>
+              <h2 className="text-base font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
+                <Megaphone size={16} style={{ color: '#f97316' }} />
+                Campanhas em Andamento
+                <span className="text-xs font-normal text-[var(--text-muted)]">— clique para detalhes e PIX</span>
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {dados.campanhas.map((c, i) => {
+                  const cor = CORES_CAMPANHA[i % CORES_CAMPANHA.length]
+                  return (
+                    <div
+                      key={c.id}
+                      className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-5 cursor-pointer hover:shadow-md hover:border-[var(--text-muted)] transition-all"
+                      onClick={() => setCampanhaModal(c)}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <h3 className="font-semibold text-[var(--text-primary)] leading-snug pr-2">{c.titulo}</h3>
+                        <span className="text-lg font-bold flex-shrink-0" style={{ color: cor }}>
+                          {c.percentual_progresso}%
+                        </span>
+                      </div>
+                      <BarraProgresso percentual={c.percentual_progresso} cor={cor} />
+                      <div className="flex justify-between mt-3 text-sm">
+                        <div>
+                          <p className="text-xs text-[var(--text-muted)]">Arrecadado</p>
+                          <p className="font-bold text-[var(--text-primary)]">{formatBRL(c.valor_arrecadado)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-[var(--text-muted)]">Meta</p>
+                          <p className="font-semibold text-[var(--text-secondary)]">{formatBRL(c.meta_valor)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+                {dados.campanhas.length === 0 && (
+                  <p className="col-span-2 text-center py-10 text-[var(--text-muted)] text-sm">
+                    Nenhuma campanha ativa no momento.
+                  </p>
+                )}
               </div>
+            </section>
 
-              {/* Pie: Distribuição */}
-              {dadosPie.length > 0 && (
+            {/* Gráficos */}
+            {dadosGraficoCampanhas.length > 0 && (
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                {/* Bar: Arrecadado vs Meta — altura dinâmica */}
                 <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-5">
                   <h2 className="text-sm font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-                    <Receipt size={15} style={{ color: '#7c3aed' }} />
-                    Distribuição de Arrecadação
+                    <TrendingUp size={15} style={{ color: '#0f4c5c' }} />
+                    Arrecadado vs Meta por Campanha
                   </h2>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <PieChart>
-                      <Pie
-                        data={dadosPie}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={85}
-                        paddingAngle={3}
-                        dataKey="value"
-                      >
-                        {dadosPie.map((entry, i) => (
-                          <Cell key={i} fill={entry.fill} />
-                        ))}
-                      </Pie>
+                  <ResponsiveContainer width="100%" height={chartHeight}>
+                    <BarChart data={dadosGraficoCampanhas} barGap={4}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
+                      <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
                       <Tooltip
-                        formatter={(v) => formatBRL(v)}
+                        formatter={v => formatBRL(v)}
                         contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
                       />
-                      <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                    </PieChart>
+                      <Bar dataKey="arrecadado" name="Arrecadado" fill="#0f4c5c" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="meta" name="Meta" fill="#f97316" opacity={0.5} radius={[4, 4, 0, 0]} />
+                    </BarChart>
                   </ResponsiveContainer>
                 </div>
-              )}
-            </div>
-          )}
 
-          {/* Doações Recentes */}
-          <section>
-            <h2 className="text-base font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-              <DollarSign size={16} style={{ color: '#0f4c5c' }} />
-              Doações Recentes
-              <span className="text-xs font-normal text-[var(--text-muted)] ml-1">
-                (nomes parcialmente anonimizados)
-              </span>
-            </h2>
-            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--border)]">
-                    <th className="text-left text-xs font-medium text-[var(--text-muted)] px-5 py-3">Doador</th>
-                    <th className="text-left text-xs font-medium text-[var(--text-muted)] px-5 py-3">Campanha</th>
-                    <th className="text-right text-xs font-medium text-[var(--text-muted)] px-5 py-3">Valor</th>
-                    <th className="text-left text-xs font-medium text-[var(--text-muted)] px-5 py-3">Data</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border-subtle)]">
-                  {dados.doacoes_recentes.map((d, i) => (
-                    <tr key={i} className="hover:bg-[var(--bg-hover)] transition-colors">
-                      <td className="px-5 py-3 font-medium text-[var(--text-primary)]">{d.doador}</td>
-                      <td className="px-5 py-3 text-[var(--text-secondary)]">
-                        {d.campanha || <span className="text-[var(--text-muted)]">—</span>}
-                      </td>
-                      <td className="px-5 py-3 text-right font-semibold text-[var(--text-primary)]">
-                        {formatBRL(d.valor)}
-                      </td>
-                      <td className="px-5 py-3 text-[var(--text-secondary)]">{formatData(d.data)}</td>
-                    </tr>
-                  ))}
-                  {dados.doacoes_recentes.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="px-5 py-10 text-center text-[var(--text-muted)] text-sm">
-                        Nenhuma doação registrada ainda.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
+                {/* Pie: Distribuição */}
+                {dadosPie.length > 0 && (
+                  <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-5">
+                    <h2 className="text-sm font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+                      <Receipt size={15} style={{ color: '#7c3aed' }} />
+                      Distribuição de Arrecadação
+                    </h2>
+                    <ResponsiveContainer width="100%" height={chartHeight}>
+                      <PieChart>
+                        <Pie data={dadosPie} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
+                          {dadosPie.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                        </Pie>
+                        <Tooltip
+                          formatter={v => formatBRL(v)}
+                          contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
+                        />
+                        <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </div>
+            )}
 
-          {/* Rodapé informativo */}
-          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-5 flex items-start gap-3 text-sm text-[var(--text-muted)]">
-            <HeartHandshake size={18} className="flex-shrink-0 mt-0.5" style={{ color: '#0f4c5c' }} />
-            <p>
-              Todos os dados exibidos são públicos e atualizados em tempo real.
-              Esta página reflete o compromisso da organização com a transparência e prestação de contas à comunidade.
-            </p>
-          </div>
-        </>
-      )}
-    </div>
+            {/* Doações Recentes */}
+            <section>
+              <h2 className="text-base font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
+                <DollarSign size={16} style={{ color: '#0f4c5c' }} />
+                Doações Recentes
+                <span className="text-xs font-normal text-[var(--text-muted)] ml-1">(nomes parcialmente anonimizados)</span>
+              </h2>
+              <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--border)]">
+                      <th className="text-left text-xs font-medium text-[var(--text-muted)] px-5 py-3">Doador</th>
+                      <th className="text-left text-xs font-medium text-[var(--text-muted)] px-5 py-3">Campanha</th>
+                      <th className="text-right text-xs font-medium text-[var(--text-muted)] px-5 py-3">Valor</th>
+                      <th className="text-left text-xs font-medium text-[var(--text-muted)] px-5 py-3">Data</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border-subtle)]">
+                    {dados.doacoes_recentes.map((d, i) => (
+                      <tr key={i} className="hover:bg-[var(--bg-hover)] transition-colors">
+                        <td className="px-5 py-3 font-medium text-[var(--text-primary)]">{d.doador}</td>
+                        <td className="px-5 py-3 text-[var(--text-secondary)]">
+                          {d.campanha || <span className="text-[var(--text-muted)]">—</span>}
+                        </td>
+                        <td className="px-5 py-3 text-right font-semibold text-[var(--text-primary)]">{formatBRL(d.valor)}</td>
+                        <td className="px-5 py-3 text-[var(--text-secondary)]">{formatData(d.data)}</td>
+                      </tr>
+                    ))}
+                    {dados.doacoes_recentes.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-5 py-10 text-center text-[var(--text-muted)] text-sm">
+                          Nenhuma doação registrada ainda.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            {/* Rodapé informativo */}
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-5 flex items-start gap-3 text-sm text-[var(--text-muted)]">
+              <HeartHandshake size={18} className="flex-shrink-0 mt-0.5" style={{ color: '#0f4c5c' }} />
+              <p>
+                Todos os dados exibidos são públicos e atualizados em tempo real.
+                Esta página reflete o compromisso da organização com a transparência e prestação de contas à comunidade.
+              </p>
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Footer */}
       <footer className="border-t border-[var(--border)] bg-[var(--bg-card)] mt-12">
@@ -345,6 +602,21 @@ export default function Transparencia() {
           </Link>
         </div>
       </footer>
+
+      {/* Modals */}
+      {donationModal && (
+        <DonationModal campanhas={dados?.campanhas ?? []} onFechar={() => setDonationModal(false)} />
+      )}
+      {gastosModal && dados && (
+        <GastosModal
+          lista={dados.gastos_mes_lista ?? []}
+          total={dados.kpis.gastos_mes}
+          onFechar={() => setGastosModal(false)}
+        />
+      )}
+      {campanhaModal && (
+        <CampanhaModal campanha={campanhaModal} onFechar={() => setCampanhaModal(null)} />
+      )}
     </div>
   )
 }
